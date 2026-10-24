@@ -28,7 +28,15 @@ OutputBaseFilename=WhoKey Installer
 SetupIconFile=gui\assets\WhoKey.ico
 UninstallDisplayIcon={app}\WhoKey.exe
 UninstallDisplayName=WhoKey
-WizardStyle=modern
+; оформление в стиле приложения (нужен Inno Setup 6.7+): тёмная тема, фон с
+; фиолетовым заревом, логотип; картинки рисует gui/assets/make_installer_art.py
+WizardStyle=modern dark
+WizardBackColor=#0a0a0c
+WizardBackImageFile=gui\assets\installer\back1x.png,gui\assets\installer\back2x.png,gui\assets\installer\back3x.png
+WizardImageFile=gui\assets\installer\side1x.png,gui\assets\installer\side2x.png,gui\assets\installer\side3x.png
+WizardSmallImageFile=gui\assets\installer\small55.png,gui\assets\installer\small83.png,gui\assets\installer\small110.png,gui\assets\installer\small165.png
+; страница приветствия (в Inno Setup 6 выключена по умолчанию) — на ней логотип слева
+DisableWelcomePage=no
 Compression=lzma2/max
 SolidCompression=yes
 

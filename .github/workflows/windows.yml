@@ -42,8 +42,10 @@ jobs:
       - name: Build installer (Inno Setup)
         shell: pwsh
         run: |
+          # оформлению нужен Inno Setup 6.7+ — ставим/обновляем до последней версии
+          choco upgrade innosetup -y --no-progress
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          Write-Host "Inno Setup: $((Get-Item $iscc).VersionInfo.ProductVersion)"
           & $iscc /Q installer.iss
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
 
@@ -65,6 +67,32 @@ jobs:
           Start-Sleep -Seconds 3
           if (Test-Path $exe) { throw "uninstall left WhoKey.exe behind" }
           Write-Host "install / run / uninstall OK"
+
+      - name: Screenshots of the installer pages
+        continue-on-error: true   # снимки — для глаз, сборку не валят
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          New-Item -ItemType Directory -Force shots | Out-Null
+          function Snap($name) {
+            $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+            $bmp.Save("shots\installer_$name.png")
+          }
+          $p = Start-Process -FilePath "dist\WhoKey Installer.exe" -ArgumentList "/LANG=ru","/CURRENTUSER" -PassThru
+          $ws = New-Object -ComObject WScript.Shell
+          # приветствие → папка → ярлыки → готово к установке → (установка) → завершение
+          foreach ($page in 1..5) {
+            Start-Sleep -Seconds 4
+            Snap $page
+            $null = $ws.AppActivate($p.Id)
+            Start-Sleep -Milliseconds 300
+            $ws.SendKeys("{ENTER}")
+          }
+          Start-Sleep -Seconds 4
+          Get-Process WhoKey -ErrorAction SilentlyContinue | Stop-Process
+          if (-not $p.HasExited) { Stop-Process -Id $p.Id }
 
       - uses: actions/upload-artifact@v4
         with:
