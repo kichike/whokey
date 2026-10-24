@@ -4,7 +4,8 @@
 Цвета взяты из CSS-переменных сайта (--bg, --surf, --acc и т.д.);
 лавандовые оттенки сдвинуты на 15° к розовому (по просьбе).
 Ступенчатые «пиксельные» углы сайт делает через clip-path браузера —
-в Qt такого нет, поэтому углы прямые, с тонкой рамкой.
+в Qt такого нет, поэтому углы прямые, с тонкой рамкой. Кнопки — скруглённые
+(по просьбе), радиус в BUTTON_RADIUS.
 """
 
 from pathlib import Path
@@ -16,6 +17,7 @@ from PySide6.QtWidgets import QAbstractSpinBox, QGraphicsDropShadowEffect, QLine
 FONT_FILE = Path(__file__).parent / "fonts" / "InterVariable.ttf"  # лицензия OFL — fonts/LICENSE.txt
 # в оформлении Qt путь пишется через «/» даже на Windows
 CHECK_FILE = (Path(__file__).parent / "assets" / "check.svg").as_posix()
+ARROW_FILE = (Path(__file__).parent / "assets" / "arrow.svg").as_posix()
 ICON_FILE = Path(__file__).parent / "assets" / "icon.png"
 
 # --- цвета (имена — как переменные на сайте) ---
@@ -45,6 +47,8 @@ BAD_INK = "#ff8a95"
 BAD_FILL = "#261a1d"
 BAD_RIM = "#7d3d46"
 
+BUTTON_RADIUS = 10  # скругление кнопок, px
+
 STYLE = f"""
 QWidget {{ color: {TEXT}; font-size: 13px; }}
 /* фиолетовое зарево сверху окна — как неоновая подсветка */
@@ -66,8 +70,8 @@ QLineEdit, QSpinBox {{
 QLineEdit:focus, QSpinBox:focus {{ border-color: {ACC}; }}
 
 QPushButton {{
-    background: {RAISED}; border: 1px solid {RAISED_RIM}; padding: 7px 16px;
-    font-weight: 600; }}
+    background: {RAISED}; border: 1px solid {RAISED_RIM}; border-radius: {BUTTON_RADIUS}px;
+    padding: 7px 16px; font-weight: 600; }}
 QPushButton:hover {{ border-color: {LINE3}; }}
 QPushButton:pressed {{ background: {WELL}; }}
 QPushButton:disabled {{ color: {FAINT}; border-color: {LINE}; }}
@@ -75,12 +79,17 @@ QPushButton[kind="primary"] {{ background: {ACC_FILL}; border-color: {ACC}; colo
 QPushButton[kind="primary"]:hover {{ background: {ACC_HOVER}; border-color: {NEON}; color: #ffffff; }}
 QPushButton[kind="danger"] {{ background: {BAD_FILL}; border-color: {BAD_RIM}; color: {BAD_INK}; }}
 
-QToolButton {{ background: {RAISED}; border: 1px solid {RAISED_RIM}; padding: 5px 8px; }}
+QToolButton {{ background: {RAISED}; border: 1px solid {RAISED_RIM}; border-radius: {BUTTON_RADIUS}px;
+              padding: 5px 8px; }}
 QToolButton:hover {{ border-color: {LINE3}; }}
 QToolButton:checked {{ background: {ACC_FILL}; border-color: {ACC_DEEP}; }}
 
-QComboBox {{ background: {RAISED}; border: 1px solid {RAISED_RIM}; padding: 5px 10px; }}
+QComboBox {{ background: {RAISED}; border: 1px solid {RAISED_RIM}; border-radius: {BUTTON_RADIUS}px;
+            padding: 5px 10px; }}
 QComboBox:hover {{ border-color: {LINE3}; }}
+/* без этого плашка под стрелкой остаётся квадратной и вылезает за скругление */
+QComboBox::drop-down {{ border: none; width: 24px; }}
+QComboBox::down-arrow {{ image: url("{ARROW_FILE}"); width: 12px; height: 12px; }}
 QComboBox QAbstractItemView {{
     background: {TIP}; border: 1px solid {TIP_RIM};
     selection-background-color: {ACC_FILL}; selection-color: {ACC_LIGHT}; }}

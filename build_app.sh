@@ -20,6 +20,7 @@ rm -rf "$BUILD"  # старой сборки не остаётся — нече�
   --name WhoKey --icon "$P/gui/assets/WhoKey.icns" --osx-bundle-identifier ru.edu.whokey \
   --add-data "$P/gui/fonts:gui/fonts" \
   --add-data "$P/gui/assets/check.svg:gui/assets" \
+  --add-data "$P/gui/assets/arrow.svg:gui/assets" \
   --add-data "$P/gui/assets/icon.png:gui/assets" \
   --paths "$P" \
   --exclude-module tkinter --exclude-module matplotlib --exclude-module pandas --exclude-module numpy \
