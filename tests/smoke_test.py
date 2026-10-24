@@ -19,6 +19,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")  # окна рисуются в памяти, без экрана
+sys.stdout.reconfigure(encoding="utf-8")  # консоль Windows по умолчанию cp1252 — русские буквы не печатаются
 
 import vault as V  # noqa: E402
 
