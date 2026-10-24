@@ -1,8 +1,10 @@
 """Копирование пароля в буфер обмена с автоочисткой.
 
-Используются встроенные команды системы: pbcopy/pbpaste на Mac,
-PowerShell на Windows. Пароль передаётся им через стандартный ввод,
-а не в командной строке — иначе его было бы видно в списке процессов.
+На Mac — встроенные команды системы (osascript, pbcopy/pbpaste). Пароль
+передаётся им через стандартный ввод, а не в командной строке — иначе его
+было бы видно в списке процессов. На Windows — прямые вызовы системы
+(user32.dll через ctypes): без PowerShell, который мигал бы окном консоли
+и портил русские буквы.
 
 Риск, о котором стоит помнить: пока пароль в буфере, его может прочитать
 любая программа, а на Mac буфер может синхронизироваться на iPhone/iPad
@@ -14,6 +16,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 
 CLEAR_AFTER = 30  # секунд
 
@@ -59,8 +62,7 @@ def _write(text):
                 pass  # не вышло — обычное копирование (без пометок) лучше, чем никакого
         _run(["pbcopy"], text)
     elif sys.platform == "win32":
-        # Set-Clipboard корректно понимает русские буквы, в отличие от clip
-        _run(["powershell", "-NoProfile", "-Command", "$input | Set-Clipboard"], text)
+        _win_write(text)
     else:
         raise OSError("clipboard is not supported on this system")
 
@@ -69,8 +71,102 @@ def _read():
     if sys.platform == "darwin":
         return _run(["pbpaste"])
     if sys.platform == "win32":
-        return _run(["powershell", "-NoProfile", "-Command", "Get-Clipboard"]).rstrip("\r\n")
+        return _win_read()
     return ""
+
+
+# --- Windows ---
+
+CF_UNICODETEXT = 13
+# Пометки для Windows 10/11 (так же делает KeePassXC): не записывать текст
+# в журнал буфера (Win+V), не отправлять в облачный буфер на другие устройства
+# и не показывать программам-«наблюдателям» за буфером.
+_WIN_PRIVATE_FORMATS = ("ExcludeClipboardContentFromMonitorProcessing",
+                        "CanIncludeInClipboardHistory", "CanUploadToCloudClipboard")
+
+
+def _win_api():
+    import ctypes
+    from ctypes import wintypes
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    # типы обязательно: без них 64-битные указатели обрезались бы до 32 бит
+    user32.OpenClipboard.argtypes = [wintypes.HWND]
+    user32.OpenClipboard.restype = wintypes.BOOL
+    user32.CloseClipboard.restype = wintypes.BOOL
+    user32.EmptyClipboard.restype = wintypes.BOOL
+    user32.SetClipboardData.argtypes = [wintypes.UINT, wintypes.HANDLE]
+    user32.SetClipboardData.restype = wintypes.HANDLE
+    user32.GetClipboardData.argtypes = [wintypes.UINT]
+    user32.GetClipboardData.restype = wintypes.HANDLE
+    user32.RegisterClipboardFormatW.argtypes = [wintypes.LPCWSTR]
+    user32.RegisterClipboardFormatW.restype = wintypes.UINT
+    kernel32.GlobalAlloc.argtypes = [wintypes.UINT, ctypes.c_size_t]
+    kernel32.GlobalAlloc.restype = wintypes.HGLOBAL
+    kernel32.GlobalLock.argtypes = [wintypes.HGLOBAL]
+    kernel32.GlobalLock.restype = ctypes.c_void_p
+    kernel32.GlobalUnlock.argtypes = [wintypes.HGLOBAL]
+    kernel32.GlobalFree.argtypes = [wintypes.HGLOBAL]
+    return ctypes, user32, kernel32
+
+
+def _win_open(user32):
+    # буфер мог на мгновение занять другая программа — пробуем несколько раз
+    for _ in range(20):
+        if user32.OpenClipboard(None):
+            return
+        time.sleep(0.025)
+    raise OSError("clipboard is busy")
+
+
+def _win_put(ctypes, user32, kernel32, fmt, data):
+    """Кладёт байты data в буфер в формате fmt (буфер уже открыт)."""
+    handle = kernel32.GlobalAlloc(0x0002, len(data))  # GMEM_MOVEABLE
+    if not handle:
+        raise OSError("GlobalAlloc failed")
+    pointer = kernel32.GlobalLock(handle)
+    ctypes.memmove(pointer, data, len(data))
+    kernel32.GlobalUnlock(handle)
+    if not user32.SetClipboardData(fmt, handle):
+        kernel32.GlobalFree(handle)  # память осталась нашей — освобождаем сами
+        raise OSError("SetClipboardData failed")
+    # после успешного SetClipboardData памятью владеет Windows — не освобождаем
+
+
+def _win_write(text):
+    ctypes, user32, kernel32 = _win_api()
+    _win_open(user32)
+    try:
+        if not user32.EmptyClipboard():
+            raise OSError("EmptyClipboard failed")
+        if text:
+            _win_put(ctypes, user32, kernel32, CF_UNICODETEXT, (text + "\0").encode("utf-16-le"))
+            for name in _WIN_PRIVATE_FORMATS:
+                # значение 0 (4 байта) = «нельзя»; для первой пометки важен сам факт.
+                # Не вышло — не страшно: пароль уже в буфере, и если бы мы сообщили
+                # «не скопировано», таймер очистки не запустился бы
+                try:
+                    _win_put(ctypes, user32, kernel32, user32.RegisterClipboardFormatW(name), bytes(4))
+                except OSError:
+                    pass
+    finally:
+        user32.CloseClipboard()
+
+
+def _win_read():
+    ctypes, user32, kernel32 = _win_api()
+    _win_open(user32)
+    try:
+        handle = user32.GetClipboardData(CF_UNICODETEXT)
+        if not handle:
+            return ""
+        pointer = kernel32.GlobalLock(handle)
+        try:
+            return ctypes.wstring_at(pointer)
+        finally:
+            kernel32.GlobalUnlock(handle)
+    finally:
+        user32.CloseClipboard()
 
 
 class Clipboard:

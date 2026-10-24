@@ -1,0 +1,76 @@
+# Сборка WhoKey для Windows на компьютере GitHub (у нас самих Windows нет).
+# Шаги: проверки → WhoKey.exe → проверка, что .exe запускается → установщик →
+# тихая установка, запуск установленной программы и удаление.
+# Результат (установщик и снимки окон) — во вкладке Actions, раздел Artifacts.
+name: Windows build
+
+on:
+  workflow_dispatch:       # запуск вручную: Actions → Windows build → Run workflow
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"   # та же версия, что на Mac
+
+      - name: Install libraries
+        run: python -m pip install -r requirements.txt
+
+      - name: Smoke test (vault, clipboard, windows)
+        run: python tests/smoke_test.py shots
+
+      - name: Build WhoKey.exe
+        run: python build_windows.py
+
+      - name: Check that WhoKey.exe starts and keeps running
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist\WhoKey\WhoKey.exe" -PassThru
+          Start-Sleep -Seconds 10
+          if ($p.HasExited) { throw "WhoKey.exe exited with code $($p.ExitCode)" }
+          Stop-Process -Id $p.Id
+          Write-Host "WhoKey.exe is running fine"
+
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          & $iscc /Q installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+
+      - name: Install silently, run, uninstall
+        shell: pwsh
+        run: |
+          $setup = Start-Process -FilePath "dist\WhoKey Installer.exe" -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/CURRENTUSER" -PassThru -Wait
+          if ($setup.ExitCode -ne 0) { throw "installer exited with code $($setup.ExitCode)" }
+          $exe = "$env:LOCALAPPDATA\Programs\WhoKey\WhoKey.exe"
+          if (-not (Test-Path $exe)) { throw "WhoKey.exe not installed" }
+          $shortcut = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\WhoKey.lnk"
+          if (-not (Test-Path $shortcut)) { throw "Start menu shortcut missing" }
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) { throw "installed WhoKey exited with code $($p.ExitCode)" }
+          Stop-Process -Id $p.Id
+          Start-Sleep -Seconds 2
+          $un = Start-Process -FilePath "$env:LOCALAPPDATA\Programs\WhoKey\unins000.exe" -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES" -PassThru -Wait
+          Start-Sleep -Seconds 3
+          if (Test-Path $exe) { throw "uninstall left WhoKey.exe behind" }
+          Write-Host "install / run / uninstall OK"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WhoKey-Windows
+          path: dist/WhoKey Installer.exe
+
+      - uses: actions/upload-artifact@v4
+        if: always()             # снимки окон нужны и когда что-то упало
+        with:
+          name: screenshots
+          path: shots/

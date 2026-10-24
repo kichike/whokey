@@ -75,3 +75,10 @@ for size in (16, 32, 128, 256, 512):
 subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(HERE / "WhoKey.icns")], check=True)
 shutil.rmtree(iconset)
 print("WhoKey.icns готов")
+
+# иконка для Windows: один .ico со всеми размерами, которые берёт Проводник
+# (Pillow ставится вместе с matplotlib в окружении проекта)
+from PIL import Image  # noqa: E402
+
+Image.open(HERE / "icon.png").save(HERE / "WhoKey.ico", sizes=[(s, s) for s in (16, 24, 32, 48, 64, 128, 256)])
+print("WhoKey.ico готов")
