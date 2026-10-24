@@ -12,6 +12,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"   # иначе Python в консоли Windows (cp1252) не печатает русские буквы
     steps:
       - uses: actions/checkout@v4
 
