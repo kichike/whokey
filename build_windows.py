@@ -28,6 +28,7 @@ args = [
     # картинки, которые нужны окнам: галочка, стрелки, «глаз», иконка окна
     *[arg for svg in sorted(ASSETS.glob("*.svg")) for arg in data(svg, "gui/assets")],
     *data(ASSETS / "icon.png", "gui/assets"),
+    *data(ASSETS / "WhoKey.ico", "gui/assets"),  # иконка окна на панели задач
     "--paths", str(HERE),
     "--exclude-module", "tkinter", "--exclude-module", "matplotlib",
     "--exclude-module", "pandas", "--exclude-module", "numpy",

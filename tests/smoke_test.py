@@ -105,6 +105,11 @@ app = QApplication([])
 from gui import theme  # noqa: E402
 
 theme.apply(app)
+from PySide6.QtGui import QIcon  # noqa: E402
+
+window_icon = QIcon(str(theme.ICON_FILE))
+check(not window_icon.isNull() and window_icon.availableSizes(),
+      f"иконка окна загружается ({theme.ICON_FILE.name}, размеров: {len(window_icon.availableSizes())})")
 import gui.dialogs as Dg  # noqa: E402
 import gui.login as L  # noqa: E402
 import gui.main_window as MW  # noqa: E402

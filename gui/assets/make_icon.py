@@ -77,8 +77,12 @@ shutil.rmtree(iconset)
 print("WhoKey.icns готов")
 
 # иконка для Windows: один .ico со всеми размерами, которые берёт Проводник
-# (Pillow ставится вместе с matplotlib в окружении проекта)
+# (Pillow ставится вместе с matplotlib в окружении проекта). Без полей macOS:
+# там плитка — 80% холста, а на Windows иконки занимают почти весь холст, и с
+# полями наша выглядела мельче соседних. Оставляем лишь тонкую кромку.
 from PIL import Image  # noqa: E402
 
-Image.open(HERE / "icon.png").save(HERE / "WhoKey.ico", sizes=[(s, s) for s in (16, 24, 32, 48, 64, 128, 256)])
+edge = (CANVAS - TILE) // 2 - 12
+Image.open(HERE / "icon.png").crop((edge, edge, CANVAS - edge, CANVAS - edge)).save(
+    HERE / "WhoKey.ico", sizes=[(s, s) for s in (16, 24, 32, 48, 64, 128, 256)])
 print("WhoKey.ico готов")

@@ -9,6 +9,7 @@
 родных элементов, в Qt его нет — поэтому стекло нарисовано прозрачностью.
 """
 
+import sys
 import traceback
 from pathlib import Path
 
@@ -24,7 +25,8 @@ ARROW_FILE = (Path(__file__).parent / "assets" / "arrow.svg").as_posix()
 ARROW_UP_FILE = (Path(__file__).parent / "assets" / "arrow_up.svg").as_posix()
 EYE_FILE = str(Path(__file__).parent / "assets" / "eye.svg")
 EYE_OFF_FILE = str(Path(__file__).parent / "assets" / "eye_off.svg")
-ICON_FILE = Path(__file__).parent / "assets" / "icon.png"
+# иконка окна: на Windows — .ico без полей macOS (с полями на панели задач она мельче соседних)
+ICON_FILE = Path(__file__).parent / "assets" / ("WhoKey.ico" if sys.platform == "win32" else "icon.png")
 
 # --- цвета (имена — как переменные на сайте) ---
 BG = "#0a0a0c"         # фон окна
