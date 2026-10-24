@@ -4,7 +4,7 @@
 
 <h1 align="center">WhoKey</h1>
 
-<p align="center">A small password manager for macOS · Простой менеджер паролей для macOS</p>
+<p align="center">A small password manager for macOS and Windows · Простой менеджер паролей для macOS и Windows</p>
 
 <p align="center"><a href="#english">English</a> · <a href="#русский">Русский</a></p>
 
@@ -17,23 +17,30 @@ WhoKey keeps your logins in one encrypted file that only opens with your master 
 ### Features
 
 - **Encryption:** the key is derived from the master password with Argon2id, and entries are encrypted with Fernet (the `cryptography` library). Nothing is stored in plain text.
-- **Clipboard:** copied passwords are wiped after 30 seconds and when the app quits — a draining neon bar shows how much time is left. macOS clipboard history apps are told not to remember them.
+- **Clipboard:** copied passwords are wiped after 30 seconds and when the app quits — a draining neon bar shows how much time is left. Clipboard history (Win+V, Raycast, Maccy…) and cloud clipboard are told to skip them.
 - **Hidden by default:** a password you reveal hides itself again after 15 seconds.
 - **Password generator** with length, letters, digits and symbols, plus a rough strength meter.
 - **Search,** and right-click actions on any entry: show, copy password, copy login, edit, delete.
 - **Backup copy:** a hidden backup sits next to the vault, so you only see one file. If the vault gets damaged, WhoKey offers to restore it.
 - **English and Russian** interface.
 
-Your vault lives in `~/Library/Application Support/EduPasswords/vault.dat`, which is not synced to iCloud.
+By default the vault lives in `~/Library/Application Support/EduPasswords/vault.dat` on macOS (not synced to iCloud) and in `%APPDATA%\EduPasswords\vault.dat` on Windows. You can choose another file in the login window.
 
 > ⚠️ The master password **cannot be recovered**. If you forget it, the vault is gone.
 > WhoKey is a hobby app that has not had a professional security audit. For important accounts, an established manager such as Bitwarden or KeePassXC is a safer choice.
 
 ### Install
 
-1. Download **WhoKey Installer.dmg** from [Releases](../../releases).
-2. Open it and drag WhoKey into **Applications**.
-3. The app is not notarized by Apple, so macOS blocks the first launch. Go to **System Settings → Privacy & Security** and click **Open Anyway**.
+Download the installer from [Releases](../../releases).
+
+**macOS (Apple Silicon):**
+1. Open **WhoKey Installer.dmg** and drag WhoKey into **Applications**.
+2. The app is not notarized by Apple, so macOS blocks the first launch. Go to **System Settings → Privacy & Security** and click **Open Anyway**.
+
+**Windows 10/11 (64-bit):**
+1. Run **WhoKey Installer.exe**. No administrator rights needed.
+2. The installer is not code-signed, so Windows SmartScreen may warn you. Click **More info → Run anyway**.
+3. WhoKey appears in the Start menu. Uninstall it from **Settings → Apps**; your vault is kept.
 
 ### Run from source
 
@@ -45,7 +52,9 @@ python3 -m venv .venv
 .venv/bin/python app.py
 ```
 
-To build `WhoKey.app` and the installer yourself, run `./build_dmg.sh`. The installer appears in `dist/`.
+On Windows, use `.venv\Scripts\python app.py`.
+
+To build the installers yourself: on macOS run `./build_dmg.sh`; on Windows run `python build_windows.py`, then compile `installer.iss` with [Inno Setup](https://jrsoftware.org/isinfo.php). Both appear in `dist/`. GitHub Actions builds and tests the Windows version automatically.
 
 ---
 
@@ -56,23 +65,30 @@ WhoKey хранит логины и пароли в одном зашифров�
 ### Возможности
 
 - **Шифрование:** ключ получается из мастер-пароля через Argon2id, записи шифруются Fernet (библиотека `cryptography`). Ничего не хранится открытым текстом.
-- **Буфер обмена:** скопированный пароль стирается через 30 секунд и при выходе из программы, неоновая полоска показывает, сколько осталось. Программам истории буфера macOS запрещено его запоминать.
+- **Буфер обмена:** скопированный пароль стирается через 30 секунд и при выходе из программы, неоновая полоска показывает, сколько осталось. Журналу буфера (Win+V, Raycast, Maccy…) и облачному буферу запрещено его запоминать.
 - **Пароли скрыты:** показанный пароль сам прячется через 15 секунд.
 - **Генератор паролей:** длина, буквы, цифры, символы и примерная шкала надёжности.
 - **Поиск** и действия с записью по правому клику: показать, скопировать пароль или логин, изменить, удалить.
 - **Резервная копия:** скрытая копия лежит рядом с хранилищем, так что в папке виден один файл. Если хранилище испортится, WhoKey предложит восстановить его.
 - Интерфейс на **русском и английском**.
 
-Хранилище лежит в `~/Library/Application Support/EduPasswords/vault.dat`. Эта папка не синхронизируется с iCloud.
+По умолчанию хранилище лежит в `~/Library/Application Support/EduPasswords/vault.dat` на macOS (эта папка не синхронизируется с iCloud) и в `%APPDATA%\EduPasswords\vault.dat` на Windows. Другой файл можно выбрать в окне входа.
 
 > ⚠️ Мастер-пароль **нельзя восстановить**. Забыли его — хранилище не открыть.
 > WhoKey — любительская программа, профессиональной проверки безопасности она не проходила. Для важных аккаунтов надёжнее проверенные менеджеры, например Bitwarden или KeePassXC.
 
 ### Установка
 
-1. Скачайте **WhoKey Installer.dmg** в разделе [Releases](../../releases).
-2. Откройте его и перетащите WhoKey в «Программы».
-3. Приложение не заверено Apple, поэтому macOS заблокирует первый запуск. Откройте «Системные настройки → Конфиденциальность и безопасность» и нажмите «Всё равно открыть».
+Скачайте установщик в разделе [Releases](../../releases).
+
+**macOS (Apple Silicon):**
+1. Откройте **WhoKey Installer.dmg** и перетащите WhoKey в «Программы».
+2. Приложение не заверено Apple, поэтому macOS заблокирует первый запуск. Откройте «Системные настройки → Конфиденциальность и безопасность» и нажмите «Всё равно открыть».
+
+**Windows 10/11 (64-бит):**
+1. Запустите **WhoKey Installer.exe**. Права администратора не нужны.
+2. Установщик не подписан, поэтому Windows SmartScreen может предупредить. Нажмите «Подробнее → Выполнить в любом случае».
+3. WhoKey появится в меню «Пуск». Удалить его можно в «Параметры → Приложения»; хранилище при этом сохранится.
 
 ### Запуск из исходников
 
@@ -84,7 +100,9 @@ python3 -m venv .venv
 .venv/bin/python app.py
 ```
 
-Чтобы самому собрать `WhoKey.app` и установщик, запустите `./build_dmg.sh`. Установщик появится в папке `dist/`.
+На Windows: `.venv\Scripts\python app.py`.
+
+Чтобы самому собрать установщики: на macOS запустите `./build_dmg.sh`; на Windows — `python build_windows.py`, а потом соберите `installer.iss` в [Inno Setup](https://jrsoftware.org/isinfo.php). Оба появятся в папке `dist/`. Windows-версию GitHub Actions собирает и проверяет автоматически.
 
 ---
 
