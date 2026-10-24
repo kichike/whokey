@@ -9,15 +9,15 @@ from pathlib import Path
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel,
-                               QMessageBox, QPushButton, QVBoxLayout, QWidget)
+                               QPushButton, QVBoxLayout, QWidget)
 
 from generator import weakness_reasons
 from gui import theme
-from gui.widgets import PasswordField, StrengthBar, ask_yes, show_error, weakness_text
+from gui.widgets import PasswordField, StrengthBar, ask_yes, show_error, show_info, weakness_text
 import texts
 from texts import set_language, t
 from vault import (SaveError, Vault, VaultError, VaultLocked, WrongPassword, backup_path,
-                   in_icloud_folder, is_readable, lock, open_backup)
+                   in_icloud_folder, is_readable, lock, open_backup, tidy_old_files)
 
 MASTER_MIN_LENGTH = 12
 LANGUAGES = [("ru", "Русский"), ("en", "English")]
@@ -68,6 +68,7 @@ class LoginWindow(QWidget):
         column.addWidget(theme.role(QLabel(t("g_tagline")), "muted"))
         column.addLayout(self._file_row())
 
+        tidy_old_files(path)  # копия и замок от прежней версии — на новые места
         # state["create"] — человек нажал «Создать новое», хотя копия есть
         if path.exists():
             self._build_open(column)
@@ -88,10 +89,12 @@ class LoginWindow(QWidget):
         row = QHBoxLayout()
         row.addStretch()
         row.addWidget(QLabel(t("g_language")))
-        combo = QComboBox()
+        combo = theme.rounded_popup(QComboBox())
         for code, name in LANGUAGES:
             combo.addItem(name, code)
         combo.setCurrentIndex([code for code, _ in LANGUAGES].index(texts.LANG))
+        # отступы пунктов в оформлении Qt при расчёте ширины списка не учитывает — добавляем сами
+        combo.view().setMinimumWidth(combo.view().sizeHintForColumn(0) + 48)
         combo.currentIndexChanged.connect(lambda i: self._set_language(combo.itemData(i)))
         row.addWidget(combo)
         return row
@@ -198,7 +201,7 @@ class LoginWindow(QWidget):
         except SaveError as error:
             show_error(self, t("save_failed", error=error))
             return
-        QMessageBox.information(self, t("g_restore_title"), t("restored"))
+        show_info(self, t("g_restore_title"), t("restored"))
         self.opened.emit(vault)
 
     def _offer_restore(self, backup):
@@ -279,5 +282,5 @@ class LoginWindow(QWidget):
             notes.append(t("old_backup_kept", name=vault.old_backup.name))
         if in_icloud_folder(self.path):
             notes.append(t("g_icloud"))
-        QMessageBox.information(self, t("g_app_title"), "\n\n".join(notes))
+        show_info(self, t("g_app_title"), "\n\n".join(notes))
         self.opened.emit(vault)

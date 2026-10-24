@@ -48,7 +48,7 @@ TEXTS = {
         "missing_options": "1. Восстановить из резервной копии\n"
                            "2. Создать новое пустое хранилище (старая копия сохранится под другим именем)\n"
                            "0. Выход",
-        "old_backup_kept": "Старая резервная копия отложена как {name}.",
+        "old_backup_kept": "Старая резервная копия отложена как {name} (скрытый файл рядом с хранилищем).",
         "enter_master": "Мастер-пароль: ",
         "wrong_password": "Неверный мастер-пароль.",
         "too_many": "Слишком много неудачных попыток. Программа закрывается.\n"
@@ -177,7 +177,7 @@ TEXTS = {
         "missing_options": "1. Restore from the backup\n"
                            "2. Create a new empty vault (the old backup will be kept under another name)\n"
                            "0. Exit",
-        "old_backup_kept": "The old backup was set aside as {name}.",
+        "old_backup_kept": "The old backup was set aside as {name} (a hidden file next to the vault).",
         "enter_master": "Master password: ",
         "wrong_password": "Wrong master password.",
         "too_many": "Too many failed attempts. Exiting.\n"
@@ -319,11 +319,14 @@ GUI_TEXTS = {
         "g_change_master": "Сменить мастер-пароль",
         "g_col_updated": "Изменено",
         "g_status_entries": "Записей: {n}",
-        "g_copied": "Пароль скопирован — буфер очистится через {sec} с.",
+        "g_countdown": "Пароль в буфере · {sec} с",
         "g_clipboard_cleared": "Буфер обмена очищен.",
         "g_select_entry": "Сначала выберите запись в таблице.",
         "g_delete_title": "Удаление",
         "g_delete_question": "Удалить «{site}» ({login})?\nЭто нельзя отменить.",
+        "g_delete_question_nologin": "Удалить «{site}»?\nЭто нельзя отменить.",
+        "g_yes": "Да",
+        "g_no": "Нет",
         "g_error_title": "Ошибка",
         "g_saved": "Сохранено.",
         "g_clear_note": "Скопированный пароль удалится из буфера обмена через {sec} с.",
@@ -397,11 +400,14 @@ GUI_TEXTS = {
         "g_change_master": "Change master password",
         "g_col_updated": "Updated",
         "g_status_entries": "Entries: {n}",
-        "g_copied": "Password copied — the clipboard will be cleared in {sec} s.",
+        "g_countdown": "Password in clipboard · {sec} s",
         "g_clipboard_cleared": "Clipboard cleared.",
         "g_select_entry": "Select an entry in the table first.",
         "g_delete_title": "Delete",
         "g_delete_question": "Delete \"{site}\" ({login})?\nThis cannot be undone.",
+        "g_delete_question_nologin": "Delete \"{site}\"?\nThis cannot be undone.",
+        "g_yes": "Yes",
+        "g_no": "No",
         "g_error_title": "Error",
         "g_saved": "Saved.",
         "g_clear_note": "A copied password is removed from the clipboard after {sec} s.",

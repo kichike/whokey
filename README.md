@@ -17,11 +17,11 @@ WhoKey keeps your logins in one encrypted file that only opens with your master 
 ### Features
 
 - **Encryption:** the key is derived from the master password with Argon2id, and entries are encrypted with Fernet (the `cryptography` library). Nothing is stored in plain text.
-- **Clipboard:** copied passwords are wiped after 30 seconds and when the app quits. macOS clipboard history apps are told not to remember them.
+- **Clipboard:** copied passwords are wiped after 30 seconds and when the app quits — a draining neon bar shows how much time is left. macOS clipboard history apps are told not to remember them.
 - **Hidden by default:** a password you reveal hides itself again after 15 seconds.
 - **Password generator** with length, letters, digits and symbols, plus a rough strength meter.
 - **Search,** and right-click actions on any entry: show, copy password, copy login, edit, delete.
-- **Backup copy:** if the vault file gets damaged, WhoKey offers to restore it from the backup.
+- **Backup copy:** a hidden backup sits next to the vault, so you only see one file. If the vault gets damaged, WhoKey offers to restore it.
 - **English and Russian** interface.
 
 Your vault lives in `~/Library/Application Support/EduPasswords/vault.dat`, which is not synced to iCloud.
@@ -56,11 +56,11 @@ WhoKey хранит логины и пароли в одном зашифров�
 ### Возможности
 
 - **Шифрование:** ключ получается из мастер-пароля через Argon2id, записи шифруются Fernet (библиотека `cryptography`). Ничего не хранится открытым текстом.
-- **Буфер обмена:** скопированный пароль стирается через 30 секунд и при выходе из программы. Программам истории буфера macOS запрещено его запоминать.
+- **Буфер обмена:** скопированный пароль стирается через 30 секунд и при выходе из программы, неоновая полоска показывает, сколько осталось. Программам истории буфера macOS запрещено его запоминать.
 - **Пароли скрыты:** показанный пароль сам прячется через 15 секунд.
 - **Генератор паролей:** длина, буквы, цифры, символы и примерная шкала надёжности.
 - **Поиск** и действия с записью по правому клику: показать, скопировать пароль или логин, изменить, удалить.
-- **Резервная копия:** если файл хранилища испортится, WhoKey предложит восстановить его из копии.
+- **Резервная копия:** скрытая копия лежит рядом с хранилищем, так что в папке виден один файл. Если хранилище испортится, WhoKey предложит восстановить его.
 - Интерфейс на **русском и английском**.
 
 Хранилище лежит в `~/Library/Application Support/EduPasswords/vault.dat`. Эта папка не синхронизируется с iCloud.

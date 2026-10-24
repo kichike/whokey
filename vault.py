@@ -11,14 +11,18 @@
 3. Мастер-пароль нигде не сохраняется. Соль и настройки Argon2id лежат
    в файле открыто — это не секрет, они нужны, чтобы получить тот же ключ.
 
-Рядом с хранилищем лежат ещё два файла:
-  vault.dat.bak  — резервная копия (тоже зашифрована), на случай порчи основного;
-  vault.dat.lock — пустой файл-замок: не даёт открыть хранилище в двух окнах сразу.
+Служебные файлы:
+  .vault.dat.bak — резервная копия (тоже зашифрована) на случай порчи основного.
+                   Скрытая, лежит рядом с хранилищем — так она переезжает вместе
+                   с ним, а пользователь видит в папке один файл.
+  замок          — пустой файл, не даёт открыть хранилище в двух окнах сразу.
+                   Лежит в папке программы (locks/), пользователю не нужен.
 
 Своей криптографии здесь нет — только проверенная библиотека cryptography.
 """
 
 import base64
+import hashlib
 import hmac
 import json
 import os
@@ -79,7 +83,56 @@ def derive_key(password, salt, params):
 
 
 def backup_path(path):
-    return Path(path).with_name(Path(path).name + ".bak")
+    """Резервная копия — скрытый файл рядом с хранилищем: .vault.dat.bak."""
+    return Path(path).with_name("." + Path(path).name + ".bak")
+
+
+def _set_hidden(path, hidden):
+    """На Windows точка в начале имени файл не прячет — нужна пометка «скрытый».
+    На Mac и Linux ничего не делает: там скрывает сама точка."""
+    if sys.platform == "win32":
+        import ctypes
+        ctypes.windll.kernel32.SetFileAttributesW(str(path), 0x2 if hidden else 0x80)  # HIDDEN / NORMAL
+
+
+def app_data_dir():
+    """Папка программы для служебных файлов (та же, где хранилище по умолчанию)."""
+    home = Path.home()
+    if sys.platform == "darwin":
+        return home / "Library" / "Application Support" / "EduPasswords"
+    if sys.platform == "win32":
+        return Path(os.environ.get("APPDATA", home / "AppData" / "Roaming")) / "EduPasswords"
+    return Path(os.environ.get("XDG_DATA_HOME", home / ".local" / "share")) / "EduPasswords"
+
+
+def lock_path(path):
+    """Файл-замок для хранилища — в папке программы, имя — отпечаток пути к хранилищу."""
+    key = unicodedata.normalize("NFC", str(Path(path).resolve()))
+    if sys.platform in ("darwin", "win32"):
+        key = key.lower()  # там «Vault.dat» и «vault.dat» — обычно один и тот же файл
+    return app_data_dir() / "locks" / (hashlib.sha256(key.encode("utf-8")).hexdigest()[:32] + ".lock")
+
+
+def tidy_old_files(path):
+    """Файлы от прежних версий программы, которые лежали рядом с хранилищем:
+    копию vault.dat.bak переименовываем в скрытую .vault.dat.bak, пустой
+    замок vault.dat.lock удаляем (замок теперь в папке программы).
+    Вызывать до любых проверок «есть ли копия». Ошибки не страшны — тогда
+    старые файлы просто остаются как были."""
+    path = Path(path)
+    old_backup, new_backup = path.with_name(path.name + ".bak"), backup_path(path)
+    try:
+        if old_backup.is_file() and not new_backup.exists():
+            os.rename(old_backup, new_backup)
+            _set_hidden(new_backup, True)
+    except OSError:
+        pass
+    old_lock = path.with_name(path.name + ".lock")
+    try:
+        if old_lock.is_file() and old_lock.stat().st_size == 0:
+            os.remove(old_lock)
+    except OSError:
+        pass
 
 
 def in_icloud_folder(path):
@@ -102,9 +155,10 @@ def lock(path):
     Возвращает номер открытого файла-замка — его держим до выхода
     (при выходе система снимет замок сама). VaultLocked — если занято.
     """
-    lock_path = Path(path).with_name(Path(path).name + ".lock")
+    lock_file = lock_path(path)
+    lock_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     # O_NOFOLLOW — не идти по символической ссылке, если её подсунули вместо замка
-    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    fd = os.open(lock_file, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
     try:
         if sys.platform == "win32":
             import msvcrt
@@ -337,8 +391,12 @@ class Vault:
         # это не повод отменять уже сохранённое изменение, но человек должен
         # об этом узнать (менеджер покажет предупреждение).
         self.backup_error = None
+        backup = backup_path(self.path)
         try:
-            _write_file(backup_path(self.path), text)
+            if backup.exists():
+                _set_hidden(backup, False)  # Windows может не дать подменить скрытый файл
+            _write_file(backup, text)
+            _set_hidden(backup, True)
         except OSError as error:
             self.backup_error = error.strerror or str(error)
 

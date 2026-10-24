@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFormLayout, QLabel, Q
 from clipboard import CLEAR_AFTER
 from generator import weakness_reasons
 from gui import theme
-from gui.widgets import GeneratorPanel, PasswordField, StrengthBar, ask_yes, show_error, weakness_text
+from gui.widgets import ClipboardCountdown, GeneratorPanel, PasswordField, StrengthBar, ask_yes, show_error, weakness_text
 from texts import t
 from vault import SaveError
 
@@ -97,13 +97,13 @@ class GeneratorDialog(QDialog):
         self.copy_password = copy_password
 
         self.generator = GeneratorPanel()
-        self.result = PasswordField(copy_password=copy_password)
+        self.result = PasswordField(copy_password=self._copy)
         self.result.edit.setReadOnly(True)
         self.strength = StrengthBar()
         self.generator.generated.connect(self._on_generated)
 
         copy = theme.kind(QPushButton(t("g_copy")), "primary")
-        copy.clicked.connect(lambda: self.copy_password(self.result.text()))
+        copy.clicked.connect(lambda: self._copy(self.result.text()))
         close = QPushButton(t("g_close"))
         close.clicked.connect(self.accept)
 
@@ -111,10 +111,20 @@ class GeneratorDialog(QDialog):
         column.addWidget(self.generator)
         column.addWidget(self.result)
         column.addWidget(self.strength)
-        column.addWidget(theme.role(QLabel(t("g_clear_note", sec=CLEAR_AFTER)), "muted"))
+        # до копирования — подсказка, после — на её месте таймер с убывающей полоской
+        self.note = theme.role(QLabel(t("g_clear_note", sec=CLEAR_AFTER)), "muted")
+        self.countdown = ClipboardCountdown()
+        self.countdown.finished.connect(self.note.show)
+        column.addWidget(self.note)
+        column.addWidget(self.countdown)
         column.addWidget(copy)
         column.addWidget(close)
         self.generator.generate()
+
+    def _copy(self, password):
+        if self.copy_password(password):
+            self.note.hide()
+            self.countdown.start(CLEAR_AFTER)
 
     def _on_generated(self, password, bits):
         self.result.setText(password)

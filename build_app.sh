@@ -21,6 +21,9 @@ rm -rf "$BUILD"  # старой сборки не остаётся — нече�
   --add-data "$P/gui/fonts:gui/fonts" \
   --add-data "$P/gui/assets/check.svg:gui/assets" \
   --add-data "$P/gui/assets/arrow.svg:gui/assets" \
+  --add-data "$P/gui/assets/arrow_up.svg:gui/assets" \
+  --add-data "$P/gui/assets/eye.svg:gui/assets" \
+  --add-data "$P/gui/assets/eye_off.svg:gui/assets" \
   --add-data "$P/gui/assets/icon.png:gui/assets" \
   --paths "$P" \
   --exclude-module tkinter --exclude-module matplotlib --exclude-module pandas --exclude-module numpy \

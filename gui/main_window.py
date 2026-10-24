@@ -3,13 +3,13 @@
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QFontDatabase, QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderView, QLabel,
-                               QLineEdit, QMainWindow, QMenu, QPushButton, QStackedLayout,
+                               QLineEdit, QMainWindow, QMenu, QPushButton, QStackedWidget,
                                QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
 from clipboard import CLEAR_AFTER
 from gui import theme
 from gui.dialogs import ChangeMasterDialog, EntryDialog, GeneratorDialog
-from gui.widgets import ask_yes, show_error
+from gui.widgets import ClipboardCountdown, ask_yes, show_error
 from texts import t
 from vault import SaveError
 
@@ -37,6 +37,13 @@ class MainWindow(QMainWindow):
         central = QWidget()
         central.setLayout(column)
         self.setCentralWidget(central)
+
+        # слева в строке состояния — сообщения и таймер буфера, справа — число записей
+        self.countdown = ClipboardCountdown(bar_width=220)
+        self.countdown.setContentsMargins(22, 0, 0, 4)  # вровень с содержимым окна
+        self.statusBar().addWidget(self.countdown)
+        self.entries_count = theme.role(QLabel(), "muted")
+        self.statusBar().addPermanentWidget(self.entries_count)
 
         # горячие клавиши, как в обычных программах Mac
         QShortcut(QKeySequence.New, self, self.add)
@@ -107,8 +114,10 @@ class MainWindow(QMainWindow):
         self.empty.setAlignment(Qt.AlignCenter)
 
         card = theme.role(QFrame(), "card")
-        self.stack = QStackedLayout(card)
-        self.stack.setContentsMargins(1, 1, 1, 1)  # чтобы рамка карточки не перекрывалась
+        self.stack = QStackedWidget()
+        inside = QVBoxLayout(card)
+        inside.setContentsMargins(8, 8, 8, 8)  # чтобы таблица не залезала на скруглённые углы
+        inside.addWidget(self.stack)
         self.stack.addWidget(self.table)
         self.stack.addWidget(self.empty)
         theme.neon_card(card)
@@ -122,7 +131,7 @@ class MainWindow(QMainWindow):
         index = self.selected_index()
         entry = self.vault.entries[index]
 
-        menu = QMenu(self)
+        menu = theme.rounded_menu(QMenu(self))
         show = t("g_ctx_hide") if self.revealed == index else t("g_ctx_show")
         menu.addAction(show, self.toggle_reveal)
         menu.addAction(t("g_copy"), self.copy)
@@ -178,7 +187,7 @@ class MainWindow(QMainWindow):
                     break
         # пустое хранилище — вместо пустой таблицы подсказка
         self.stack.setCurrentWidget(self.empty if not self.vault.entries else self.table)
-        self.statusBar().showMessage(t("g_status_entries", n=len(self.vault.entries)))
+        self.entries_count.setText(t("g_status_entries", n=len(self.vault.entries)))
 
     def _save(self, change):
         """Выполняет изменение хранилища и сообщает об ошибках записи. True — получилось."""
@@ -218,8 +227,10 @@ class MainWindow(QMainWindow):
         if index is None:
             return
         entry = self.vault.entries[index]
-        if not ask_yes(self, t("g_delete_title"),
-                       t("g_delete_question", site=entry["site"], login=entry["login"])):
+        # без логина — без пустых скобок «()»
+        question = (t("g_delete_question", site=entry["site"], login=entry["login"]) if entry["login"]
+                    else t("g_delete_question_nologin", site=entry["site"]))
+        if not ask_yes(self, t("g_delete_title"), question):
             return
         if self._save(lambda: self.vault.delete(index)):
             # номера записей после удалённой сдвинулись — показанный пароль прячем
@@ -253,10 +264,13 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(t("g_login_copied"), 5000)
 
     def copy_password(self, password):
-        if self.clipboard.copy(password):
-            self.statusBar().showMessage(t("g_copied", sec=CLEAR_AFTER), CLEAR_AFTER * 1000)
-        else:
+        """Копирует через буфер с автоочисткой и запускает таймер внизу окна. True — получилось."""
+        if not self.clipboard.copy(password):
             show_error(self, t("copy_failed"))
+            return False
+        self.statusBar().clearMessage()  # сообщение поверх скрыло бы таймер
+        self.countdown.start(CLEAR_AFTER)
+        return True
 
     def open_generator(self):
         GeneratorDialog(self, self.copy_password).exec()
