@@ -1,0 +1,22 @@
+# Libraries are reinstalled with: pip install -r requirements.txt
+.venv/
+
+# macOS and Python service files
+.DS_Store
+__pycache__/
+*.pyc
+
+# Builds go to GitHub Releases, not into the code
+dist/
+build/
+*.dmg
+*.exe
+
+# Password vaults, in case one ends up here
+*.dat
+*.dat.bak
+*.dat.lock
+*.dat.old-*
+
+# Console version: local only
+manager.py

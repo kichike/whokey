@@ -1,0 +1,435 @@
+"""Тексты менеджера паролей на русском и английском."""
+
+LANG = "ru"  # текущий язык; меняется через set_language()
+
+
+def set_language(lang):
+    global LANG
+    LANG = lang
+
+
+def t(key, **values):
+    """Текст по ключу на текущем языке."""
+    return TEXTS[LANG][key].format(**values)
+
+
+TEXTS = {
+    "ru": {
+        # общее
+        "choice": "Ваш выбор: ",
+        "bye": "До свидания!",
+        "clipboard_cleared": "Скопированный пароль удалён из буфера обмена.",
+        "no_option": "Нет такого пункта — нажмите цифру из меню.",
+        "cancelled": "Отменено.",
+        "yes_no": "1 — да, 0 — нет: ",
+        "save_failed": "⚠ Не удалось сохранить: {error}. Изменение не применено, файл на диске не тронут.",
+        "backup_failed": "⚠ Изменение сохранено, но резервная копия не обновилась: {error}.",
+        "bad_input": "Не удалось прочитать ввод (сломанная буква?) — введите ещё раз.",
+        "unexpected": "⚠ Непредвиденная ошибка: {error}.\nФайл хранилища цел: изменения записываются через временный файл.",
+        "back_prompt": "0 — назад в меню: ",
+
+        # создание и вход
+        "no_vault": "Хранилище {path} не найдено.",
+        "create_or_exit": "1. Создать новое хранилище\n0. Выход",
+        "new_master_rules": "Придумайте мастер-пароль: не короче 12 символов. "
+                            "Его нельзя восстановить — если забудете, пароли пропадут.",
+        "new_master": "Новый мастер-пароль (символы не видны; Enter без пароля — отмена): ",
+        "repeat_master": "Повторите мастер-пароль: ",
+        "too_short": "Слишком короткий: {n} симв., нужно не меньше 12.",
+        "mismatch": "Пароли не совпадают, попробуйте ещё раз.",
+        "weak_header": "⚠ Пароль слабый:",
+        "use_anyway": "Всё равно использовать? 1 — да, 0 — придумать другой: ",
+        "vault_created": "Хранилище создано: {path}",
+        "icloud_warning": "⚠ Похоже, эта папка синхронизируется с iCloud («Рабочий стол и Документы»).\n"
+                          "Хранилище там зашифровано, но оно и его старые версии будут лежать в облаке.\n"
+                          "Если не хотите этого, храните его в другой папке: "
+                          "../.venv/bin/python manager.py ~/vault.dat",
+        "main_missing": "Основной файл {name} не найден, но есть резервная копия {backup}.",
+        "missing_options": "1. Восстановить из резервной копии\n"
+                           "2. Создать новое пустое хранилище (старая копия сохранится под другим именем)\n"
+                           "0. Выход",
+        "old_backup_kept": "Старая резервная копия отложена как {name}.",
+        "enter_master": "Мастер-пароль: ",
+        "wrong_password": "Неверный мастер-пароль.",
+        "too_many": "Слишком много неудачных попыток. Программа закрывается.\n"
+                    "(Если вы точно уверены в пароле — возможно, файл повреждён.)",
+        "vault_damaged": "Файл {path} повреждён или не является хранилищем паролей.",
+        "try_backup": "Есть резервная копия {name} — попробуем открыть её.",
+        "main_damaged": "Основной файл хранилища повреждён, но резервная копия открылась этим паролем\n"
+                        "(в ней может не быть самых последних изменений).",
+        "restore_question": "Восстановить хранилище из резервной копии? ",
+        "restored": "Хранилище восстановлено из резервной копии.",
+        "restore_declined": "Восстановление отменено, хранилище не изменено.",
+        "vault_locked": "Это хранилище уже открыто в другом окне. Закройте его там и попробуйте снова.",
+        "lock_error": "Не удалось открыть хранилище {path}: {error}",
+        "unlocked": "Хранилище открыто, записей: {n}.",
+
+        # причины слабости пароля
+        "weak_short": "короче 12 символов",
+        "weak_common": "содержит очень частое слово или комбинацию (qwerty, 123456, password...)",
+        "weak_one_kind": "только один вид символов — добавьте буквы разного регистра, цифры, знаки",
+        "weak_repeat": "один символ повторяется 4 раза подряд",
+
+        # меню
+        "menu_header": "Хранилище: {name} · записей: {n}",
+        "m_list": "1. Все записи",
+        "m_search": "2. Найти",
+        "m_add": "3. Добавить",
+        "m_edit": "4. Изменить",
+        "m_delete": "5. Удалить",
+        "m_show": "6. Показать / скопировать пароль",
+        "m_generate": "7. Генератор паролей",
+        "m_master": "8. Сменить мастер-пароль",
+        "m_exit": "0. Выход",
+
+        # список и выбор записи
+        "col_site": "Сайт",
+        "col_login": "Логин",
+        "col_password": "Пароль",
+        "col_note": "Заметка",
+        "empty_vault": "Записей пока нет — добавьте первую (пункт 3).",
+        "nothing_found": "Ничего не найдено.",
+        "search_prompt": "Что искать (сайт, логин или заметка): ",
+        "pick_entry": "Номер записи (Enter — отмена): ",
+        "bad_number": "Нет записи с таким номером.",
+
+        # добавление и изменение
+        "site": "Сайт или сервис: ",
+        "login": "Логин: ",
+        "note": "Заметка (можно пусто): ",
+        "site_required": "Сайт нужно указать.",
+        "password_how": "Пароль:\n1. Сгенерировать\n2. Ввести самому\n0. Отмена",
+        "enter_password": "Пароль (символы не видны; Enter без пароля — отмена): ",
+        "repeat_password": "Повторите пароль: ",
+        "password_not_changed": "Пароль НЕ изменён.",
+        "site_password_weak": "Сайт может требовать простой пароль, поэтому сохраняю, но лучше сгенерировать.",
+        "added": "Запись «{site}» добавлена.",
+        "edit_hint": "Enter — оставить как было, «-» — очистить поле.",
+        "edit_field": "{label} [{value}]: ",
+        "password_edit": "Пароль:\n1. Оставить\n2. Сгенерировать новый\n3. Ввести самому",
+        "updated": "Запись «{site}» изменена.",
+        "nothing_changed": "Ничего не изменено.",
+        "confirm_delete": "Удалить «{site}» ({login})? ",
+        "deleted": "Запись «{site}» удалена.",
+
+        # просмотр и буфер
+        "entry_details": "Сайт:     {site}\nЛогин:    {login}\nЗаметка:  {note}\nИзменено: {updated}",
+        "show_what": "1. Показать пароль на экране\n2. Скопировать пароль в буфер (очистится через {sec} с)\n0. Назад",
+        "password_is": "Пароль:   {password}",
+        "screen_warning": "(пароль остался в истории окна терминала — закройте окно, если за компьютером не только вы)",
+        "copied": "Пароль скопирован. Буфер очистится через {sec} с или при выходе из программы.",
+        "copy_failed": "Не получилось скопировать пароль в буфер обмена.",
+        "copy_now": "Скопировать пароль в буфер? ",
+
+        # генератор
+        "gen_header": "Генератор паролей:",
+        "gen_presets": ("1. Надёжный — 20 знаков, все виды символов\n"
+                        "2. Без спецсимволов — 16 знаков (для сайтов, которые их не принимают)\n"
+                        "3. Свои настройки\n"
+                        "0. Назад"),
+        "gen_length": "Длина ({low}–{high}, Enter — 16): ",
+        "gen_bad_length": "Длина должна быть числом от {low} до {high}.",
+        "gen_use_lower": "Строчные буквы (abc)? ",
+        "gen_use_upper": "Заглавные буквы (ABC)? ",
+        "gen_use_digits": "Цифры (123)? ",
+        "gen_use_symbols": "Спецсимволы (!@#)? ",
+        "gen_nothing": "Нужно выбрать хотя бы один вид символов.",
+        "gen_strength": "Пароль создан. Надёжность: ≈{bits:.0f} бит ({verdict}).",
+        "gen_hidden": "Пароль на экран не выводится: скопируйте его сейчас или посмотрите позже (пункт 6).",
+        "verdict_strong": "очень надёжно",
+        "verdict_ok": "надёжно",
+        "verdict_weak": "слабовато — увеличьте длину",
+
+        # смена мастер-пароля
+        "current_master": "Текущий мастер-пароль: ",
+        "master_changed": "Мастер-пароль изменён, хранилище перешифровано.",
+    },
+
+    "en": {
+        "choice": "Your choice: ",
+        "bye": "Goodbye!",
+        "clipboard_cleared": "The copied password was removed from the clipboard.",
+        "no_option": "No such option — press a digit from the menu.",
+        "cancelled": "Cancelled.",
+        "yes_no": "1 — yes, 0 — no: ",
+        "save_failed": "⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.",
+        "backup_failed": "⚠ The change is saved, but the backup was not updated: {error}.",
+        "bad_input": "Could not read the input (broken character?) — please type it again.",
+        "unexpected": "⚠ Unexpected error: {error}.\nThe vault file is intact: changes are written via a temporary file.",
+        "back_prompt": "0 — back to menu: ",
+
+        "no_vault": "Vault {path} not found.",
+        "create_or_exit": "1. Create a new vault\n0. Exit",
+        "new_master_rules": "Choose a master password: at least 12 characters. "
+                            "It cannot be recovered — if you forget it, your passwords are lost.",
+        "new_master": "New master password (input hidden; Enter with no password — cancel): ",
+        "repeat_master": "Repeat master password: ",
+        "too_short": "Too short: {n} characters, at least 12 required.",
+        "mismatch": "Passwords don't match, try again.",
+        "weak_header": "⚠ Weak password:",
+        "use_anyway": "Use it anyway? 1 — yes, 0 — choose another: ",
+        "vault_created": "Vault created: {path}",
+        "icloud_warning": "⚠ This folder seems to be synced with iCloud (\"Desktop & Documents\").\n"
+                          "The vault is encrypted there, but it and its old versions will be stored in the cloud.\n"
+                          "If you don't want that, keep it in another folder: "
+                          "../.venv/bin/python manager.py ~/vault.dat",
+        "main_missing": "The main file {name} was not found, but there is a backup {backup}.",
+        "missing_options": "1. Restore from the backup\n"
+                           "2. Create a new empty vault (the old backup will be kept under another name)\n"
+                           "0. Exit",
+        "old_backup_kept": "The old backup was set aside as {name}.",
+        "enter_master": "Master password: ",
+        "wrong_password": "Wrong master password.",
+        "too_many": "Too many failed attempts. Exiting.\n"
+                    "(If you are sure the password is right, the file may be damaged.)",
+        "vault_damaged": "{path} is damaged or is not a password vault.",
+        "try_backup": "There is a backup {name} — trying to open it.",
+        "main_damaged": "The main vault file is damaged, but the backup opened with this password\n"
+                        "(it may lack the most recent changes).",
+        "restore_question": "Restore the vault from the backup? ",
+        "restored": "Vault restored from the backup.",
+        "restore_declined": "Restore cancelled, the vault was not changed.",
+        "vault_locked": "This vault is already open in another window. Close it there and try again.",
+        "lock_error": "Could not open the vault {path}: {error}",
+        "unlocked": "Vault unlocked, entries: {n}.",
+
+        "weak_short": "shorter than 12 characters",
+        "weak_common": "contains a very common word or pattern (qwerty, 123456, password...)",
+        "weak_one_kind": "only one kind of characters — mix upper/lower case, digits, symbols",
+        "weak_repeat": "one character repeated 4 times in a row",
+
+        "menu_header": "Vault: {name} · entries: {n}",
+        "m_list": "1. All entries",
+        "m_search": "2. Search",
+        "m_add": "3. Add",
+        "m_edit": "4. Edit",
+        "m_delete": "5. Delete",
+        "m_show": "6. Show / copy password",
+        "m_generate": "7. Password generator",
+        "m_master": "8. Change master password",
+        "m_exit": "0. Exit",
+
+        "col_site": "Site",
+        "col_login": "Login",
+        "col_password": "Password",
+        "col_note": "Note",
+        "empty_vault": "No entries yet — add the first one (option 3).",
+        "nothing_found": "Nothing found.",
+        "search_prompt": "Search for (site, login or note): ",
+        "pick_entry": "Entry number (Enter — cancel): ",
+        "bad_number": "No entry with this number.",
+
+        "site": "Site or service: ",
+        "login": "Login: ",
+        "note": "Note (may be empty): ",
+        "site_required": "Site is required.",
+        "password_how": "Password:\n1. Generate\n2. Type it myself\n0. Cancel",
+        "enter_password": "Password (input hidden; Enter with no password — cancel): ",
+        "repeat_password": "Repeat password: ",
+        "password_not_changed": "The password was NOT changed.",
+        "site_password_weak": "The site may require a simple password, so it is saved, but generating one is better.",
+        "added": "Entry \"{site}\" added.",
+        "edit_hint": "Enter — keep the current value, \"-\" — clear the field.",
+        "edit_field": "{label} [{value}]: ",
+        "password_edit": "Password:\n1. Keep\n2. Generate a new one\n3. Type it myself",
+        "updated": "Entry \"{site}\" updated.",
+        "nothing_changed": "Nothing changed.",
+        "confirm_delete": "Delete \"{site}\" ({login})? ",
+        "deleted": "Entry \"{site}\" deleted.",
+
+        "entry_details": "Site:     {site}\nLogin:    {login}\nNote:     {note}\nUpdated:  {updated}",
+        "show_what": "1. Show password on screen\n2. Copy password to clipboard (cleared in {sec} s)\n0. Back",
+        "password_is": "Password: {password}",
+        "screen_warning": "(the password stays in the terminal window history — close the window if others use this computer)",
+        "copied": "Password copied. The clipboard will be cleared in {sec} s or when you exit.",
+        "copy_failed": "Could not copy the password to the clipboard.",
+        "copy_now": "Copy the password to the clipboard? ",
+
+        "gen_header": "Password generator:",
+        "gen_presets": ("1. Strong — 20 characters, all kinds\n"
+                        "2. No symbols — 16 characters (for sites that reject them)\n"
+                        "3. Custom settings\n"
+                        "0. Back"),
+        "gen_length": "Length ({low}–{high}, Enter — 16): ",
+        "gen_bad_length": "Length must be a number from {low} to {high}.",
+        "gen_use_lower": "Lowercase letters (abc)? ",
+        "gen_use_upper": "Uppercase letters (ABC)? ",
+        "gen_use_digits": "Digits (123)? ",
+        "gen_use_symbols": "Symbols (!@#)? ",
+        "gen_nothing": "Choose at least one kind of characters.",
+        "gen_strength": "Password generated. Strength: ≈{bits:.0f} bits ({verdict}).",
+        "gen_hidden": "The password is not shown on screen: copy it now or view it later (option 6).",
+        "verdict_strong": "very strong",
+        "verdict_ok": "strong",
+        "verdict_weak": "weak-ish — increase the length",
+
+        "current_master": "Current master password: ",
+        "master_changed": "Master password changed, vault re-encrypted.",
+    },
+}
+
+
+# --- Надписи приложения с окнами (app.py, папка gui/) ---
+# Отдельным блоком, чтобы не смешивать с консольной версией.
+# В конце файла они добавляются в общий словарь TEXTS.
+
+GUI_TEXTS = {
+    "ru": {
+        "g_app_title": "WhoKey",
+        "g_tagline": "менеджер паролей",
+        "g_language": "Язык:",
+        "g_vault_file": "Файл хранилища:",
+        "g_other_file": "Другой файл…",
+        "g_choose_file": "Выберите файл хранилища",
+        "g_new_file": "Где создать новое хранилище",
+        "g_files_filter": "Хранилище паролей (*.dat);;Все файлы (*)",
+        "g_master": "Мастер-пароль",
+        "g_master_repeat": "Повторите мастер-пароль",
+        "g_open": "Открыть",
+        "g_create": "Создать хранилище",
+        "g_create_hint": "Хранилища ещё нет — создадим новое.",
+        "g_strength_master_empty": "Введите мастер-пароль",
+        "g_show_chars": "Показать / скрыть символы",
+        "g_weak_title": "Слабый пароль",
+        "g_weak_question": "Пароль слабый:\n{reasons}\n\nВсё равно использовать?",
+        "g_both_damaged": "Повреждены и файл хранилища, и его резервная копия — дело в файлах, а не в пароле.",
+        "g_file_appeared": "Пока окно было открыто, этот файл хранилища появился — откройте его своим мастер-паролем.",
+        "g_folder_missing": "Папка прошлого хранилища недоступна: {folder}\nВозможно, не подключён диск. Открыто хранилище по умолчанию; "
+                            "чтобы вернуться к прежнему, подключите диск и нажмите «Другой файл…».",
+        "g_restore_title": "Резервная копия",
+        "g_missing_question": "Основной файл {name} не найден, но есть резервная копия {backup}.\n\n"
+                              "Восстановить из неё? Если создать новое хранилище, "
+                              "старая копия сохранится под другим именем.",
+        "g_restore": "Восстановить",
+        "g_create_new": "Создать новое",
+        "g_cancel": "Отмена",
+        "g_icloud": "Похоже, эта папка синхронизируется с iCloud: зашифрованное хранилище "
+                    "и его старые версии будут лежать в облаке.",
+
+        "g_search": "Поиск по сайту, логину или заметке",
+        "g_add": "Добавить",
+        "g_edit": "Изменить",
+        "g_delete": "Удалить",
+        "g_show": "Показать",
+        "g_hide": "Скрыть",
+        "g_copy": "Копировать пароль",
+        "g_paste": "Вставить",
+        "g_select_all": "Выделить всё",
+        "g_generator": "Генератор",
+        "g_change_master": "Сменить мастер-пароль",
+        "g_col_updated": "Изменено",
+        "g_status_entries": "Записей: {n}",
+        "g_copied": "Пароль скопирован — буфер очистится через {sec} с.",
+        "g_clipboard_cleared": "Буфер обмена очищен.",
+        "g_select_entry": "Сначала выберите запись в таблице.",
+        "g_delete_title": "Удаление",
+        "g_delete_question": "Удалить «{site}» ({login})?\nЭто нельзя отменить.",
+        "g_error_title": "Ошибка",
+        "g_saved": "Сохранено.",
+        "g_clear_note": "Скопированный пароль удалится из буфера обмена через {sec} с.",
+
+        "g_ctx_show": "Показать пароль",
+        "g_ctx_hide": "Скрыть пароль",
+        "g_ctx_copy_login": "Копировать логин",
+        "g_ctx_edit": "Изменить…",
+        "g_login_copied": "Логин скопирован.",
+        "g_hint": "Правый клик по записи — действия. Двойной клик — изменить.",
+        "g_empty_list": "Записей пока нет — нажмите «+ Добавить».",
+        "g_add_title": "Новая запись",
+        "g_edit_title": "Изменить запись",
+        "g_generate": "Сгенерировать",
+        "g_length": "Длина:",
+        "g_strength": "≈{bits:.0f} бит — {verdict}",
+        "g_strength_empty": "Введите или сгенерируйте пароль",
+        "g_verdict_medium": "средне",
+        "g_verdict_weak": "слабо",
+        "g_save": "Сохранить",
+        "g_password_required": "Пароль не может быть пустым.",
+
+        "g_current_master": "Текущий мастер-пароль",
+        "g_new_master": "Новый мастер-пароль",
+        "g_generator_title": "Генератор паролей",
+        "g_close": "Закрыть",
+    },
+
+    "en": {
+        "g_app_title": "WhoKey",
+        "g_tagline": "password manager",
+        "g_language": "Language:",
+        "g_vault_file": "Vault file:",
+        "g_other_file": "Other file…",
+        "g_choose_file": "Choose a vault file",
+        "g_new_file": "Where to create the new vault",
+        "g_files_filter": "Password vault (*.dat);;All files (*)",
+        "g_master": "Master password",
+        "g_master_repeat": "Repeat master password",
+        "g_open": "Open",
+        "g_create": "Create vault",
+        "g_create_hint": "There is no vault yet — let's create one.",
+        "g_strength_master_empty": "Type a master password",
+        "g_show_chars": "Show / hide characters",
+        "g_weak_title": "Weak password",
+        "g_weak_question": "The password is weak:\n{reasons}\n\nUse it anyway?",
+        "g_both_damaged": "Both the vault file and its backup are damaged — the problem is the files, not the password.",
+        "g_file_appeared": "This vault file appeared while the window was open — open it with its master password.",
+        "g_folder_missing": "The folder of the last vault is unavailable: {folder}\nMaybe a drive is not connected. The default vault is shown; "
+                            "to go back, connect the drive and click \"Other file…\".",
+        "g_restore_title": "Backup",
+        "g_missing_question": "The main file {name} was not found, but there is a backup {backup}.\n\n"
+                              "Restore from it? If you create a new vault, "
+                              "the old backup will be kept under another name.",
+        "g_restore": "Restore",
+        "g_create_new": "Create new",
+        "g_cancel": "Cancel",
+        "g_icloud": "This folder seems to be synced with iCloud: the encrypted vault "
+                    "and its old versions will be stored in the cloud.",
+
+        "g_search": "Search by site, login or note",
+        "g_add": "Add",
+        "g_edit": "Edit",
+        "g_delete": "Delete",
+        "g_show": "Show",
+        "g_hide": "Hide",
+        "g_copy": "Copy password",
+        "g_paste": "Paste",
+        "g_select_all": "Select all",
+        "g_generator": "Generator",
+        "g_change_master": "Change master password",
+        "g_col_updated": "Updated",
+        "g_status_entries": "Entries: {n}",
+        "g_copied": "Password copied — the clipboard will be cleared in {sec} s.",
+        "g_clipboard_cleared": "Clipboard cleared.",
+        "g_select_entry": "Select an entry in the table first.",
+        "g_delete_title": "Delete",
+        "g_delete_question": "Delete \"{site}\" ({login})?\nThis cannot be undone.",
+        "g_error_title": "Error",
+        "g_saved": "Saved.",
+        "g_clear_note": "A copied password is removed from the clipboard after {sec} s.",
+
+        "g_ctx_show": "Show password",
+        "g_ctx_hide": "Hide password",
+        "g_ctx_copy_login": "Copy login",
+        "g_ctx_edit": "Edit…",
+        "g_login_copied": "Login copied.",
+        "g_hint": "Right-click an entry for actions. Double-click to edit.",
+        "g_empty_list": "No entries yet — click \"+ Add\".",
+        "g_add_title": "New entry",
+        "g_edit_title": "Edit entry",
+        "g_generate": "Generate",
+        "g_length": "Length:",
+        "g_strength": "≈{bits:.0f} bits — {verdict}",
+        "g_strength_empty": "Type or generate a password",
+        "g_verdict_medium": "medium",
+        "g_verdict_weak": "weak",
+        "g_save": "Save",
+        "g_password_required": "Password cannot be empty.",
+
+        "g_current_master": "Current master password",
+        "g_new_master": "New master password",
+        "g_generator_title": "Password generator",
+        "g_close": "Close",
+    },
+}
+
+for _lang in TEXTS:
+    TEXTS[_lang].update(GUI_TEXTS[_lang])
