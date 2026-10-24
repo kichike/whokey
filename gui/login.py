@@ -49,7 +49,7 @@ class LoginWindow(QWidget):
         self.path = path
         self.state = state
         self.setWindowTitle(t("g_app_title"))
-        self.setMinimumWidth(560)
+        self.resize(560, 1)  # начальная ширина, а не минимум — см. EntryDialog
 
         # снаружи — выбор языка, внутри «карточки» с жёсткой тенью — всё остальное
         outer = QVBoxLayout(self)
@@ -105,7 +105,10 @@ class LoginWindow(QWidget):
 
     def _file_row(self):
         row = QHBoxLayout()
-        label = theme.role(QLabel(f"{t('g_vault_file')} {self.path}"), "muted")
+        # невидимые точки переноса после «\» и «/»: длинный путь Windows (C:\Users\…)
+        # иначе не переносится и обрезается справа
+        shown = str(self.path).replace("\\", "\\\u200b").replace("/", "/\u200b")
+        label = theme.role(QLabel(f"{t('g_vault_file')} {shown}"), "muted")
         label.setWordWrap(True)
         row.addWidget(label, 1)
         other = QPushButton(t("g_other_file"))

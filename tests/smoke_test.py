@@ -99,7 +99,7 @@ if sys.platform in ("win32", "darwin"):
 # --- окна ---
 from PySide6.QtCore import QPoint, QTimer  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
-from PySide6.QtWidgets import QApplication, QLineEdit  # noqa: E402
+from PySide6.QtWidgets import QApplication, QLabel, QLineEdit, QPushButton  # noqa: E402
 
 app = QApplication([])
 from gui import theme  # noqa: E402
@@ -119,6 +119,13 @@ class FakeClipboard:  # окна проверяем без настоящего 
         return True
 
 
+def buttons_fit(window, name):
+    """Ни одна кнопка не сжата уже, чем нужно для её текста (так обрезалось «Сгенерировать»)."""
+    squeezed = [b.text() for b in window.findChildren(QPushButton)
+                if b.isVisible() and b.width() < b.sizeHint().width()]
+    check(not squeezed, f"{name}: кнопки не обрезаны {squeezed}")
+
+
 def shot(widget, name):
     if SHOTS:
         SHOTS.mkdir(parents=True, exist_ok=True)
@@ -132,6 +139,10 @@ def run():
     QTest.keyClicks(login.master.edit, "abc")
     app.processEvents()
     shot(login, "login")
+    buttons_fit(login, "окно входа")
+    from texts import t
+    file_label = [x for x in login.findChildren(QLabel) if x.text().startswith(t("g_vault_file"))][0]
+    check("\u200b" in file_label.text(), "в пути к файлу есть точки переноса (длинный путь не обрежется)")
     login.close()
     login.deleteLater()
 
@@ -149,6 +160,7 @@ def run():
     app.processEvents()
     check(main.countdown.isVisible(), "после копирования виден таймер буфера")
     shot(main, "main")
+    buttons_fit(main, "главное окно")
 
     def grab_menu():
         menu = QApplication.activePopupWidget()
@@ -169,6 +181,7 @@ def run():
             QTest.keyClicks(edit, "x")
         app.processEvents()
         shot(dialog, name)
+        buttons_fit(dialog, name)
         dialog.close()
         dialog.deleteLater()
         QApplication.sendPostedEvents(None, 0)

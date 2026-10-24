@@ -32,7 +32,10 @@ class EntryDialog(QDialog):
         """copy_password — как копировать пароль из поля (через буфер с автоочисткой)."""
         super().__init__(parent)
         self.setWindowTitle(t("g_edit_title" if entry else "g_add_title"))
-        self.setMinimumWidth(520)
+        # начальная ширина, а не жёсткий минимум: с жёстким минимумом Qt перестаёт
+        # расширять окно под содержимое и сжимает кнопки (на Windows шрифт шире —
+        # «Сгенерировать» обрезалось до «нериров»)
+        self.resize(520, 1)
         entry = entry or {"site": "", "login": "", "password": "", "note": ""}
 
         self.site = QLineEdit(entry["site"])
@@ -93,7 +96,7 @@ class GeneratorDialog(QDialog):
     def __init__(self, parent, copy_password):
         super().__init__(parent)
         self.setWindowTitle(t("g_generator_title"))
-        self.setMinimumWidth(520)
+        self.resize(520, 1)  # начальная ширина, см. EntryDialog
         self.copy_password = copy_password
 
         self.generator = GeneratorPanel()
@@ -137,7 +140,7 @@ class ChangeMasterDialog(QDialog):
     def __init__(self, parent, vault):
         super().__init__(parent)
         self.setWindowTitle(t("g_change_master"))
-        self.setMinimumWidth(480)
+        self.resize(480, 1)  # начальная ширина, см. EntryDialog
         self.vault = vault
 
         self.current = PasswordField(t("g_current_master"))

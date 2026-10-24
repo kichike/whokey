@@ -292,6 +292,7 @@ class Halo(QWidget):
     def _drop(self):
         _halos.discard(self)
         if isValid(self):
+            self.hide()  # сразу, не дожидаясь удаления
             self.deleteLater()
 
     def remove(self):
