@@ -8,6 +8,14 @@
 
 <p align="center"><a href="#english">English</a> · <a href="#русский">Русский</a></p>
 
+<p align="center">
+  <img src="docs/screenshots/main.png" width="820" alt="WhoKey main window">
+</p>
+<p align="center">
+  <img src="docs/screenshots/login.png" width="405" alt="Login window">
+  <img src="docs/screenshots/entry.png" width="405" alt="New entry window">
+</p>
+
 ---
 
 ## English
