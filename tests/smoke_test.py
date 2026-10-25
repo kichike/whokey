@@ -110,6 +110,39 @@ from PySide6.QtGui import QIcon  # noqa: E402
 window_icon = QIcon(str(theme.ICON_FILE))
 check(not window_icon.isNull() and window_icon.availableSizes(),
       f"иконка окна загружается ({theme.ICON_FILE.name}, размеров: {len(window_icon.availableSizes())})")
+from gui.secure_clipboard import SecureClipboard  # noqa: E402
+
+# буфер обмена приложения — через Qt (QClipboard) с пометками «секретное»
+if sys.platform in ("win32", "darwin"):
+    secret = "Пароль-Ж ü #42"
+    qt_board = SecureClipboard()
+    check(qt_board.copy(secret), "приложение: пароль скопирован через QClipboard")
+    check(QApplication.clipboard().text() == secret, "приложение: в буфере ровно тот пароль")
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+        user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
+        user32.RegisterClipboardFormatW.restype = wintypes.UINT
+        user32.GetClipboardData.restype = wintypes.HANDLE
+        user32.GetClipboardData.argtypes = [wintypes.UINT]
+        kernel32.GlobalLock.restype = ctypes.c_void_p
+        kernel32.GlobalLock.argtypes = [wintypes.HGLOBAL]
+        kernel32.GlobalUnlock.argtypes = [wintypes.HGLOBAL]
+        user32.OpenClipboard(None)
+        try:
+            for name, value in (("ExcludeClipboardContentFromMonitorProcessing", None),
+                                ("CanIncludeInClipboardHistory", 0), ("CanUploadToCloudClipboard", 0)):
+                fmt = user32.RegisterClipboardFormatW(name)
+                present = bool(user32.IsClipboardFormatAvailable(fmt))
+                if present and value is not None:
+                    handle = user32.GetClipboardData(fmt)
+                    pointer = kernel32.GlobalLock(handle)
+                    present = ctypes.c_uint32.from_address(pointer).value == value
+                    kernel32.GlobalUnlock(handle)
+                check(present, f"приложение: пометка {name}" + ("" if value is None else f" = {value}"))
+        finally:
+            user32.CloseClipboard()
+    check(qt_board.clear_now() and QApplication.clipboard().text() == "", "приложение: буфер очищен")
 import gui.dialogs as Dg  # noqa: E402
 import gui.login as L  # noqa: E402
 import gui.main_window as MW  # noqa: E402

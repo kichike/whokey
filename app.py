@@ -1,7 +1,7 @@
 """Менеджер паролей — приложение с окнами (PySide6 / Qt).
 
-То же шифрование, что у консольной версии (manager.py): vault.py, generator.py,
-clipboard.py. Окна — в папке gui/.
+То же шифрование, что у консольной версии (manager.py): vault.py, generator.py.
+Буфер обмена — через Qt (gui/secure_clipboard.py). Окна — в папке gui/.
 
 Хранилище по умолчанию лежит там, где программы Mac держат свои данные:
 ~/Library/Application Support/EduPasswords/vault.dat (на Windows — в %APPDATA%).
@@ -30,7 +30,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
 import bridge_protocol
-from clipboard import Clipboard
+from gui.secure_clipboard import SecureClipboard
 from gui import theme
 from gui.autolock import AutoLock
 from gui.bridge import BridgeServer
@@ -53,7 +53,7 @@ class Controller:
     def __init__(self):
         # настройки (язык, последний файл) — не секрет, пароли сюда не попадают
         self.settings = QSettings(APP_NAME, APP_NAME)
-        self.clipboard = Clipboard()
+        self.clipboard = SecureClipboard()  # буфер обмена через Qt (у консольной версии — clipboard.py)
         self.state = {}
         self.window = None
         self.bridge = None  # сервер для расширения браузера — пока открыто хранилище
