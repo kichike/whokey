@@ -8,7 +8,7 @@ from clipboard import CLEAR_AFTER
 from generator import weakness_reasons
 from gui import theme
 from gui.widgets import ClipboardCountdown, GeneratorPanel, PasswordField, StrengthBar, ask_yes, show_error, weakness_text
-from texts import t
+from gui.i18n import tr
 from vault import SaveError
 
 MASTER_MIN_LENGTH = 12
@@ -19,7 +19,7 @@ def _buttons(dialog, ok_text):
     box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
     box.button(QDialogButtonBox.Ok).setText(ok_text)
     theme.kind(box.button(QDialogButtonBox.Ok), "primary")
-    box.button(QDialogButtonBox.Cancel).setText(t("g_cancel"))
+    box.button(QDialogButtonBox.Cancel).setText(tr("Cancel"))
     box.accepted.connect(dialog.accept)
     box.rejected.connect(dialog.reject)
     return box
@@ -32,7 +32,7 @@ class EntryDialog(QDialog):
     def __init__(self, parent, entry=None, copy_password=None):
         """copy_password — как копировать пароль из поля (через буфер с автоочисткой)."""
         super().__init__(parent)
-        self.setWindowTitle(t("g_edit_title" if entry else "g_add_title"))
+        self.setWindowTitle(tr("Edit entry") if entry else tr("New entry"))
         # начальная ширина, а не жёсткий минимум: с жёстким минимумом Qt перестаёт
         # расширять окно под содержимое и сжимает кнопки (на Windows шрифт шире —
         # «Сгенерировать» обрезалось до «нериров»)
@@ -42,7 +42,7 @@ class EntryDialog(QDialog):
         self.site = QLineEdit(entry["site"])
         # адрес сайта — для расширения браузера: по нему решается, на какой странице заполнять
         self.url = QLineEdit(entry.get("url", ""))
-        self.url.setPlaceholderText(t("g_url_placeholder"))
+        self.url.setPlaceholderText(tr("mail.ru — for filling in the browser"))
         self.login = QLineEdit(entry["login"])
         self.password = PasswordField(copy_password=copy_password)
         self.password.setText(entry["password"])
@@ -56,20 +56,20 @@ class EntryDialog(QDialog):
         self._on_password_changed(entry["password"])
 
         form = QFormLayout()
-        form.addRow(t("col_site"), self.site)
-        form.addRow(t("g_url"), self.url)
-        form.addRow(t("col_login"), self.login)
-        form.addRow(t("col_password"), self.password)
+        form.addRow(tr("Site"), self.site)
+        form.addRow(tr("Website"), self.url)
+        form.addRow(tr("Login"), self.login)
+        form.addRow(tr("Password"), self.password)
         form.addRow("", self.strength)
         form.addRow("", self.generator)
-        form.addRow(t("col_note"), self.note)
+        form.addRow(tr("Note"), self.note)
 
         self.error = QLabel()
         theme.role(self.error, "error")
         column = QVBoxLayout(self)
         column.addLayout(form)
         column.addWidget(self.error)
-        column.addWidget(_buttons(self, t("g_save")))
+        column.addWidget(_buttons(self, tr("Save")))
 
     def _on_generated(self, password, bits):
         self._generated = (password, bits)
@@ -83,13 +83,13 @@ class EntryDialog(QDialog):
 
     def accept(self):
         if not self.site.text().strip():
-            self.error.setText(t("site_required"))
+            self.error.setText(tr("Site is required."))
             return
         if not self.password.text():
-            self.error.setText(t("g_password_required"))
+            self.error.setText(tr("Password cannot be empty."))
             return
         if sites.normalize(self.url.text()) is None:
-            self.error.setText(t("g_url_bad"))
+            self.error.setText(tr("This does not look like a website address. Example: mail.ru"))
             return
         super().accept()
 
@@ -104,7 +104,7 @@ class GeneratorDialog(QDialog):
 
     def __init__(self, parent, copy_password):
         super().__init__(parent)
-        self.setWindowTitle(t("g_generator_title"))
+        self.setWindowTitle(tr("Password generator"))
         self.resize(520, 1)  # начальная ширина, см. EntryDialog
         self.copy_password = copy_password
 
@@ -114,9 +114,9 @@ class GeneratorDialog(QDialog):
         self.strength = StrengthBar()
         self.generator.generated.connect(self._on_generated)
 
-        copy = theme.kind(QPushButton(t("g_copy")), "primary")
+        copy = theme.kind(QPushButton(tr("Copy password")), "primary")
         copy.clicked.connect(lambda: self._copy(self.result.text()))
-        close = QPushButton(t("g_close"))
+        close = QPushButton(tr("Close"))
         close.clicked.connect(self.accept)
 
         column = QVBoxLayout(self)
@@ -124,7 +124,7 @@ class GeneratorDialog(QDialog):
         column.addWidget(self.result)
         column.addWidget(self.strength)
         # до копирования — подсказка, после — на её месте таймер с убывающей полоской
-        self.note = theme.role(QLabel(t("g_clear_note", sec=CLEAR_AFTER)), "muted")
+        self.note = theme.role(QLabel(tr("A copied password is removed from the clipboard after {sec} s.").format(sec=CLEAR_AFTER)), "muted")
         self.countdown = ClipboardCountdown()
         self.countdown.finished.connect(self.note.show)
         column.addWidget(self.note)
@@ -148,16 +148,16 @@ class ChangeMasterDialog(QDialog):
 
     def __init__(self, parent, vault):
         super().__init__(parent)
-        self.setWindowTitle(t("g_change_master"))
+        self.setWindowTitle(tr("Change master password"))
         self.resize(480, 1)  # начальная ширина, см. EntryDialog
         self.vault = vault
 
-        self.current = PasswordField(t("g_current_master"))
-        self.new = PasswordField(t("g_new_master"))
-        self.repeat = PasswordField(t("g_master_repeat"))
-        self.strength = StrengthBar("g_strength_master_empty")
+        self.current = PasswordField(tr("Current master password"))
+        self.new = PasswordField(tr("New master password"))
+        self.repeat = PasswordField(tr("Repeat master password"))
+        self.strength = StrengthBar(tr("Type a master password"))
         self.new.textChanged.connect(self.strength.show_for)
-        rules = QLabel(t("new_master_rules"))
+        rules = QLabel(tr("Choose a master password: at least 12 characters. It cannot be recovered — if you forget it, your passwords are lost."))
         rules.setWordWrap(True)
         self.error = QLabel()
         self.error.setWordWrap(True)
@@ -166,29 +166,29 @@ class ChangeMasterDialog(QDialog):
         column = QVBoxLayout(self)
         for widget in (self.current, rules, self.new, self.repeat, self.strength, self.error):
             column.addWidget(widget)
-        column.addWidget(_buttons(self, t("g_save")))
+        column.addWidget(_buttons(self, tr("Save")))
         self.current.setFocus()
 
     def accept(self):
         if not self.vault.check_password(self.current.text()):
-            self.error.setText(t("wrong_password"))
+            self.error.setText(tr("Wrong master password."))
             self.current.clear()
             return
         password = self.new.text()
         if len(password) < MASTER_MIN_LENGTH:
-            self.error.setText(t("too_short", n=len(password)))
+            self.error.setText(tr("Too short: {n} characters, at least 12 required.").format(n=len(password)))
             return
         reasons = [r for r in weakness_reasons(password) if r != "weak_short"]
-        if reasons and not ask_yes(self, t("g_weak_title"),
-                                   t("g_weak_question", reasons=weakness_text(reasons))):
+        if reasons and not ask_yes(self, tr("Weak password"),
+                                   tr("The password is weak:\n{reasons}\n\nUse it anyway?").format(reasons=weakness_text(reasons))):
             return
         if self.repeat.text() != password:
-            self.error.setText(t("mismatch"))
+            self.error.setText(tr("Passwords don't match, try again."))
             self.repeat.clear()
             return
         try:
             self.vault.change_password(password)
         except SaveError as error:
-            show_error(self, t("save_failed", error=error))
+            show_error(self, tr("⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.").format(error=error))
             return
         super().accept()

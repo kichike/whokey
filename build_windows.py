@@ -9,6 +9,8 @@
 """
 
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 import PyInstaller.__main__
@@ -21,6 +23,9 @@ def data(source, dest):
     return ["--add-data", f"{source}{os.pathsep}{dest}"]
 
 
+# переводы окон: translations/*.ts -> *.qm (Qt Linguist)
+subprocess.run([sys.executable, str(HERE / "translations" / "build.py")], check=True)
+
 args = [
     "--noconfirm", "--windowed", "--log-level", "WARN",
     "--name", "WhoKey", "--icon", str(ASSETS / "WhoKey.ico"),
@@ -29,6 +34,7 @@ args = [
     *[arg for svg in sorted(ASSETS.glob("*.svg")) for arg in data(svg, "gui/assets")],
     *data(ASSETS / "icon.png", "gui/assets"),
     *data(ASSETS / "WhoKey.ico", "gui/assets"),  # иконка окна на панели задач
+    *[arg for qm in sorted((HERE / "translations").glob("*.qm")) for arg in data(qm, "translations")],
     "--paths", str(HERE),
     "--exclude-module", "tkinter", "--exclude-module", "matplotlib",
     "--exclude-module", "pandas", "--exclude-module", "numpy",

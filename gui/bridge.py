@@ -32,7 +32,7 @@ from PySide6.QtNetwork import QLocalServer
 import bridge_protocol as P
 import sites
 from gui.widgets import ask_yes
-from texts import t
+from gui.i18n import tr
 from vault import SaveError
 
 OLD_KEYS_SETTING = "bridge/keys"  # раньше отпечатки лежали в открытых настройках — удаляем
@@ -216,7 +216,7 @@ class BridgeServer(QObject):
             self.window.showNormal()
             self.window.raise_()
             self.window.activateWindow()
-            if not ask_yes(self.window, t("g_bridge_pair_title"), t("g_bridge_pair_question", code=code)):
+            if not ask_yes(self.window, tr("Browser extension"), tr("The WhoKey browser extension asks for access to your passwords.\nIt will be able to fill the login and password on websites listed in your entries.\n\nCode: {code}\nAllow only if the extension popup shows the same code.").format(code=code)):
                 self.denied_at = time.monotonic()
                 return {"status": "denied"}
             key = P.new_key()
@@ -249,5 +249,5 @@ class BridgeServer(QObject):
         if entry["login"] != login or not sites.matches(entry.get("url", ""), url):
             return {"status": "not_found"}
         self.window.statusBar().showMessage(
-            t("g_bridge_filled", site=sites.page_host(url)), 8000)
+            tr("Password for {site} sent to the browser").format(site=sites.page_host(url)), 8000)
         return {"status": "ok", "login": entry["login"], "password": entry["password"]}

@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QCheckBox, QHBoxLayout, QLabel, QLineEdit, QMenu,
 
 from generator import MAX_LENGTH, MIN_LENGTH, entropy_bits, estimate_bits, generate_password
 from gui import theme
-from texts import t
+from gui.i18n import tr
 
 # Цвета шкалы надёжности — «светофор» из оформления: хорошо / так себе / плохо
 GOOD, WARNING, BAD = theme.OK, theme.WARN, theme.BAD
@@ -49,9 +49,9 @@ class SecretEdit(QLineEdit):
         # своё меню вместо стандартного: в стандартном «Копировать» шло бы мимо нас
         menu = theme.rounded_menu(QMenu(self))
         if self.copy_password:
-            menu.addAction(t("g_copy"), self._copy_out).setEnabled(bool(self.text()))
-        menu.addAction(t("g_paste"), self.paste).setEnabled(not self.isReadOnly())
-        menu.addAction(t("g_select_all"), self.selectAll)
+            menu.addAction(tr("Copy password"), self._copy_out).setEnabled(bool(self.text()))
+        menu.addAction(tr("Paste"), self.paste).setEnabled(not self.isReadOnly())
+        menu.addAction(tr("Select all"), self.selectAll)
         menu.exec(event.globalPos())
 
 
@@ -74,7 +74,7 @@ class PasswordField(QWidget):
         self.eye.setIcon(icon)
         self.eye.setIconSize(QSize(18, 18))
         self.eye.setCheckable(True)
-        self.eye.setToolTip(t("g_show_chars"))
+        self.eye.setToolTip(tr("Show / hide characters"))
         self.eye.toggled.connect(self._toggle)
         self.hide_timer = QTimer(self)
         self.hide_timer.setSingleShot(True)
@@ -109,12 +109,12 @@ class PasswordField(QWidget):
 def verdict(bits):
     """Оценка словами и цвет для шкалы."""
     if bits >= 100:
-        return t("verdict_strong"), GOOD
+        return tr("very strong"), GOOD
     if bits >= 70:
-        return t("verdict_ok"), GOOD
+        return tr("strong"), GOOD
     if bits >= 45:
-        return t("g_verdict_medium"), WARNING
-    return t("g_verdict_weak"), BAD
+        return tr("medium"), WARNING
+    return tr("weak"), BAD
 
 
 class _DrainingBar(QWidget):
@@ -194,14 +194,14 @@ class ClipboardCountdown(QWidget):
             self.hide()
             self.finished.emit()
             return
-        self.label.setText(t("g_countdown", sec=math.ceil(left)))
+        self.label.setText(tr("Password in clipboard · {sec} s").format(sec=math.ceil(left)))
         self.bar.set_fraction(left / self.seconds)
 
 
 class StrengthBar(QWidget):
     """Полоска надёжности пароля + подпись «≈129 бит — очень надёжно»."""
 
-    def __init__(self, empty_text="g_strength_empty", parent=None):
+    def __init__(self, empty_text=None, parent=None):
         """empty_text — подсказка, пока пароль не введён (у мастер-пароля
         нет кнопки «Сгенерировать», поэтому для него своя подсказка)."""
         super().__init__(parent)
@@ -221,7 +221,7 @@ class StrengthBar(QWidget):
         """bits — точное значение для сгенерированного пароля, иначе оценка."""
         if not password:
             self.bar.setValue(0)
-            self.label.setText(t(self.empty_text))
+            self.label.setText(self.empty_text or tr("Type or generate a password"))
             return
         if bits is None:
             bits = estimate_bits(password)
@@ -229,7 +229,7 @@ class StrengthBar(QWidget):
         self.bar.setValue(min(int(bits), 128))
         # сама полоска оформлена в theme.py, здесь только цвет заполнения
         self.bar.setStyleSheet(f"QProgressBar::chunk {{ background: {color}; }}")
-        self.label.setText(t("g_strength", bits=bits, verdict=words))
+        self.label.setText(tr("≈{bits:.0f} bits — {verdict}").format(bits=bits, verdict=words))
 
 
 class GeneratorPanel(QWidget):
@@ -248,12 +248,12 @@ class GeneratorPanel(QWidget):
             box.setChecked(True)
             box.toggled.connect(self._update_button)
             self.kinds[name] = box
-        self.button = QPushButton(t("g_generate"))
+        self.button = QPushButton(tr("Generate"))
         self.button.clicked.connect(self.generate)
 
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
-        row.addWidget(QLabel(t("g_length")))
+        row.addWidget(QLabel(tr("Length:")))
         row.addWidget(self.length)
         for box in self.kinds.values():
             row.addWidget(box)
@@ -285,15 +285,15 @@ def _message(parent, title, text, symbol, color):
 def ask_yes(parent, title, text):
     box = _message(parent, title, text, "?", theme.NEON)
     # свои кнопки: стандартные Yes/No Qt без перевода показал бы по-английски
-    no = box.addButton(t("g_no"), QMessageBox.RejectRole)
-    yes = box.addButton(t("g_yes"), QMessageBox.AcceptRole)
+    no = box.addButton(tr("No"), QMessageBox.RejectRole)
+    yes = box.addButton(tr("Yes"), QMessageBox.AcceptRole)
     box.setDefaultButton(no)  # Enter по ошибке не удалит запись
     box.exec()
     return box.clickedButton() is yes
 
 
 def show_error(parent, text):
-    _message(parent, t("g_error_title"), text, "!", theme.BAD_INK).exec()
+    _message(parent, tr("Error"), text, "!", theme.BAD_INK).exec()
 
 
 def show_info(parent, title, text):
@@ -301,4 +301,11 @@ def show_info(parent, title, text):
 
 
 def weakness_text(reasons):
-    return "\n".join("• " + t(reason) for reason in reasons)
+    """Причины слабого пароля (ключи из generator.weakness_reasons) — списком."""
+    reason_texts = {
+        "weak_common": tr("contains a very common word or pattern (qwerty, 123456, password...)"),
+        "weak_one_kind": tr("only one kind of characters — mix upper/lower case, digits, symbols"),
+        "weak_repeat": tr("one character repeated 4 times in a row"),
+        "weak_short": tr("shorter than 12 characters"),
+    }
+    return "\n".join("• " + reason_texts[reason] for reason in reasons)

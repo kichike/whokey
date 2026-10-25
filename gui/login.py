@@ -14,13 +14,12 @@ from PySide6.QtWidgets import (QComboBox, QFileDialog, QFrame, QHBoxLayout, QLab
 from generator import weakness_reasons
 from gui import theme
 from gui.widgets import PasswordField, StrengthBar, ask_yes, show_error, show_info, weakness_text
-import texts
-from texts import set_language, t
+from gui import i18n
+from gui.i18n import LANGUAGES, set_language, tr
 from vault import (SaveError, Vault, VaultError, VaultLocked, WrongPassword, backup_path,
                    in_icloud_folder, is_readable, lock, open_backup, tidy_old_files)
 
 MASTER_MIN_LENGTH = 12
-LANGUAGES = [("ru", "Русский"), ("en", "English")]
 
 # Замок на файл хранилища держим, пока программа работает: второе окно
 # (или консольная версия) с тем же файлом иначе затёрло бы записи.
@@ -48,7 +47,7 @@ class LoginWindow(QWidget):
         super().__init__()
         self.path = path
         self.state = state
-        self.setWindowTitle(t("g_app_title"))
+        self.setWindowTitle(tr("WhoKey"))
         self.resize(560, 1)  # начальная ширина, а не минимум — см. EntryDialog
 
         # снаружи — выбор языка, внутри «карточки» с жёсткой тенью — всё остальное
@@ -64,8 +63,8 @@ class LoginWindow(QWidget):
         column = QVBoxLayout(card)
         column.setContentsMargins(28, 24, 28, 24)
         column.setSpacing(12)
-        column.addWidget(theme.neon_title(theme.role(QLabel(t("g_app_title")), "title")))
-        column.addWidget(theme.role(QLabel(t("g_tagline")), "muted"))
+        column.addWidget(theme.neon_title(theme.role(QLabel(tr("WhoKey")), "title")))
+        column.addWidget(theme.role(QLabel(tr("password manager")), "muted"))
         column.addLayout(self._file_row())
 
         tidy_old_files(path)  # копия и замок от прежней версии — на новые места
@@ -83,16 +82,22 @@ class LoginWindow(QWidget):
         column.addWidget(self.error)
         outer.addStretch()
 
+    def resizeEvent(self, event):
+        # подписи с переносом строк (путь к файлу, подсказки) Qt при расчёте высоты
+        # окна не учитывает — им не хватало места, и строки обрезались сверху и снизу
+        self.setMinimumHeight(self.layout().totalHeightForWidth(event.size().width()))
+        super().resizeEvent(event)
+
     # --- общие части окна ---
 
     def _language_row(self):
         row = QHBoxLayout()
         row.addStretch()
-        row.addWidget(QLabel(t("g_language")))
+        row.addWidget(QLabel(tr("Language:")))
         combo = theme.rounded_popup(QComboBox())
         for code, name in LANGUAGES:
             combo.addItem(name, code)
-        combo.setCurrentIndex([code for code, _ in LANGUAGES].index(texts.LANG))
+        combo.setCurrentIndex([code for code, _ in LANGUAGES].index(i18n.LANG))
         # отступы пунктов в оформлении Qt при расчёте ширины списка не учитывает — добавляем сами
         combo.view().setMinimumWidth(combo.view().sizeHintForColumn(0) + 48)
         combo.currentIndexChanged.connect(lambda i: self._set_language(combo.itemData(i)))
@@ -108,10 +113,10 @@ class LoginWindow(QWidget):
         # невидимые точки переноса после «\» и «/»: длинный путь Windows (C:\Users\…)
         # иначе не переносится и обрезается справа
         shown = str(self.path).replace("\\", "\\\u200b").replace("/", "/\u200b")
-        label = theme.role(QLabel(f"{t('g_vault_file')} {shown}"), "muted")
+        label = theme.role(QLabel(tr("Vault file:") + " " + shown), "muted")
         label.setWordWrap(True)
         row.addWidget(label, 1)
-        other = QPushButton(t("g_other_file"))
+        other = QPushButton(tr("Other file…"))
         other.clicked.connect(self._choose_file)
         row.addWidget(other)
         return row
@@ -120,7 +125,7 @@ class LoginWindow(QWidget):
         # «Сохранить как» без вопроса о замене: подходит и чтобы выбрать
         # существующий файл, и чтобы указать имя нового
         name, _ = QFileDialog.getSaveFileName(
-            self, t("g_choose_file"), str(self.path), t("g_files_filter"),
+            self, tr("Choose a vault file"), str(self.path), tr("Password vault (*.dat);;All files (*)"),
             options=QFileDialog.DontConfirmOverwrite)
         if name:
             self.restart.emit(Path(name).resolve())
@@ -136,39 +141,38 @@ class LoginWindow(QWidget):
     # --- три режима окна ---
 
     def _build_open(self, column):
-        self.master = PasswordField(t("g_master"))
+        self.master = PasswordField(tr("Master password"))
         self.master.edit.returnPressed.connect(self.on_open)
         column.addWidget(self.master)
-        column.addWidget(self._button(t("g_open"), self.on_open, default=True))
+        column.addWidget(self._button(tr("Open"), self.on_open, default=True))
         self.master.setFocus()
 
     def _build_missing(self, column):
-        text = QLabel(t("g_missing_question", name=self.path.name,
-                        backup=backup_path(self.path).name))
+        text = QLabel(tr("The main file {name} was not found, but there is a backup {backup}.\n\nRestore from it? If you create a new vault, the old backup will be kept under another name.").format(name=self.path.name, backup=backup_path(self.path).name))
         text.setWordWrap(True)
         column.addWidget(text)
-        self.master = PasswordField(t("g_master"))
+        self.master = PasswordField(tr("Master password"))
         self.master.edit.returnPressed.connect(self.on_restore)
         column.addWidget(self.master)
         row = QHBoxLayout()
-        row.addWidget(self._button(t("g_create_new"), self._switch_to_create))
+        row.addWidget(self._button(tr("Create new"), self._switch_to_create))
         row.addStretch()
-        row.addWidget(self._button(t("g_restore"), self.on_restore, default=True))
+        row.addWidget(self._button(tr("Restore"), self.on_restore, default=True))
         column.addLayout(row)
         self.master.setFocus()
 
     def _build_create(self, column):
-        hint = QLabel(t("g_create_hint") + "\n" + t("new_master_rules"))
+        hint = QLabel(tr("There is no vault yet — let's create one.") + "\n" + tr("Choose a master password: at least 12 characters. It cannot be recovered — if you forget it, your passwords are lost."))
         hint.setWordWrap(True)
         column.addWidget(hint)
-        self.master = PasswordField(t("g_master"))
-        self.repeat = PasswordField(t("g_master_repeat"))
+        self.master = PasswordField(tr("Master password"))
+        self.repeat = PasswordField(tr("Repeat master password"))
         self.repeat.edit.returnPressed.connect(self.on_create)
-        self.strength = StrengthBar("g_strength_master_empty")
+        self.strength = StrengthBar(tr("Type a master password"))
         self.master.textChanged.connect(self.strength.show_for)
         for widget in (self.master, self.repeat, self.strength):
             column.addWidget(widget)
-        column.addWidget(self._button(t("g_create"), self.on_create, default=True))
+        column.addWidget(self._button(tr("Create vault"), self.on_create, default=True))
         self.master.setFocus()
 
     def _switch_to_create(self):
@@ -186,33 +190,33 @@ class LoginWindow(QWidget):
             hold_lock(self.path)
             return True
         except VaultLocked:
-            self.error.setText(t("vault_locked"))
+            self.error.setText(tr("This vault is already open in another window. Close it there and try again."))
         except OSError as error:
-            self.error.setText(t("lock_error", path=self.path, error=error.strerror or error))
+            self.error.setText(tr("Could not open the vault {path}: {error}").format(path=self.path, error=error.strerror or error))
         return False
 
     def _wrong_password(self):
         # Без ограничения попыток: оно лишь косметика (обходится перезапуском),
         # а от перебора защищает медленная функция Argon2id.
         self.master.clear()
-        self.error.setText(t("wrong_password"))
+        self.error.setText(tr("Wrong master password."))
 
     def _restore(self, vault):
         vault.path = self.path
         try:
             vault.save()
         except SaveError as error:
-            show_error(self, t("save_failed", error=error))
+            show_error(self, tr("⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.").format(error=error))
             return
-        show_info(self, t("g_restore_title"), t("restored"))
+        show_info(self, tr("Backup"), tr("Vault restored from the backup."))
         self.opened.emit(vault)
 
     def _offer_restore(self, backup):
         """Пароль подошёл к копии той же «эпохи» — значит, испорчен файл, а не забыт пароль."""
-        if ask_yes(self, t("g_restore_title"), t("main_damaged") + "\n\n" + t("restore_question")):
+        if ask_yes(self, tr("Backup"), tr("The main vault file is damaged, but the backup opened with this password\n(it may lack the most recent changes).") + "\n\n" + tr("Restore the vault from the backup? ")):
             self._restore(backup)
         else:
-            self.error.setText(t("restore_declined"))
+            self.error.setText(tr("Restore cancelled, the vault was not changed."))
 
     def on_open(self):
         password = self.master.text()
@@ -237,9 +241,9 @@ class LoginWindow(QWidget):
             elif backup_path(self.path).exists():
                 # испорчены и файл, и копия — честно говорим, что дело в файлах,
                 # иначе человек решит, что забыл пароль
-                self.error.setText(t("g_both_damaged"))
+                self.error.setText(tr("Both the vault file and its backup are damaged — the problem is the files, not the password."))
             else:
-                self.error.setText(t("vault_damaged", path=self.path))
+                self.error.setText(tr("{path} is damaged or is not a password vault.").format(path=self.path))
             return
         self.opened.emit(vault)
 
@@ -256,15 +260,15 @@ class LoginWindow(QWidget):
     def on_create(self):
         password = self.master.text()
         if len(password) < MASTER_MIN_LENGTH:
-            self.error.setText(t("too_short", n=len(password)))
+            self.error.setText(tr("Too short: {n} characters, at least 12 required.").format(n=len(password)))
             return
         # короткие уже отсеяли — остальные слабости только предупреждение
         reasons = [r for r in weakness_reasons(password) if r != "weak_short"]
-        if reasons and not ask_yes(self, t("g_weak_title"),
-                                   t("g_weak_question", reasons=weakness_text(reasons))):
+        if reasons and not ask_yes(self, tr("Weak password"),
+                                   tr("The password is weak:\n{reasons}\n\nUse it anyway?").format(reasons=weakness_text(reasons))):
             return
         if self.repeat.text() != password:
-            self.error.setText(t("mismatch"))
+            self.error.setText(tr("Passwords don't match, try again."))
             self.repeat.clear()
             return
         if not self._take_lock():
@@ -272,18 +276,18 @@ class LoginWindow(QWidget):
         if self.path.exists():
             # пока окно было открыто, файл появился (например, его создала консольная
             # версия) — не затираем его новым пустым хранилищем, а предлагаем открыть
-            self.state["notice"] = t("g_file_appeared")
+            self.state["notice"] = tr("This vault file appeared while the window was open — open it with its master password.")
             self.restart.emit(self.path)
             return
         try:
             vault = Vault.create(self.path, password)
         except (SaveError, OSError) as error:
-            show_error(self, t("save_failed", error=error))
+            show_error(self, tr("⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.").format(error=error))
             return
-        notes = [t("vault_created", path=self.path)]
+        notes = [tr("Vault created: {path}").format(path=self.path)]
         if vault.old_backup:
-            notes.append(t("old_backup_kept", name=vault.old_backup.name))
+            notes.append(tr("The old backup was set aside as {name} (a hidden file next to the vault).").format(name=vault.old_backup.name))
         if in_icloud_folder(self.path):
-            notes.append(t("g_icloud"))
-        show_info(self, t("g_app_title"), "\n\n".join(notes))
+            notes.append(tr("This folder seems to be synced with iCloud: the encrypted vault and its old versions will be stored in the cloud."))
+        show_info(self, tr("WhoKey"), "\n\n".join(notes))
         self.opened.emit(vault)

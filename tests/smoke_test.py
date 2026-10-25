@@ -159,8 +159,8 @@ def run():
     app.processEvents()
     shot(login, "login")
     buttons_fit(login, "окно входа")
-    from texts import t
-    file_label = [x for x in login.findChildren(QLabel) if x.text().startswith(t("g_vault_file"))][0]
+    from gui.i18n import tr
+    file_label = [x for x in login.findChildren(QLabel) if x.text().startswith(tr("Vault file:"))][0]
     check("\u200b" in file_label.text(), "в пути к файлу есть точки переноса (длинный путь не обрежется)")
     login.close()
     login.deleteLater()

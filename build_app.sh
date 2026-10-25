@@ -16,6 +16,9 @@ VENV="$P/.venv"; [ -d "$VENV" ] || VENV="$P/../.venv"
 
 rm -rf "$BUILD"  # старой сборки не остаётся — нечего случайно выдать за новую
 
+# переводы окон: translations/*.ts -> *.qm (Qt Linguist)
+"$VENV/bin/python" "$P/translations/build.py"
+
 "$VENV/bin/pyinstaller" --noconfirm --windowed --log-level WARN \
   --name WhoKey --icon "$P/gui/assets/WhoKey.icns" --osx-bundle-identifier ru.edu.whokey \
   --add-data "$P/gui/fonts:gui/fonts" \
@@ -25,6 +28,8 @@ rm -rf "$BUILD"  # старой сборки не остаётся — нече�
   --add-data "$P/gui/assets/eye.svg:gui/assets" \
   --add-data "$P/gui/assets/eye_off.svg:gui/assets" \
   --add-data "$P/gui/assets/icon.png:gui/assets" \
+  --add-data "$P/translations/whokey_ru.qm:translations" \
+  --add-data "$P/translations/whokey_en.qm:translations" \
   --paths "$P" \
   --exclude-module tkinter --exclude-module matplotlib --exclude-module pandas --exclude-module numpy \
   --exclude-module PySide6.QtQml --exclude-module PySide6.QtQuick \

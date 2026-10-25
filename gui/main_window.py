@@ -10,7 +10,7 @@ from clipboard import CLEAR_AFTER
 from gui import theme
 from gui.dialogs import ChangeMasterDialog, EntryDialog, GeneratorDialog
 from gui.widgets import ClipboardCountdown, ask_yes, show_error, show_info
-from texts import t
+from gui.i18n import tr
 from vault import SaveError
 
 HIDDEN = "••••••••"   # одинаковые точки — не выдаём даже длину пароля
@@ -24,7 +24,7 @@ class MainWindow(QMainWindow):
         self.vault = vault
         self.clipboard = clipboard
         self.revealed = None  # номер записи, чей пароль сейчас показан
-        self.setWindowTitle(f"{t('g_app_title')} — {vault.path.name}")
+        self.setWindowTitle(tr("WhoKey") + " — " + vault.path.name)
         self.resize(960, 600)
 
         column = QVBoxLayout()
@@ -33,7 +33,7 @@ class MainWindow(QMainWindow):
         column.addLayout(self._header())
         column.addLayout(self._toolbar())
         column.addWidget(self._table_card(), 1)
-        column.addWidget(theme.role(QLabel(t("g_hint")), "muted"))
+        column.addWidget(theme.role(QLabel(tr("Right-click an entry for actions. Double-click to edit.")), "muted"))
         central = QWidget()
         central.setLayout(column)
         self.setCentralWidget(central)
@@ -63,14 +63,14 @@ class MainWindow(QMainWindow):
     def _header(self):
         """Заголовок слева, общие действия справа."""
         row = QHBoxLayout()
-        title = theme.neon_title(theme.role(QLabel(t("g_app_title")), "title"))
+        title = theme.neon_title(theme.role(QLabel(tr("WhoKey")), "title"))
         row.addWidget(title)
-        row.addWidget(theme.role(QLabel(t("g_tagline")), "muted"), 0, Qt.AlignBottom)
+        row.addWidget(theme.role(QLabel(tr("password manager")), "muted"), 0, Qt.AlignBottom)
         row.addWidget(theme.role(QLabel(self.vault.path.name), "accent"), 0, Qt.AlignBottom)
         row.addStretch()
-        for text, handler in [(t("g_generator"), self.open_generator),
-                              (t("g_change_master"), self.change_master),
-                              (t("g_extension"), self.extension)]:
+        for text, handler in [(tr("Generator"), self.open_generator),
+                              (tr("Change master password"), self.change_master),
+                              (tr("Extension"), self.extension)]:
             button = QPushButton(text)
             button.clicked.connect(handler)
             row.addWidget(button)
@@ -79,11 +79,11 @@ class MainWindow(QMainWindow):
     def _toolbar(self):
         row = QHBoxLayout()
         self.search = QLineEdit()
-        self.search.setPlaceholderText(t("g_search"))
+        self.search.setPlaceholderText(tr("Search by site, login or note"))
         self.search.setClearButtonEnabled(True)
         self.search.textChanged.connect(lambda: self.refresh())
         row.addWidget(self.search, 1)
-        add = theme.kind(QPushButton("+ " + t("g_add")), "primary")
+        add = theme.kind(QPushButton("+ " + tr("Add")), "primary")
         add.clicked.connect(self.add)
         row.addWidget(add)
         return row
@@ -92,7 +92,7 @@ class MainWindow(QMainWindow):
         """Таблица в «карточке» с неоновым ореолом; если записей нет — подсказка вместо неё."""
         self.table = QTableWidget(0, len(COLUMNS))
         self.table.setHorizontalHeaderLabels(
-            [t("col_site"), t("col_login"), t("col_password"), t("col_note"), t("g_col_updated")])
+            [tr("Site"), tr("Login"), tr("Password"), tr("Note"), tr("Updated")])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)  # правка — только в окне записи
@@ -111,7 +111,7 @@ class MainWindow(QMainWindow):
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._context_menu)
 
-        self.empty = theme.role(QLabel(t("g_empty_list")), "muted")
+        self.empty = theme.role(QLabel(tr("No entries yet — click \"+ Add\".")), "muted")
         self.empty.setAlignment(Qt.AlignCenter)
 
         card = theme.role(QFrame(), "card")
@@ -133,14 +133,14 @@ class MainWindow(QMainWindow):
         entry = self.vault.entries[index]
 
         menu = theme.rounded_menu(QMenu(self))
-        show = t("g_ctx_hide") if self.revealed == index else t("g_ctx_show")
+        show = tr("Hide password") if self.revealed == index else tr("Show password")
         menu.addAction(show, self.toggle_reveal)
-        menu.addAction(t("g_copy"), self.copy)
-        login = menu.addAction(t("g_ctx_copy_login"), self.copy_login)
+        menu.addAction(tr("Copy password"), self.copy)
+        login = menu.addAction(tr("Copy login"), self.copy_login)
         login.setEnabled(bool(entry["login"]))
         menu.addSeparator()
-        menu.addAction(t("g_ctx_edit"), self.edit)
-        menu.addAction(t("g_delete"), self.delete)
+        menu.addAction(tr("Edit…"), self.edit)
+        menu.addAction(tr("Delete"), self.delete)
         menu.exec(self.table.viewport().mapToGlobal(pos))
 
     # --- таблица ---
@@ -188,7 +188,10 @@ class MainWindow(QMainWindow):
                     break
         # пустое хранилище — вместо пустой таблицы подсказка
         self.stack.setCurrentWidget(self.empty if not self.vault.entries else self.table)
-        self.entries_count.setText(t("g_status_entries", n=len(self.vault.entries)))
+        # число — отдельной переменной, а не len() внутри: иначе lupdate не поймёт,
+        # что у надписи есть формы «1 запись / 2 записи / 5 записей»
+        count = len(self.vault.entries)
+        self.entries_count.setText(self.tr("%n entries", "", count))
 
     def _save(self, change):
         """Выполняет изменение хранилища и сообщает об ошибках записи. True — получилось."""
@@ -196,10 +199,10 @@ class MainWindow(QMainWindow):
             change()
         except SaveError as error:
             # диск полон, нет прав на запись — изменение не применено
-            show_error(self, t("save_failed", error=error))
+            show_error(self, tr("⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.").format(error=error))
             return False
         if self.vault.backup_error:
-            self.statusBar().showMessage(t("backup_failed", error=self.vault.backup_error), 10000)
+            self.statusBar().showMessage(tr("⚠ The change is saved, but the backup was not updated: {error}.").format(error=self.vault.backup_error), 10000)
             self.vault.backup_error = None
         return True
 
@@ -229,9 +232,9 @@ class MainWindow(QMainWindow):
             return
         entry = self.vault.entries[index]
         # без логина — без пустых скобок «()»
-        question = (t("g_delete_question", site=entry["site"], login=entry["login"]) if entry["login"]
-                    else t("g_delete_question_nologin", site=entry["site"]))
-        if not ask_yes(self, t("g_delete_title"), question):
+        question = (tr("Delete \"{site}\" ({login})?\nThis cannot be undone.").format(site=entry["site"], login=entry["login"]) if entry["login"]
+                    else tr("Delete \"{site}\"?\nThis cannot be undone.").format(site=entry["site"]))
+        if not ask_yes(self, tr("Delete entry"), question):
             return
         if self._save(lambda: self.vault.delete(index)):
             # номера записей после удалённой сдвинулись — показанный пароль прячем
@@ -262,12 +265,12 @@ class MainWindow(QMainWindow):
         index = self.selected_index()
         if index is not None:
             QGuiApplication.clipboard().setText(self.vault.entries[index]["login"])
-            self.statusBar().showMessage(t("g_login_copied"), 5000)
+            self.statusBar().showMessage(tr("Login copied."), 5000)
 
     def copy_password(self, password):
         """Копирует через буфер с автоочисткой и запускает таймер внизу окна. True — получилось."""
         if not self.clipboard.copy(password):
-            show_error(self, t("copy_failed"))
+            show_error(self, tr("Could not copy the password to the clipboard."))
             return False
         self.statusBar().clearMessage()  # сообщение поверх скрыло бы таймер
         self.countdown.start(CLEAR_AFTER)
@@ -276,12 +279,12 @@ class MainWindow(QMainWindow):
     def extension(self):
         """Расширение браузера: подключено ли — и кнопка «отключить»."""
         if not self.vault.bridge_keys:
-            show_info(self, t("g_extension"), t("g_extension_none"))
+            show_info(self, tr("Extension"), tr("The browser extension is not connected.\nHow to install it — see the README on GitHub."))
             return
-        if not ask_yes(self, t("g_extension"), t("g_extension_forget_question")):
+        if not ask_yes(self, tr("Extension"), tr("Disconnect the browser extension?\nIt will no longer receive passwords. To connect it again, WhoKey will ask for permission once more.")):
             return
         if self._save(lambda: self.vault.set_bridge_keys([])):
-            self.statusBar().showMessage(t("g_extension_forgotten"), 8000)
+            self.statusBar().showMessage(tr("Extension disconnected"), 8000)
 
     def open_generator(self):
         GeneratorDialog(self, self.copy_password).exec()
@@ -289,9 +292,9 @@ class MainWindow(QMainWindow):
     def change_master(self):
         if not ChangeMasterDialog(self, self.vault).exec():
             return
-        self.statusBar().showMessage(t("master_changed"), 10000)
+        self.statusBar().showMessage(tr("Master password changed, vault re-encrypted."), 10000)
         if self.vault.backup_error:
             # копия со старым паролем при этом удалена — человек должен знать,
             # что резервной копии сейчас нет
-            show_error(self, t("backup_failed", error=self.vault.backup_error))
+            show_error(self, tr("⚠ The change is saved, but the backup was not updated: {error}.").format(error=self.vault.backup_error))
             self.vault.backup_error = None

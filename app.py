@@ -34,10 +34,10 @@ from gui.secure_clipboard import SecureClipboard
 from gui import theme
 from gui.autolock import AutoLock
 from gui.bridge import BridgeServer
-from gui.login import LANGUAGES, LoginWindow
+from gui.i18n import LANGUAGES, set_language, tr
+from gui.login import LoginWindow
 from gui.main_window import MainWindow
-import texts
-from texts import set_language, t
+from gui import i18n
 
 APP_NAME = "EduPasswords"
 
@@ -78,7 +78,7 @@ class Controller:
             # папка прошлого хранилища недоступна (например, не подключена флешка).
             # Не предлагаем создать новое на её месте — открываем хранилище
             # по умолчанию и прямо говорим, что случилось.
-            self.state["notice"] = t("g_folder_missing", folder=Path(saved).parent)
+            self.state["notice"] = tr("The folder of the last vault is unavailable: {folder}\nMaybe a drive is not connected. The default vault is shown; to go back, connect the drive and click \"Other file…\".").format(folder=Path(saved).parent)
         self.show_login(path)
 
     def _replace_window(self, window):
@@ -91,7 +91,7 @@ class Controller:
             old.deleteLater()
 
     def show_login(self, path):
-        self.settings.setValue("language", texts.LANG)
+        self.settings.setValue("language", i18n.LANG)
         window = LoginWindow(path, self.state)
         window.restart.connect(self.show_login)
         window.opened.connect(self.show_main)
@@ -121,7 +121,7 @@ class Controller:
             if isinstance(widget, QDialog) and widget.isVisible():
                 widget.reject()
         self.clipboard.clear_now()
-        self.state["notice"] = t("g_locked")
+        self.state["notice"] = tr("WhoKey locked: the screen was locked or the Mac slept. Enter your master password.")
         path = self.window.vault.path
         # окно меняем, когда закроются окошки (их циклы событий ещё работают)
         QTimer.singleShot(0, lambda: self.show_login(path))
@@ -142,8 +142,8 @@ def main():
         # непредвиденная ошибка — понятное окошко вместо молчаливого падения;
         # подробности для разработчика — в Терминал
         traceback.print_exception(kind, error, trace)
-        QMessageBox.critical(None, t("g_error_title"),
-                             t("unexpected", error=f"{kind.__name__}: {error}"))
+        QMessageBox.critical(None, tr("Error"),
+                             tr("⚠ Unexpected error: {error}.\nThe vault file is intact: changes are written via a temporary file.").format(error=f"{kind.__name__}: {error}"))
     sys.excepthook = on_error
 
     controller = Controller()
