@@ -3,6 +3,7 @@
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
                                QPushButton, QVBoxLayout)
 
+import sites
 from clipboard import CLEAR_AFTER
 from generator import weakness_reasons
 from gui import theme
@@ -39,6 +40,9 @@ class EntryDialog(QDialog):
         entry = entry or {"site": "", "login": "", "password": "", "note": ""}
 
         self.site = QLineEdit(entry["site"])
+        # адрес сайта — для расширения браузера: по нему решается, на какой странице заполнять
+        self.url = QLineEdit(entry.get("url", ""))
+        self.url.setPlaceholderText(t("g_url_placeholder"))
         self.login = QLineEdit(entry["login"])
         self.password = PasswordField(copy_password=copy_password)
         self.password.setText(entry["password"])
@@ -53,6 +57,7 @@ class EntryDialog(QDialog):
 
         form = QFormLayout()
         form.addRow(t("col_site"), self.site)
+        form.addRow(t("g_url"), self.url)
         form.addRow(t("col_login"), self.login)
         form.addRow(t("col_password"), self.password)
         form.addRow("", self.strength)
@@ -83,11 +88,15 @@ class EntryDialog(QDialog):
         if not self.password.text():
             self.error.setText(t("g_password_required"))
             return
+        if sites.normalize(self.url.text()) is None:
+            self.error.setText(t("g_url_bad"))
+            return
         super().accept()
 
     def values(self):
         return {"site": self.site.text().strip(), "login": self.login.text().strip(),
-                "password": self.password.text(), "note": self.note.text().strip()}
+                "password": self.password.text(), "note": self.note.text().strip(),
+                "url": sites.normalize(self.url.text())}
 
 
 class GeneratorDialog(QDialog):

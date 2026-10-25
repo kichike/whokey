@@ -32,7 +32,7 @@ args = [
     "--paths", str(HERE),
     "--exclude-module", "tkinter", "--exclude-module", "matplotlib",
     "--exclude-module", "pandas", "--exclude-module", "numpy",
-    "--exclude-module", "PySide6.QtNetwork", "--exclude-module", "PySide6.QtQml",
+    "--exclude-module", "PySide6.QtQml",
     "--exclude-module", "PySide6.QtQuick", "--exclude-module", "PySide6.QtPdf",
     "--exclude-module", "PySide6.QtVirtualKeyboard",
     "--distpath", str(HERE / "dist"), "--workpath", str(HERE / "build"), "--specpath", str(HERE / "build"),

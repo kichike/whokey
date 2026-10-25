@@ -18,12 +18,22 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))  # чтобы найти vault.py и остальные модули рядом
 
+# Браузер запускает этот же файл как мост для расширения, передавая адрес
+# расширения (chrome-extension://…/). Тогда никаких окон — сразу работа моста.
+if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1].startswith("chrome-extension://"):
+    import bridge_host
+    bridge_host.main()
+    sys.exit(0)
+
 from PySide6.QtCore import QLocale, QSettings, QStandardPaths, QTimer
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
+import bridge_protocol
 from clipboard import Clipboard
 from gui import theme
+from gui.autolock import AutoLock
+from gui.bridge import BridgeServer
 from gui.login import LANGUAGES, LoginWindow
 from gui.main_window import MainWindow
 import texts
@@ -46,6 +56,13 @@ class Controller:
         self.clipboard = Clipboard()
         self.state = {}
         self.window = None
+        self.bridge = None  # сервер для расширения браузера — пока открыто хранилище
+        # экран заблокировали или Mac уснул — закрыть хранилище (расширение перестанет получать пароли)
+        self.autolock = AutoLock()
+        self.autolock.lock.connect(self.lock)
+        if getattr(sys, "frozen", False):
+            # собранное приложение: прописать мост в браузерах (путь к себе мог поменяться)
+            bridge_protocol.install_native_host(Path(sys.executable).resolve())
 
         # язык — только из известных: с неизвестным (кто-то поправил настройки
         # вручную) окно входа падало бы при каждом запуске
@@ -82,7 +99,32 @@ class Controller:
 
     def show_main(self, vault):
         self.settings.setValue("vault_path", str(vault.path))
-        self._replace_window(MainWindow(vault, self.clipboard))
+        window = MainWindow(vault, self.clipboard)
+        self._replace_window(window)
+        self.bridge = BridgeServer(vault, window, self.settings)
+        self.bridge.start()
+        self.autolock.start()
+
+    def stop_bridge(self):
+        if self.bridge is not None:
+            self.bridge.stop()
+            self.bridge = None
+
+    def lock(self):
+        """Автоблокировка: закрыть хранилище и вернуть окно входа."""
+        if not isinstance(self.window, MainWindow):
+            return
+        self.autolock.stop()
+        self.stop_bridge()
+        # открытые окошки (запись, генератор…) закрываем — они держат данные хранилища
+        for widget in QApplication.topLevelWidgets():
+            if isinstance(widget, QDialog) and widget.isVisible():
+                widget.reject()
+        self.clipboard.clear_now()
+        self.state["notice"] = t("g_locked")
+        path = self.window.vault.path
+        # окно меняем, когда закроются окошки (их циклы событий ещё работают)
+        QTimer.singleShot(0, lambda: self.show_login(path))
 
 
 def main():
@@ -108,6 +150,7 @@ def main():
 
     # что бы ни случилось — при выходе не оставляем пароль в буфере обмена
     app.aboutToQuit.connect(controller.clipboard.clear_now)
+    app.aboutToQuit.connect(controller.stop_bridge)
 
     # kill, закрытие Терминала, Ctrl+\ — тоже нормальный выход с очисткой буфера.
     # Qt почти всё время занят своим циклом, и Python замечает сигнал, только

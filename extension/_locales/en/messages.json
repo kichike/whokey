@@ -1,0 +1,74 @@
+{
+  "name": {
+    "message": "WhoKey"
+  },
+  "description": {
+    "message": "Fills logins and passwords from the WhoKey password manager"
+  },
+  "connecting": {
+    "message": "Connecting to WhoKey…"
+  },
+  "waiting": {
+    "message": "Opening WhoKey — enter your master password.\nI will fill in as soon as it opens."
+  },
+  "choose": {
+    "message": "Choose an account:"
+  },
+  "no_entries": {
+    "message": "No entries for $1.\nIn WhoKey, open the entry and set its “Website”."
+  },
+  "filling": {
+    "message": "Filling…"
+  },
+  "filled": {
+    "message": "Filled ✓"
+  },
+  "filled_login": {
+    "message": "Login filled ✓ The password comes on the next step — press again."
+  },
+  "no_field": {
+    "message": "No login or password field found on this page."
+  },
+  "moved": {
+    "message": "The page changed — open the login form and press again."
+  },
+  "denied": {
+    "message": "WhoKey did not allow the extension."
+  },
+  "locked": {
+    "message": "WhoKey was not unlocked. Enter your master password in WhoKey and press again."
+  },
+  "not_installed": {
+    "message": "WhoKey not found. Install it and run it once — it will set up the browser."
+  },
+  "bridge_closed": {
+    "message": "The connection to WhoKey was lost. Try again."
+  },
+  "bad_page": {
+    "message": "Filling only works on secure websites (https)."
+  },
+  "not_found": {
+    "message": "Entry not found — it may have just changed. Open the popup again."
+  },
+  "error": {
+    "message": "Something went wrong. Try again."
+  },
+  "hint": {
+    "message": "⌘⇧L (Ctrl+Shift+L) opens this popup from the keyboard"
+  },
+  "pairing": {
+    "message": "WhoKey asks to confirm the connection.\nCode: $1 — allow it if WhoKey shows the same code."
+  },
+  "busy": {
+    "message": "Too many requests in a row. Wait a minute."
+  },
+  "timeout": {
+    "message": "WhoKey did not answer in time. Try again."
+  },
+  "fake_app": {
+    "message": "Another program answered instead of WhoKey — nothing was sent. Restart WhoKey."
+  },
+  "ambiguous": {
+    "message": "There are several password fields on the page — press ⌘⇧L again and choose the account."
+  }
+}

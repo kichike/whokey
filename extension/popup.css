@@ -1,0 +1,53 @@
+/* Окошко расширения в стиле WhoKey: почти чёрный фон с фиолетовым заревом,
+   лавандовый неон и стеклянные кнопки — те же цвета, что в gui/theme.py */
+:root {
+  --bg: #0a0a0c;
+  --text: #ecebf1;
+  --muted: #a29fae;
+  --neon: #ddaaf9;
+  --acc: #caa7f0;
+  --rim: #3a3242;
+  --bad: #ff8a95;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  width: 320px;
+  padding: 16px;
+  font: 13px/1.4 -apple-system, "Inter", "Segoe UI", sans-serif;
+  color: var(--text);
+  background: radial-gradient(120% 90% at 50% -15%, #3f2160 0%, #1a1024 45%, var(--bg) 100%);
+}
+header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--neon);
+  text-shadow: 0 0 10px rgba(221, 170, 249, 0.7);
+}
+#host { color: var(--acc); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#status { margin: 0 0 10px; color: var(--muted); white-space: pre-line; }
+#status.bad { color: var(--bad); }
+#status.good { color: var(--neon); }
+ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+button {
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  border: 1px solid var(--rim);
+  border-radius: 12px;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.09) 45%, rgba(255, 255, 255, 0.05) 100%);
+}
+button:hover, button:focus-visible {
+  outline: none;
+  border-color: var(--acc);
+  box-shadow: 0 0 12px rgba(202, 167, 240, 0.45);
+}
+button .login { display: block; font-weight: 600; }
+button .site { display: block; color: var(--muted); font-size: 12px; }
+button .num { float: right; color: var(--muted); }
+footer { margin-top: 12px; color: var(--muted); font-size: 11px; }

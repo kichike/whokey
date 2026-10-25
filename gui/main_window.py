@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderVi
 from clipboard import CLEAR_AFTER
 from gui import theme
 from gui.dialogs import ChangeMasterDialog, EntryDialog, GeneratorDialog
-from gui.widgets import ClipboardCountdown, ask_yes, show_error
+from gui.widgets import ClipboardCountdown, ask_yes, show_error, show_info
 from texts import t
 from vault import SaveError
 
@@ -69,7 +69,8 @@ class MainWindow(QMainWindow):
         row.addWidget(theme.role(QLabel(self.vault.path.name), "accent"), 0, Qt.AlignBottom)
         row.addStretch()
         for text, handler in [(t("g_generator"), self.open_generator),
-                              (t("g_change_master"), self.change_master)]:
+                              (t("g_change_master"), self.change_master),
+                              (t("g_extension"), self.extension)]:
             button = QPushButton(text)
             button.clicked.connect(handler)
             row.addWidget(button)
@@ -218,7 +219,7 @@ class MainWindow(QMainWindow):
         dialog = EntryDialog(self, entry, copy_password=self.copy_password)
         if not dialog.exec():
             return
-        changes = {k: v for k, v in dialog.values().items() if v != entry[k]}
+        changes = {k: v for k, v in dialog.values().items() if v != entry.get(k, "")}  # у старых записей нет url
         if changes and self._save(lambda: self.vault.update(index, **changes)):
             self.refresh(select=index)
 
@@ -271,6 +272,16 @@ class MainWindow(QMainWindow):
         self.statusBar().clearMessage()  # сообщение поверх скрыло бы таймер
         self.countdown.start(CLEAR_AFTER)
         return True
+
+    def extension(self):
+        """Расширение браузера: подключено ли — и кнопка «отключить»."""
+        if not self.vault.bridge_keys:
+            show_info(self, t("g_extension"), t("g_extension_none"))
+            return
+        if not ask_yes(self, t("g_extension"), t("g_extension_forget_question")):
+            return
+        if self._save(lambda: self.vault.set_bridge_keys([])):
+            self.statusBar().showMessage(t("g_extension_forgotten"), 8000)
 
     def open_generator(self):
         GeneratorDialog(self, self.copy_password).exec()

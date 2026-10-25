@@ -258,7 +258,9 @@ def open_backup(path, password):
 
 
 def _valid_entry(entry):
-    return isinstance(entry, dict) and all(isinstance(entry.get(f), str) for f in ENTRY_FIELDS)
+    # url (адрес сайта для расширения браузера) появился позже — у старых записей его нет
+    return isinstance(entry, dict) and all(isinstance(entry.get(f), str) for f in ENTRY_FIELDS) \
+        and isinstance(entry.get("url", ""), str)
 
 
 # --- Запись файла ---
@@ -322,6 +324,9 @@ class Vault:
         self._salt = salt
         self._params = params
         self.entries = entries  # список словарей: site, login, password, note, ...
+        # отпечатки (SHA-256) ключей расширений браузера, которым разрешён доступ.
+        # Лежат внутри зашифрованных данных: подменить их можно, только зная мастер-пароль
+        self.bridge_keys = []
         self.backup_error = None  # почему не обновилась резервная копия (если так)
         self.old_backup = None    # куда отложена чужая старая копия при создании
 
@@ -355,12 +360,18 @@ class Vault:
         except InvalidToken:
             raise WrongPassword()
         try:
-            entries = json.loads(data.decode("utf-8"))["entries"]
+            content = json.loads(data.decode("utf-8"))
+            entries = content["entries"]
             if not isinstance(entries, list) or not all(_valid_entry(e) for e in entries):
                 raise ValueError("bad entries")
-        except (ValueError, KeyError, TypeError, RecursionError) as error:
+            bridge_keys = content.get("bridge_keys", [])  # у хранилищ до расширения браузера его нет
+            if not isinstance(bridge_keys, list) or not all(isinstance(k, str) for k in bridge_keys):
+                raise ValueError("bad bridge keys")
+        except (ValueError, KeyError, TypeError, AttributeError, RecursionError) as error:
             raise VaultError(str(error))
-        return cls(path, key, salt, params, entries)
+        vault = cls(path, key, salt, params, entries)
+        vault.bridge_keys = bridge_keys
+        return vault
 
     def check_password(self, password):
         """Верный ли мастер-пароль — без повторного чтения файла."""
@@ -370,9 +381,13 @@ class Vault:
 
     # --- сохранение ---
 
-    def _write(self, entries, key, salt, params):
+    def _write(self, entries, key, salt, params, bridge_keys=None):
         """Шифрует записи и сохраняет файл + резервную копию. SaveError — если не вышло."""
-        data = json.dumps({"entries": entries}, ensure_ascii=False).encode("utf-8")
+        content = {"entries": entries}
+        bridge_keys = self.bridge_keys if bridge_keys is None else bridge_keys
+        if bridge_keys:
+            content["bridge_keys"] = bridge_keys
+        data = json.dumps(content, ensure_ascii=False).encode("utf-8")
         header = {
             "format": FORMAT,
             "version": VERSION,
@@ -429,10 +444,15 @@ class Vault:
         self._write(entries, self._key, self._salt, self._params)
         self.entries = entries
 
-    def add(self, site, login, password, note=""):
+    def set_bridge_keys(self, keys):
+        """Разрешённые расширения браузера: сначала на диск, потом в память. SaveError — если не вышло."""
+        self._write(self.entries, self._key, self._salt, self._params, bridge_keys=list(keys))
+        self.bridge_keys = list(keys)
+
+    def add(self, site, login, password, note="", url=""):
         now = _now()
         entry = {"site": site, "login": login, "password": password,
-                 "note": note, "created": now, "updated": now}
+                 "note": note, "url": url, "created": now, "updated": now}
         self._commit(self.entries + [entry])
 
     def update(self, index, **fields):
@@ -449,7 +469,8 @@ class Vault:
         return [i for i, entry in enumerate(self.entries)
                 if text in entry["site"].lower()
                 or text in entry["login"].lower()
-                or text in entry["note"].lower()]
+                or text in entry["note"].lower()
+                or text in entry.get("url", "").lower()]
 
 
 def _now():

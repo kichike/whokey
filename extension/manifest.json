@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_name__",
+  "description": "__MSG_description__",
+  "version": "1.0",
+  "default_locale": "en",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApCkbvLXrtNHd3nF5IJ3rUQ2rqatkxoigUR0iWuX77PmiOlY4sio+JYXhc8ciRakbjfvlKl0ch6yJlJ+IS3+JTtanNQyrKbfvIwJ39SVti35JmYKbaYEWigJIifkcCjulVC2fS+iqwLIrtt7z9+9pSVtAcfXTwHZ+OAHaG4DYAz/zS7PJTi6bm+/zp2t0cxxyFMa/tW/Az41aLWZYpeMFcFeM7a8RKRk+AoRZ8jBpJHQ/b9mGygmwn13CmgPNqJ6i0sku48XQNPRfkGdln6U0ZW+ROmPSoH2fq2ZcB6IQ+VGna9+5TLjrkfsNFBdeLwRRaMUv65krE1nJDVAZPK49zwIDAQAB",
+  "permissions": [
+    "nativeMessaging",
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "WhoKey",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L",
+        "mac": "Command+Shift+L"
+      }
+    }
+  },
+  "externally_connectable": {
+    "ids": []
+  }
+}

@@ -27,20 +27,21 @@ rm -rf "$BUILD"  # старой сборки не остаётся — нече�
   --add-data "$P/gui/assets/icon.png:gui/assets" \
   --paths "$P" \
   --exclude-module tkinter --exclude-module matplotlib --exclude-module pandas --exclude-module numpy \
-  --exclude-module PySide6.QtNetwork --exclude-module PySide6.QtQml --exclude-module PySide6.QtQuick \
+  --exclude-module PySide6.QtQml --exclude-module PySide6.QtQuick \
   --exclude-module PySide6.QtPdf --exclude-module PySide6.QtVirtualKeyboard \
   --distpath "$BUILD/dist" --workpath "$BUILD/work" --specpath "$BUILD" \
   "$P/app.py"
 
 # Лишние части Qt (~25 МБ): их тянут плагины, которые приложению не нужны —
 # виртуальная клавиатура, чтение PDF как картинок, сенсорный экран.
-# QtDBus НЕ трогаем: на нём держится QtGui.
+# QtDBus НЕ трогаем: на нём держится QtGui. QtNetwork тоже нужен — через его
+# локальный сокет WhoKey разговаривает с расширением браузера (gui/bridge.py).
 QT="$APP/Contents/Frameworks/PySide6/Qt"
 rm -f "$QT/plugins/platforminputcontexts/libqtvirtualkeyboardplugin.dylib" \
       "$QT/plugins/imageformats/libqpdf.dylib" \
       "$QT/plugins/generic/libqtuiotouchplugin.dylib"
 for lib in QtPdf QtQml QtQmlMeta QtQmlModels QtQmlWorkerScript QtQuick \
-           QtVirtualKeyboard QtVirtualKeyboardQml QtNetwork; do
+           QtVirtualKeyboard QtVirtualKeyboardQml; do
   rm -rf "$QT/lib/$lib.framework"
 done
 # PyInstaller кладёт в Contents/Frameworks ещё и ярлыки на эти библиотеки —
