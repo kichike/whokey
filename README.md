@@ -160,5 +160,5 @@ python3 -m venv .venv
 
 ---
 
-The Inter font is used under the SIL Open Font License (`gui/fonts/LICENSE.txt`).
-Шрифт Inter распространяется по лицензии SIL Open Font License (`gui/fonts/LICENSE.txt`).
+The MesloLGS Nerd Font is used under the Apache License 2.0 (`gui/fonts/LICENSE.txt`).
+Шрифт MesloLGS Nerd Font распространяется по лицензии Apache 2.0 (`gui/fonts/LICENSE.txt`).

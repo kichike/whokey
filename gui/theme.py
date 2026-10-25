@@ -1,5 +1,5 @@
 """Оформление: почти чёрный фон с фиолетовым заревом, лавандовый неон и
-«стекло» в духе Liquid Glass, шрифт Inter.
+«стекло» в духе Liquid Glass, моноширинный шрифт MesloLGS Nerd Font.
 
 Цвета взяты из CSS-переменных chat.eblo.id (--bg, --surf, --acc и т.д.);
 лавандовые оттенки сдвинуты на 15° к розовому (по просьбе).
@@ -18,7 +18,13 @@ from PySide6.QtGui import QColor, QFont, QFontDatabase, QLinearGradient, QPainte
 from PySide6.QtWidgets import QAbstractSpinBox, QApplication, QGraphicsDropShadowEffect, QLineEdit, QWidget
 from shiboken6 import isValid  # жив ли ещё объект Qt за питоновской обёрткой
 
-FONT_FILE = Path(__file__).parent / "fonts" / "InterVariable.ttf"  # лицензия OFL — fonts/LICENSE.txt
+# лицензия Apache 2.0 — fonts/LICENSE.txt; обычное начертание и жирное (для кнопок и заголовков)
+FONT_FILE = Path(__file__).parent / "fonts" / "MesloLGSNerdFont-Regular.ttf"
+FONT_BOLD_FILE = Path(__file__).parent / "fonts" / "MesloLGSNerdFont-Bold.ttf"
+# у Mac экран Retina (на точку шрифта — 4 пикселя), на обычном экране Windows
+# тот же размер выглядит мельче — поэтому там на единицу крупнее
+FONT_SIZE = 14 if sys.platform == "win32" else 13
+FONT_FAMILY = "MesloLGS Nerd Font"
 # в оформлении Qt путь пишется через «/» даже на Windows
 CHECK_FILE = (Path(__file__).parent / "assets" / "check.svg").as_posix()
 ARROW_FILE = (Path(__file__).parent / "assets" / "arrow.svg").as_posix()
@@ -108,13 +114,15 @@ RIM_CARD = solid(ACC, 120)
 HOLLOW = rgba("#000000", 95) # «углубление» поля ввода
 
 STYLE = f"""
-QWidget {{ color: {TEXT}; font-size: 13px; }}
+/* шрифт — здесь, а не только через app.setFont: на macOS Qt ставит кнопкам, подписям
+   и таблице системный шрифт отдельно, и общий шрифт приложения до них не доходил */
+QWidget {{ color: {TEXT}; font-family: "{FONT_FAMILY}"; font-size: {FONT_SIZE}px; }}
 /* фиолетовое зарево сверху окна — как неоновая подсветка; его видно сквозь стекло */
 QMainWindow, QDialog, QWidget[role="backdrop"] {{
     background: qradialgradient(cx:0.5, cy:-0.15, radius:1.1, fx:0.5, fy:-0.15,
                                 stop:0 #3f2160, stop:0.45 #1a1024, stop:1 {BG}); }}
 QLabel {{ background: transparent; }}
-QLabel[role="title"] {{ font-size: 28px; font-weight: 800; color: {NEON}; }}
+QLabel[role="title"] {{ font-size: {FONT_SIZE * 2 + 2}px; font-weight: 800; color: {NEON}; }}
 QLabel[role="muted"] {{ color: {MUTED}; }}
 QLabel[role="error"] {{ color: {BAD_INK}; }}
 QLabel[role="accent"] {{ color: {ACC}; font-weight: 600; }}
@@ -186,7 +194,7 @@ QHeaderView {{ background: transparent; }}
 QHeaderView::section {{
     background: transparent; color: {MUTED}; border: none;
     border-bottom: 1px solid {rgba(ACC, 90)};
-    padding: 8px 10px; font-size: 12px; font-weight: 600; }}
+    padding: 8px 10px; font-size: {FONT_SIZE - 1}px; font-weight: 600; }}
 
 /* меню скруглено (см. rounded_menu) и непрозрачно: размытия под ним нет,
    и сквозь прозрачное меню читался бы текст таблицы */
@@ -212,9 +220,10 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none
 
 def apply(app):
     """Включает оформление для всего приложения."""
+    QFontDatabase.addApplicationFont(str(FONT_BOLD_FILE))
     families = QFontDatabase.applicationFontFamilies(QFontDatabase.addApplicationFont(str(FONT_FILE)))
-    font = QFont(families[0] if families else "Inter Variable")
-    font.setPointSize(13)
+    font = QFont(families[0] if families else FONT_FAMILY)
+    font.setPixelSize(FONT_SIZE)
     app.setFont(font)
     # Fusion — простой стиль Qt, который послушно перекрашивается;
     # родной стиль macOS игнорирует часть настроек оформления
