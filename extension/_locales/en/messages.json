@@ -69,6 +69,6 @@
     "message": "Another program answered instead of WhoKey — nothing was sent. Restart WhoKey."
   },
   "ambiguous": {
-    "message": "There are several password fields on the page — press ⌘⇧L again and choose the account."
+    "message": "There are several password fields on the page — press ⌘⇧L (Ctrl+Shift+L) again and choose the account."
   }
 }

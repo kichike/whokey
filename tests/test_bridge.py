@@ -328,12 +328,12 @@ class WindowsPipe(unittest.TestCase):
         server, *_ = make_server()
         self.assertTrue(server.start())
         self.assertEqual(self.request(b'{"type": "ping"}\n'), {"status": "ok"})
-        # чужая программа (PowerShell) получает только «не доверяю»
+        # чужая программа (PowerShell) сразу получает только «не доверяю», и канал закрывается —
+        # даже запрос отправить не успевает (поэтому она только читает)
         client = self.powershell(
             f"$p = New-Object System.IO.Pipes.NamedPipeClientStream('.', '{self.name}', 'InOut'); "
-            "$p.Connect(5000); $w = New-Object System.IO.StreamWriter($p); $w.AutoFlush = $true; "
-            "$w.WriteLine('{\"type\": \"ping\"}'); $r = New-Object System.IO.StreamReader($p); "
-            "Write-Output $r.ReadLine()")
+            "$p.Connect(5000); $r = New-Object System.IO.StreamReader($p); "
+            "Write-Output ('reply: ' + $r.ReadLine())")
         end = time.monotonic() + 20
         while client.poll() is None and time.monotonic() < end:
             pump(0.1)
