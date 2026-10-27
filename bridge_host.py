@@ -99,6 +99,8 @@ def std_streams():
         get_handle = ctypes.windll.kernel32.GetStdHandle
         get_handle.restype = ctypes.c_void_p
         handle = get_handle(number)  # STD_INPUT_HANDLE / STD_OUTPUT_HANDLE
+        if handle in (None, 0, ctypes.c_void_p(-1).value):
+            sys.exit(0)  # браузер не дал каналов — значит, мост запустили не из браузера
         fd = msvcrt.open_osfhandle(handle, os.O_BINARY)
         streams.append(os.fdopen(fd, mode))
     return streams[0], streams[1]

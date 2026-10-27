@@ -19,8 +19,9 @@ AppPublisherURL=https://github.com/kichike/whokey
 DefaultDirName={autopf}\WhoKey
 DefaultGroupName=WhoKey
 DisableProgramGroupPage=yes
+; только для текущего пользователя: мост расширения прописывается в его реестре (HKCU),
+; а общий exe в Program Files могли бы запускать и другие пользователи (ревью безопасности 1.4)
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=dist

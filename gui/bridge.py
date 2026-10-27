@@ -41,6 +41,7 @@ MAX_CONNECTIONS = 8                # больше одновременно не 
 REQUEST_TIMEOUT_MS = 5000          # соединение без запроса дольше этого закрывается
 PAIR_COOLDOWN = 10                 # секунд после отказа — новые запросы разрешения не показываем
 RATE_LIMIT = {"logins": 30, "fill": 10}  # запросов в минуту
+CLOSE_AFTER_MS = 2000              # после ответа: сколько ждём, пока собеседник закроет соединение
 
 
 def _fingerprint(key):
@@ -54,6 +55,7 @@ class BridgeServer(QObject):
         self.server = None
         self.buffers = {}  # соединение -> полученные байты
         self.busy = set()  # соединения, чей запрос сейчас обрабатывается (например, ждёт «разрешить?»)
+        self.closing = set()  # ответ отправлен — ждём, пока собеседник закроет соединение
         self.pairing = False      # окно «разрешить?» уже открыто
         self.denied_at = None     # когда в последний раз отказали в разрешении (None — не отказывали)
         self.recent = {kind: [] for kind in RATE_LIMIT}  # время последних запросов
@@ -86,10 +88,11 @@ class BridgeServer(QObject):
         if self.server is not None:
             self.server.close()
             self.server = None
-        for conn in list(self.buffers):
+        for conn in list(self.buffers) + list(self.closing):
             conn.abort()
         self.buffers.clear()
         self.busy.clear()
+        self.closing.clear()
 
     def _ensure_listening(self):
         if self.server is None or not self.server.isListening():
@@ -109,12 +112,7 @@ class BridgeServer(QObject):
             if not self._trusted(conn):
                 # чужая программа: ничего не читаем и не отдаём, только говорим «не доверяю» —
                 # иначе мост принял бы обрыв за «WhoKey закрыт» и открывал бы его снова
-                # удаляем, когда ответ уйдёт и канал закроется: на Windows запись идёт
-                # не сразу, и немедленное удаление обрывало бы её — ответ терялся
-                conn.disconnected.connect(conn.deleteLater)
-                conn.write(b'{"status": "untrusted"}\n')
-                conn.flush()
-                conn.disconnectFromServer()
+                self._answer_and_close(conn, b'{"status": "untrusted"}\n')
                 continue
             self.buffers[conn] = b""
             conn.readyRead.connect(lambda c=conn: self._read(c))
@@ -173,9 +171,32 @@ class BridgeServer(QObject):
         # пока человек думал над «разрешить?», соединение могло закрыться (и объект удалён) —
         # тогда к нему не обращаемся вовсе: проверка «есть ли в списке» его не трогает
         if conn in self.buffers:
-            conn.write(json.dumps(reply, ensure_ascii=False).encode("utf-8") + b"\n")
-            conn.flush()
-            conn.disconnectFromServer()
+            self._answer_and_close(conn, json.dumps(reply, ensure_ascii=False).encode("utf-8") + b"\n")
+
+    def _answer_and_close(self, conn, data):
+        """Отвечает и ждёт, пока собеседник сам закроет соединение (он закрывает, прочитав ответ).
+
+        Если закрыть со своей стороны сразу, на Windows непрочитанный ответ пропадает
+        (канал рвётся вместе с ним) — мост решил бы, что WhoKey закрыт. Молчуна
+        закрываем принудительно через CLOSE_AFTER_MS.
+        """
+        if len(self.closing) >= MAX_CONNECTIONS:  # слишком много «повисших» — не ждём
+            conn.abort()
+            conn.deleteLater()
+            return
+        self.closing.add(conn)
+        conn.disconnected.connect(lambda c=conn: self._closed(c))
+        conn.write(data)
+        conn.flush()
+        QTimer.singleShot(CLOSE_AFTER_MS, lambda c=conn: self._closed(c, force=True))
+
+    def _closed(self, conn, force=False):
+        if conn not in self.closing:  # уже закрыт — объект не трогаем
+            return
+        self.closing.discard(conn)
+        if force:
+            conn.abort()
+        conn.deleteLater()
 
     # --- запросы ---
 

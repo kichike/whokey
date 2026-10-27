@@ -30,7 +30,7 @@ from PySide6.QtWidgets import QApplication, QMainWindow  # noqa: E402
 import bridge_host as H  # noqa: E402
 import bridge_protocol as P  # noqa: E402
 import gui.bridge as B  # noqa: E402
-from gui.autolock import AutoLock, monotonic, screen_locked  # noqa: E402
+from gui.autolock import AutoLock, monotonic, screen_locked, session_info_locked  # noqa: E402
 from vault import Vault  # noqa: E402
 
 APP = QApplication.instance() or QApplication([])
@@ -183,6 +183,11 @@ class Socket(unittest.TestCase):
             nc.stdin.flush()
             self.pump(1.0)
             nc.stdin.close()
+            # WhoKey ждёт, пока собеседник закроет соединение сам, и через CLOSE_AFTER_MS
+            # закрывает его принудительно — сервер в этом же процессе, поэтому «качаем» его
+            end = time.monotonic() + B.CLOSE_AFTER_MS / 1000 + 3
+            while nc.poll() is None and time.monotonic() < end:
+                self.pump(0.1)
             out = nc.stdout.read()
         self.assertIn(b"untrusted", out)
         server.stop()
@@ -427,6 +432,15 @@ class Autolock(unittest.TestCase):
         lock._clocks = (time.time() - 100, monotonic() - 1)
         lock._check()
         self.assertEqual(events, [1])
+
+    def test_windows_session_info_layout(self):
+        """Ревью: флаги блокировки лежат по смещению 16 — не путать с состоянием сеанса."""
+        active_unlocked = struct.pack("<I4xIii", 1, 2, 0, 1)  # State=WTSActive(0), Flags=UNLOCK(1)
+        locked = struct.pack("<I4xIii", 1, 2, 0, 0)          # Flags=LOCK(0)
+        unknown = struct.pack("<I4xIii", 1, 2, 0, -1)
+        self.assertFalse(session_info_locked(active_unlocked))
+        self.assertTrue(session_info_locked(locked))
+        self.assertFalse(session_info_locked(unknown))
 
     @unittest.skipUnless(WINDOWS, "Windows: состояние сеанса и часы без сна")
     def test_windows_session_and_clock(self):

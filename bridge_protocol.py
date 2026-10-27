@@ -54,7 +54,9 @@ WINDOWS_BROWSER_KEYS = [
 
 
 def _user_tag():
-    name = os.environ.get("USERNAME", "") + "@" + os.environ.get("USERDOMAIN", "")
+    """Метка пользователя для имён каналов. На Windows — из SID учётной записи
+    (переменные окружения USERNAME может подделать кто угодно)."""
+    name = (current_sid() or "") if WINDOWS else str(os.getuid())
     return hashlib.sha256(name.lower().encode("utf-8")).hexdigest()[:16]
 
 
@@ -276,6 +278,20 @@ if WINDOWS:
                                ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
     _k32.CloseHandle.argtypes = [wintypes.HANDLE]
     _k32.WaitNamedPipeW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD]
+    _k32.GetNamedPipeClientSessionId.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.ULONG)]
+    _k32.GetNamedPipeClientComputerNameW.argtypes = [wintypes.HANDLE, wintypes.LPWSTR, wintypes.ULONG]
+    _k32.ProcessIdToSessionId.argtypes = [wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)]
+    _k32.GetCurrentProcess.restype = wintypes.HANDLE
+    _k32.LocalFree.argtypes = [ctypes.c_void_p]
+    _adv = ctypes.WinDLL("advapi32", use_last_error=True)
+    _adv.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
+    _adv.GetTokenInformation.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD,
+                                         ctypes.POINTER(wintypes.DWORD)]
+    _adv.ConvertSidToStringSidW.argtypes = [ctypes.c_void_p, ctypes.POINTER(wintypes.LPWSTR)]
+    _adv.GetSecurityInfo.restype = wintypes.DWORD
+    _adv.GetSecurityInfo.argtypes = [wintypes.HANDLE, ctypes.c_int, wintypes.DWORD, ctypes.POINTER(ctypes.c_void_p),
+                                     ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
+                                     ctypes.POINTER(ctypes.c_void_p)]
     _INVALID = wintypes.HANDLE(-1).value
     _ERROR_PIPE_BUSY, _ERROR_BROKEN_PIPE = 231, 109
 
@@ -296,13 +312,69 @@ def _windows_program_of(pid):
 
 
 def _windows_own_program():
-    return os.path.normcase(os.path.realpath(sys.executable))
+    # программа процесса так, как её видит система: в виртуальном окружении
+    # Scripts\python.exe лишь запускает настоящий python.exe, и пути не совпали бы
+    return _windows_program_of(os.getpid()) or os.path.normcase(os.path.realpath(sys.executable))
+
+
+def _sid_string(sid_pointer):
+    text = wintypes.LPWSTR()
+    if not _adv.ConvertSidToStringSidW(sid_pointer, ctypes.byref(text)):
+        return None
+    try:
+        return text.value
+    finally:
+        _k32.LocalFree(text)
+
+
+def current_sid():
+    """SID учётной записи, от которой запущены (Windows), строкой «S-1-5-…»."""
+    token = wintypes.HANDLE()
+    if not _adv.OpenProcessToken(_k32.GetCurrentProcess(), 0x0008, ctypes.byref(token)):  # TOKEN_QUERY
+        return None
+    try:
+        size = wintypes.DWORD()
+        _adv.GetTokenInformation(token, 1, None, 0, ctypes.byref(size))  # TokenUser — узнать размер
+        buffer = ctypes.create_string_buffer(size.value)
+        if not _adv.GetTokenInformation(token, 1, buffer, size, ctypes.byref(size)):
+            return None
+        return _sid_string(ctypes.c_void_p.from_buffer(buffer).value)  # TOKEN_USER начинается с указателя на SID
+    finally:
+        _k32.CloseHandle(token)
+
+
+def pipe_owner_sid(handle):
+    """Чей канал: SID владельца (Windows). Чужой пользователь не может создать канал
+    с нашим SID владельцем — так отсекаем каналы, занятые другой учётной записью."""
+    owner, descriptor = ctypes.c_void_p(), ctypes.c_void_p()
+    # SE_KERNEL_OBJECT (6), OWNER_SECURITY_INFORMATION (1)
+    if _adv.GetSecurityInfo(handle, 6, 1, ctypes.byref(owner), None, None, None, ctypes.byref(descriptor)) != 0:
+        return None
+    try:
+        return _sid_string(owner)
+    finally:
+        _k32.LocalFree(descriptor)
 
 
 def trusted_pipe_client(handle):
-    """Сервер WhoKey: на другом конце канала — наш мост (та же программа)? (Windows)"""
+    """Сервер WhoKey: на другом конце канала — наш мост (та же программа)? (Windows)
+
+    Номер процесса собеседника Windows сообщает со слов клиента, и программа того же
+    пользователя может его подделать (Project Zero, 2019) — поэтому это лишь одна из
+    преград. Настоящая защита — ключ сопряжения и разрешение человека в окне WhoKey.
+    Дополнительно: только с этого же компьютера и из этого же сеанса Windows.
+    """
+    handle = wintypes.HANDLE(int(handle))
+    computer = ctypes.create_unicode_buffer(256)
+    if _k32.GetNamedPipeClientComputerNameW(handle, computer, ctypes.sizeof(computer)):
+        return False  # подключились по сети — только для удалённых клиентов это удаётся
+    session, own_session = wintypes.ULONG(), wintypes.DWORD()
+    if (not _k32.GetNamedPipeClientSessionId(handle, ctypes.byref(session))
+            or not _k32.ProcessIdToSessionId(os.getpid(), ctypes.byref(own_session))
+            or session.value != own_session.value):
+        return False
     pid = wintypes.ULONG()
-    if not _k32.GetNamedPipeClientProcessId(wintypes.HANDLE(int(handle)), ctypes.byref(pid)):
+    if not _k32.GetNamedPipeClientProcessId(handle, ctypes.byref(pid)):
         return False
     return _windows_program_of(pid.value) == _windows_own_program()
 
@@ -313,7 +385,9 @@ class WinPipe:
     def __init__(self, name):
         path = "\\\\.\\pipe\\" + name
         for _attempt in range(3):
-            self.handle = _k32.CreateFileW(path, 0x80000000 | 0x40000000, 0, None, 3, 0, None)
+            # SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION: чужой сервер на этом канале
+            # не сможет действовать от имени моста (только узнать, кто подключился)
+            self.handle = _k32.CreateFileW(path, 0x80000000 | 0x40000000, 0, None, 3, 0x00110000, None)
             if self.handle != _INVALID:
                 return
             error = ctypes.get_last_error()
@@ -358,7 +432,7 @@ def _ask_app_windows(message, timeout):
     pipe = WinPipe(socket_address())
     try:
         # пока WhoKey закрыт, канал с таким именем могла открыть чужая программа
-        if pipe.server_program() != _windows_own_program():
+        if pipe_owner_sid(pipe.handle) != current_sid() or pipe.server_program() != _windows_own_program():
             raise PeerError("the pipe is not served by WhoKey")
         pipe.write(json.dumps(message, ensure_ascii=False).encode("utf-8") + b"\n")
         data, deadline = b"", time.monotonic() + timeout
@@ -388,7 +462,12 @@ def _install_native_host_windows(executable):
     """Windows: описание моста — файлом в папке программы, путь к нему — в реестре браузеров."""
     import winreg
     temp = os.path.normcase(os.path.realpath(tempfile.gettempdir()))
-    if os.path.normcase(os.path.realpath(str(executable))).startswith(temp):
+    exe = os.path.normcase(os.path.realpath(str(executable)))
+    try:
+        inside_temp = os.path.commonpath([temp, exe]) == temp
+    except ValueError:  # разные диски
+        inside_temp = False
+    if inside_temp:
         return []  # запуск из временной папки (например, из архива) — путь скоро пропадёт
     manifest = {
         "name": HOST_NAME,

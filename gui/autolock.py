@@ -26,8 +26,21 @@ CHECK_EVERY_MS = 3000
 SLEEP_GAP = 20  # секунд «пропало» из монотонного времени — считаем, что компьютер спал
 
 
+def session_info_locked(raw):
+    """Разбор начала WTSINFOEXW (20 байт): True — сеанс Windows заблокирован.
+
+    Level (4 байта), 4 байта выравнивания (внутри есть 8-байтные поля), затем
+    SessionId, SessionState, SessionFlags. Смещение флагов — 16, не 12: иначе
+    прочли бы SessionState («активен» = 0) и блокировались бы каждые 3 секунды.
+    """
+    level, _session, _state, flags = struct.unpack_from("<I4xIii", raw)
+    return level == 1 and flags == 0  # WTS_SESSIONSTATE_LOCK
+
+
 def _windows_screen_locked():
     """Заблокирован ли сеанс Windows (экран блокировки). Ошибка — False."""
+    if sys.getwindowsversion()[:2] < (6, 2):
+        return False  # в Windows 7 значение флага перевёрнуто — там полагаемся только на сон
     try:
         wts = ctypes.WinDLL("wtsapi32")
         wts.WTSQuerySessionInformationW.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_int,
@@ -39,11 +52,9 @@ def _windows_screen_locked():
         if not wts.WTSQuerySessionInformationW(None, 0xFFFFFFFF, 25, ctypes.byref(buffer), ctypes.byref(size)):
             return False
         try:
-            if size.value < 16:
+            if size.value < 20:
                 return False
-            # WTSINFOEXW: Level, затем SessionId, SessionState, SessionFlags (по 4 байта)
-            level, _session, _state, flags = struct.unpack_from("<IIIi", ctypes.string_at(buffer, 16))
-            return level == 1 and flags == 0  # WTS_SESSIONSTATE_LOCK (Windows 8 и новее)
+            return session_info_locked(ctypes.string_at(buffer, 20))
         finally:
             wts.WTSFreeMemory(buffer)
     except (OSError, AttributeError, struct.error):

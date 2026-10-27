@@ -149,16 +149,34 @@ def hand_over_to_running():
 
     На Mac вторую копию не даёт открыть сама система; на Windows её запустил бы,
     например, мост расширения, пока окно входа уже открыто.
+    Кто уже работает, узнаём по мьютексу в пространстве имён своего сеанса
+    (Local\\…): другой пользователь занять его не может — значит, и не помешает
+    WhoKey запуститься (канал с тем же именем он занять мог бы).
     """
+    import ctypes
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.restype = ctypes.c_void_p
+    kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
+    ctypes.set_last_error(0)
+    handle = kernel32.CreateMutexW(None, False, "Local\\WhoKey-" + bridge_protocol._user_tag())
+    if not handle:
+        return False  # мьютекс не создать — лучше запуститься, чем молча не открыться
+    if ctypes.get_last_error() != 183:  # не ERROR_ALREADY_EXISTS — значит, мы первые
+        hand_over_to_running.mutex = handle  # держим, пока программа работает
+        return False
     sock = QLocalSocket()
     sock.connectToServer(INSTANCE_NAME)
-    if not sock.waitForConnected(500):
-        return False
-    import ctypes
-    ctypes.windll.user32.AllowSetForegroundWindow(-1)  # иначе Windows не даст первой копии выйти вперёд
-    sock.write(b"show\n")
-    sock.waitForBytesWritten(500)
-    sock.disconnectFromServer()
+    if sock.waitForConnected(1000):
+        # выводить вперёд разрешаем только настоящему WhoKey этого же пользователя
+        pid = ctypes.c_ulong()
+        handle = ctypes.c_void_p(int(sock.socketDescriptor()))
+        if (kernel32.GetNamedPipeServerProcessId(handle, ctypes.byref(pid))
+                and bridge_protocol._windows_program_of(pid.value) == bridge_protocol.own_program()
+                and bridge_protocol.pipe_owner_sid(handle.value) == bridge_protocol.current_sid()):
+            ctypes.windll.user32.AllowSetForegroundWindow(pid.value)
+            sock.write(b"show\n")
+            sock.waitForBytesWritten(500)
+        sock.disconnectFromServer()
     return True
 
 
