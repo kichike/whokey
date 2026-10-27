@@ -14,6 +14,8 @@ build/
 
 # Password vaults, in case one ends up here
 *.dat
+# не хранилище — список зон доменов для sites.py
+!public_suffix_list.dat
 *.dat.bak
 *.dat.lock
 *.dat.old-*
