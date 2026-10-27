@@ -7,15 +7,14 @@
 import os
 from pathlib import Path
 
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import (QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel,
+from PySide6.QtCore import QTimer, Signal
+from PySide6.QtWidgets import (QFileDialog, QFrame, QHBoxLayout, QLabel,
                                QPushButton, QVBoxLayout, QWidget)
 
 from generator import weakness_reasons
-from gui import theme
+from gui import theme, touchid
 from gui.widgets import PasswordField, StrengthBar, ask_yes, show_error, show_info, weakness_text
-from gui import i18n
-from gui.i18n import LANGUAGES, set_language, tr
+from gui.i18n import tr
 from vault import (SaveError, Vault, VaultError, VaultLocked, WrongPassword, backup_path,
                    in_icloud_folder, is_readable, lock, open_backup, tidy_old_files)
 
@@ -55,7 +54,6 @@ class LoginWindow(QWidget):
         outer.setContentsMargins(40, 20, 40, 40)  # место для неонового ореола вокруг карточки
         theme.role(self, "backdrop")  # фон окна с фиолетовым заревом
         outer.setSpacing(16)
-        outer.addLayout(self._language_row())
         card = theme.role(QFrame(), "card")
         theme.neon_card(card)
         outer.addWidget(card)
@@ -82,6 +80,14 @@ class LoginWindow(QWidget):
         column.addWidget(self.error)
         outer.addStretch()
 
+    _touch_id_on_show = False
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self._touch_id_on_show:
+            self._touch_id_on_show = False
+            QTimer.singleShot(300, self.on_touch_id)
+
     def resizeEvent(self, event):
         # подписи с переносом строк (путь к файлу, подсказки) Qt при расчёте высоты
         # окна не учитывает — им не хватало места, и строки обрезались сверху и снизу
@@ -89,24 +95,6 @@ class LoginWindow(QWidget):
         super().resizeEvent(event)
 
     # --- общие части окна ---
-
-    def _language_row(self):
-        row = QHBoxLayout()
-        row.addStretch()
-        row.addWidget(QLabel(tr("Language:")))
-        combo = theme.rounded_popup(QComboBox())
-        for code, name in LANGUAGES:
-            combo.addItem(name, code)
-        combo.setCurrentIndex([code for code, _ in LANGUAGES].index(i18n.LANG))
-        # отступы пунктов в оформлении Qt при расчёте ширины списка не учитывает — добавляем сами
-        combo.view().setMinimumWidth(combo.view().sizeHintForColumn(0) + 48)
-        combo.currentIndexChanged.connect(lambda i: self._set_language(combo.itemData(i)))
-        row.addWidget(combo)
-        return row
-
-    def _set_language(self, code):
-        set_language(code)
-        self.restart.emit(self.path)
 
     def _file_row(self):
         row = QHBoxLayout()
@@ -146,6 +134,18 @@ class LoginWindow(QWidget):
         column.addWidget(self.master)
         column.addWidget(self._button(tr("Open"), self.on_open, default=True))
         self.master.setFocus()
+        if touchid.available():
+            self._build_touch_id(column)
+
+    def _build_touch_id(self, column):
+        enabled = touchid.is_enabled(self.path)
+        if enabled and touchid.is_fresh(self.path):
+            column.addWidget(self._button(tr("Unlock with Touch ID"), self.on_touch_id))
+            self._touch_id_on_show = True  # палец спрашиваем сразу, как окно появится
+        elif enabled:
+            hint = theme.role(QLabel(tr("The Mac was restarted: enter the master password once, then Touch ID will work again.")), "muted")
+            hint.setWordWrap(True)
+            column.addWidget(hint)
 
     def _build_missing(self, column):
         text = QLabel(tr("The main file {name} was not found, but there is a backup {backup}.\n\nRestore from it? If you create a new vault, the old backup will be kept under another name.").format(name=self.path.name, backup=backup_path(self.path).name))
@@ -209,7 +209,7 @@ class LoginWindow(QWidget):
             show_error(self, tr("⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.").format(error=error))
             return
         show_info(self, tr("Backup"), tr("Vault restored from the backup."))
-        self.opened.emit(vault)
+        self._finish(vault)
 
     def _offer_restore(self, backup):
         """Пароль подошёл к копии той же «эпохи» — значит, испорчен файл, а не забыт пароль."""
@@ -245,7 +245,7 @@ class LoginWindow(QWidget):
             else:
                 self.error.setText(tr("{path} is damaged or is not a password vault.").format(path=self.path))
             return
-        self.opened.emit(vault)
+        self._finish(vault)
 
     def on_restore(self):
         password = self.master.text()
@@ -290,4 +290,40 @@ class LoginWindow(QWidget):
         if in_icloud_folder(self.path):
             notes.append(tr("This folder seems to be synced with iCloud: the encrypted vault and its old versions will be stored in the cloud."))
         show_info(self, tr("WhoKey"), "\n\n".join(notes))
+        self._finish(vault)
+
+    # --- Touch ID (только macOS, см. gui/touchid.py) ---
+
+    def _finish(self, vault):
+        """Хранилище открыто мастер-паролем: обновить ключ для Touch ID или предложить его."""
+        if touchid.available():
+            if touchid.is_enabled(self.path):
+                touchid.save_key(self.path, vault.key)  # заодно отметка «после этой загрузки Mac»
+            elif not touchid.was_offered(self.path):
+                touchid.set_offered(self.path)
+                if ask_yes(self, tr("Touch ID"), tr("Unlock WhoKey with Touch ID next time?") + "\n\n" + tr("The vault key will be kept in the macOS Keychain, and WhoKey will ask for your fingerprint before using it. After the Mac restarts, the master password is needed once. You can turn it off in Settings (⌘,).")):
+                    if not touchid.save_key(self.path, vault.key):
+                        show_error(self, tr("macOS did not allow saving the key to the Keychain. Touch ID is off."))
+        self.opened.emit(vault)
+
+    def on_touch_id(self):
+        if not self._take_lock():
+            return
+        self._prompt = touchid.TouchIdPrompt(self)
+        self._prompt.finished.connect(self._touch_id_answered)
+        self._prompt.ask(tr("open your password vault"))
+
+    def _touch_id_answered(self, success):
+        if not success:  # отменили или палец не подошёл — остаётся вход по паролю
+            self.master.setFocus()
+            return
+        key = touchid.load_key(self.path)
+        try:
+            vault = Vault.open_with_key(self.path, key) if key else None
+        except (WrongPassword, VaultError):
+            vault = None
+        if vault is None:
+            touchid.forget(self.path)
+            self.error.setText(tr("Touch ID could not open the vault. Enter the master password."))
+            return
         self.opened.emit(vault)

@@ -186,10 +186,9 @@ QCheckBox::indicator:checked {{ background: {rgba(ACC, 70)}; border-color: {ACC}
 /* таблица прозрачная — лежит прямо на стеклянной карточке */
 QTableWidget {{
     background: transparent; border: none; gridline-color: {LINE};
-    selection-background-color: {ACC_FILL}; selection-color: {TEXT}; outline: 0; }}
+    selection-background-color: transparent; selection-color: {TEXT}; outline: 0; }}
 QTableWidget::item {{ padding: 6px 10px; }}
-/* ровная подсветка: градиент в Qt рисуется заново в каждой ячейке — строка выглядела бы полосатой */
-QTableWidget::item:selected {{ background: {rgba(ACC, 70)}; color: {WHITE}; }}
+/* выделенную строку рисует widgets.RoundedRowDelegate — одной скруглённой плашкой */
 QHeaderView {{ background: transparent; }}
 QHeaderView::section {{
     background: transparent; color: {MUTED}; border: none;

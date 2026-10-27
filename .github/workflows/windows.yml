@@ -24,7 +24,7 @@ jobs:
       - name: Install libraries
         run: python -m pip install -r requirements.txt
 
-      - name: Unit tests (sites, bridge, extension server, translations)
+      - name: Unit tests (sites, bridge, extension server, translations, Touch ID)
         run: python -m unittest discover tests -v
 
       - name: Smoke test (vault, clipboard, windows)
@@ -39,8 +39,22 @@ jobs:
           $p = Start-Process -FilePath "dist\WhoKey\WhoKey.exe" -PassThru
           Start-Sleep -Seconds 10
           if ($p.HasExited) { throw "WhoKey.exe exited with code $($p.ExitCode)" }
-          Stop-Process -Id $p.Id
           Write-Host "WhoKey.exe is running fine"
+          # вторая копия не открывается, а передаёт окно первой и выходит
+          $second = Start-Process -FilePath "dist\WhoKey\WhoKey.exe" -PassThru
+          if (-not $second.WaitForExit(15000)) { throw "second WhoKey.exe did not exit" }
+          if ($p.HasExited) { throw "first WhoKey.exe exited" }
+          Write-Host "second copy handed over to the first one"
+          # при запуске WhoKey прописал мост для расширения в браузерах
+          $key = "HKCU:\Software\Google\Chrome\NativeMessagingHosts\ru.edu.whokey"
+          $manifest = (Get-ItemProperty -Path $key).'(default)'
+          $json = Get-Content $manifest -Raw | ConvertFrom-Json
+          if (-not $json.path.EndsWith("WhoKey.exe")) { throw "bad native host manifest: $($json.path)" }
+          Write-Host "native host registered: $manifest"
+          Stop-Process -Id $p.Id
+
+      - name: Check WhoKey.exe as the browser bridge
+        run: python tests/host_mode_check.py dist\WhoKey\WhoKey.exe
 
       - name: Build installer (Inno Setup)
         shell: pwsh

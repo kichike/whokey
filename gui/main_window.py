@@ -1,6 +1,6 @@
 """Главное окно: поиск, таблица записей и меню действий по правому клику."""
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFontDatabase, QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderView, QLabel,
                                QLineEdit, QMainWindow, QMenu, QPushButton, QStackedWidget,
@@ -8,8 +8,8 @@ from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderVi
 
 from clipboard import CLEAR_AFTER
 from gui import theme
-from gui.dialogs import ChangeMasterDialog, EntryDialog, GeneratorDialog
-from gui.widgets import ClipboardCountdown, ask_yes, show_error, show_info
+from gui.dialogs import ChangeMasterDialog, EntryDialog, GeneratorDialog, SettingsDialog
+from gui.widgets import ClipboardCountdown, RoundedRowDelegate, ask_yes, show_error, show_info
 from gui.i18n import tr
 from vault import SaveError
 
@@ -19,6 +19,8 @@ COLUMNS = ["site", "login", "password", "note", "updated"]
 
 
 class MainWindow(QMainWindow):
+    language_changed = Signal(str)  # выбран другой язык в настройках — app.py пересоздаст окно
+
     def __init__(self, vault, clipboard):
         super().__init__()
         self.vault = vault
@@ -48,6 +50,8 @@ class MainWindow(QMainWindow):
         # горячие клавиши, как в обычных программах Mac
         QShortcut(QKeySequence.New, self, self.add)
         QShortcut(QKeySequence.Find, self, self.search.setFocus)
+        # настройки — ⌘, на Mac (Qt сам заменяет Ctrl на ⌘), Ctrl+, на Windows
+        QShortcut(QKeySequence("Ctrl+,"), self, self.open_settings)
         # ⌘C, ⌫ и Enter — только когда в фокусе таблица (WidgetShortcut). Иначе они
         # срабатывали бы во всём окне: Enter в поиске открывал бы правку записи,
         # а ⌘C в поиске копировал бы пароль вместо набранного текста.
@@ -69,8 +73,8 @@ class MainWindow(QMainWindow):
         row.addWidget(theme.role(QLabel(self.vault.path.name), "accent"), 0, Qt.AlignBottom)
         row.addStretch()
         for text, handler in [(tr("Generator"), self.open_generator),
-                              (tr("Change master password"), self.change_master),
-                              (tr("Extension"), self.extension)]:
+                              (tr("Extension"), self.extension),
+                              (tr("Settings"), self.open_settings)]:
             button = QPushButton(text)
             button.clicked.connect(handler)
             row.addWidget(button)
@@ -97,6 +101,7 @@ class MainWindow(QMainWindow):
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)  # правка — только в окне записи
         self.table.setShowGrid(False)
+        self.table.setItemDelegate(RoundedRowDelegate(self.table))  # выделение — скруглённой плашкой
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setDefaultSectionSize(38)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -288,6 +293,11 @@ class MainWindow(QMainWindow):
 
     def open_generator(self):
         GeneratorDialog(self, self.copy_password).exec()
+
+    def open_settings(self):
+        dialog = SettingsDialog(self, self.vault, self.change_master)
+        dialog.language_chosen.connect(self.language_changed)
+        dialog.exec()
 
     def change_master(self):
         if not ChangeMasterDialog(self, self.vault).exec():

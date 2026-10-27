@@ -6,7 +6,8 @@
 chrome-extension://…/ — см. app.py) и общается с ним через stdin/stdout:
 4 байта длины + JSON. Мост пересылает запрос в WhoKey одной строкой JSON
 через локальный сокет: на Mac это файл в папке программы, доступный только
-владельцу; сеть не используется вообще.
+владельцу, на Windows — именованный канал (named pipe), открытый только для
+текущего пользователя; сеть не используется вообще.
 
 Обе стороны проверяют друг друга (по ревью безопасности): система сообщает,
 какой процесс на другом конце сокета, и это должна быть та же программа —
@@ -16,6 +17,7 @@ chrome-extension://…/ — см. app.py) и общается с ним чере
 
 import ctypes
 import ctypes.util
+import hashlib
 import json
 import os
 import secrets
@@ -25,6 +27,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from vault import app_data_dir
@@ -32,6 +35,8 @@ from vault import app_data_dir
 HOST_NAME = "ru.edu.whokey"                       # имя моста для браузера
 EXTENSION_ID = "pchmmhgfnhhkginkifminckbjcojodgl"  # закреплён ключом в extension/manifest.json
 MAX_LINE = 64 * 1024                               # больше запрос/ответ быть не может
+
+WINDOWS = sys.platform == "win32"
 
 # Папки, где браузеры на основе Chromium ищут описания мостов (macOS)
 BROWSER_DIRS = [
@@ -41,8 +46,25 @@ BROWSER_DIRS = [
 ]
 
 
+# Ключи реестра, где их ищут на Windows (в HKEY_CURRENT_USER\Software\…)
+WINDOWS_BROWSER_KEYS = [
+    "Google\\Chrome", "Chromium", "Microsoft\\Edge", "BraveSoftware\\Brave-Browser",
+    "Vivaldi", "Yandex\\YandexBrowser",
+]
+
+
+def _user_tag():
+    name = os.environ.get("USERNAME", "") + "@" + os.environ.get("USERDOMAIN", "")
+    return hashlib.sha256(name.lower().encode("utf-8")).hexdigest()[:16]
+
+
 def socket_address():
-    """Адрес локального сокета WhoKey (QLocalServer понимает полный путь)."""
+    """Адрес локального сокета WhoKey (QLocalServer понимает полный путь).
+
+    На Windows — имя именованного канала (\\\\.\\pipe\\…): своё у каждого пользователя.
+    """
+    if WINDOWS:
+        return "whokey-" + _user_tag()
     path = app_data_dir() / "bridge.sock"
     if len(str(path)) < 100:  # у Unix-сокета путь не длиннее ~104 символов
         return str(path)
@@ -80,6 +102,8 @@ def own_program():
         path = _program_of(os.getpid())
         if path:
             return path
+    if WINDOWS:
+        return _windows_own_program()
     return os.path.realpath(sys.executable)
 
 
@@ -97,7 +121,7 @@ def peer_program(sock):
 def trusted_peer(sock):
     """Тот ли процесс на другом конце: та же программа, что и мы (WhoKey ↔ его мост)."""
     if sys.platform != "darwin":
-        return True  # на других системах проверки пока нет (Windows — следующим шагом)
+        return True  # Windows проверяет по-своему (trusted_pipe_client, WinPipe.server_program)
     return peer_program(sock) == own_program()
 
 
@@ -132,6 +156,8 @@ def ask_app(message, timeout=120):
     timeout большой: на первый запрос WhoKey может показать окно
     «Разрешить расширению доступ?», и человек думает над ответом.
     """
+    if WINDOWS:
+        return _ask_app_windows(message, timeout)
     address = socket_address()
     info = os.lstat(address)  # не идём по ссылке: это должен быть сокет нашего пользователя
     if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid():
@@ -157,8 +183,19 @@ def launch_app():
     bundle = exe.parents[2] if len(exe.parents) > 2 else None
     # stdin/stdout моста — канал к браузеру: запущенной программе он не нужен,
     # а её вывод сломал бы разговор с браузером
-    quiet = {"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL,
-             "stderr": subprocess.DEVNULL, "start_new_session": True}
+    quiet = {"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    if WINDOWS:
+        command = [sys.executable] if getattr(sys, "frozen", False) else \
+            [sys.executable, str(Path(__file__).resolve().parent / "app.py")]
+        # без окна консоли, отдельно от моста: браузер держит мост в «задании» Windows
+        # и при выходе моста закрыл бы всё, что тот запустил, — поэтому просим выйти из него
+        flags = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        try:
+            subprocess.Popen(command, creationflags=flags | 0x01000000, **quiet)  # CREATE_BREAKAWAY_FROM_JOB
+        except OSError:  # задание не разрешает выходить — запускаем как есть
+            subprocess.Popen(command, creationflags=flags, **quiet)
+        return  # вторую копию WhoKey не откроет: она передаст окно первой (app.py)
+    quiet["start_new_session"] = True
     if getattr(sys, "frozen", False) and bundle is not None and bundle.suffix == ".app":
         subprocess.Popen(["open", str(bundle)], **quiet)  # open сам не запустит вторую копию
     else:  # запуск из исходников (разработка)
@@ -179,6 +216,8 @@ def install_native_host(executable):
     или из «карантинной» копии macOS (AppTranslocation) — после закрытия
     образа мост бы сломался.
     """
+    if WINDOWS:
+        return _install_native_host_windows(executable)
     if str(executable).startswith("/Volumes/") or "/AppTranslocation/" in str(executable):
         return []
     manifest = {
@@ -207,6 +246,175 @@ def install_native_host(executable):
                     f.write(text)
                 os.chmod(tmp, 0o644)
                 os.replace(tmp, target)
+            done.append(browser)
+        except OSError:
+            pass
+    return done
+
+
+# --- Windows: именованный канал, проверка собеседника, реестр ---
+# Только стандартная библиотека (ctypes): мост запускается без Qt.
+
+if WINDOWS:
+    from ctypes import wintypes
+
+    _k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    _k32.CreateFileW.restype = wintypes.HANDLE
+    _k32.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+                                 wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    _k32.OpenProcess.restype = wintypes.HANDLE
+    _k32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    _k32.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR,
+                                                ctypes.POINTER(wintypes.DWORD)]
+    _k32.GetNamedPipeServerProcessId.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.ULONG)]
+    _k32.GetNamedPipeClientProcessId.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.ULONG)]
+    _k32.PeekNamedPipe.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.c_void_p,
+                                   ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+    _k32.ReadFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
+                              ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+    _k32.WriteFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
+                               ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+    _k32.CloseHandle.argtypes = [wintypes.HANDLE]
+    _k32.WaitNamedPipeW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD]
+    _INVALID = wintypes.HANDLE(-1).value
+    _ERROR_PIPE_BUSY, _ERROR_BROKEN_PIPE = 231, 109
+
+
+def _windows_program_of(pid):
+    """Путь к программе процесса pid (Windows) или None."""
+    handle = _k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        return None
+    try:
+        buffer = ctypes.create_unicode_buffer(32768)
+        size = wintypes.DWORD(len(buffer))
+        if not _k32.QueryFullProcessImageNameW(handle, 0, buffer, ctypes.byref(size)):
+            return None
+        return os.path.normcase(os.path.realpath(buffer.value))
+    finally:
+        _k32.CloseHandle(handle)
+
+
+def _windows_own_program():
+    return os.path.normcase(os.path.realpath(sys.executable))
+
+
+def trusted_pipe_client(handle):
+    """Сервер WhoKey: на другом конце канала — наш мост (та же программа)? (Windows)"""
+    pid = wintypes.ULONG()
+    if not _k32.GetNamedPipeClientProcessId(wintypes.HANDLE(int(handle)), ctypes.byref(pid)):
+        return False
+    return _windows_program_of(pid.value) == _windows_own_program()
+
+
+class WinPipe:
+    """Клиентский конец именованного канала WhoKey (Windows): то, что на Mac — Unix-сокет."""
+
+    def __init__(self, name):
+        path = "\\\\.\\pipe\\" + name
+        for _attempt in range(3):
+            self.handle = _k32.CreateFileW(path, 0x80000000 | 0x40000000, 0, None, 3, 0, None)
+            if self.handle != _INVALID:
+                return
+            error = ctypes.get_last_error()
+            if error != _ERROR_PIPE_BUSY:
+                break
+            _k32.WaitNamedPipeW(path, 1000)  # все «линии» заняты — подождать свободную
+        raise ConnectionRefusedError(f"WhoKey is not listening (Windows error {error})")
+
+    def server_program(self):
+        pid = wintypes.ULONG()
+        if not _k32.GetNamedPipeServerProcessId(self.handle, ctypes.byref(pid)):
+            return None
+        return _windows_program_of(pid.value)
+
+    def write(self, data):
+        while data:
+            done = wintypes.DWORD()
+            if not _k32.WriteFile(self.handle, data, len(data), ctypes.byref(done), None):
+                raise OSError("WhoKey closed the connection")
+            data = data[done.value:]
+
+    def read_available(self):
+        """Что уже пришло (b"" — пока ничего). OSError — если WhoKey закрыл канал."""
+        waiting = wintypes.DWORD()
+        if not _k32.PeekNamedPipe(self.handle, None, 0, None, ctypes.byref(waiting), None):
+            raise OSError("WhoKey closed the connection")
+        if not waiting.value:
+            return b""
+        buffer = ctypes.create_string_buffer(waiting.value)
+        done = wintypes.DWORD()
+        if not _k32.ReadFile(self.handle, buffer, waiting.value, ctypes.byref(done), None):
+            raise OSError("WhoKey closed the connection")
+        return buffer.raw[:done.value]
+
+    def close(self):
+        if self.handle not in (None, _INVALID):
+            _k32.CloseHandle(self.handle)
+            self.handle = None
+
+
+def _ask_app_windows(message, timeout):
+    pipe = WinPipe(socket_address())
+    try:
+        # пока WhoKey закрыт, канал с таким именем могла открыть чужая программа
+        if pipe.server_program() != _windows_own_program():
+            raise PeerError("the pipe is not served by WhoKey")
+        pipe.write(json.dumps(message, ensure_ascii=False).encode("utf-8") + b"\n")
+        data, deadline = b"", time.monotonic() + timeout
+        while b"\n" not in data:
+            if len(data) > MAX_LINE:
+                raise OSError("reply too long")
+            chunk = pipe.read_available()
+            if not chunk:
+                if time.monotonic() > deadline:
+                    raise socket.timeout("timed out")
+                time.sleep(0.03)
+            data += chunk
+    finally:
+        pipe.close()
+    return json.loads(data.split(b"\n", 1)[0].decode("utf-8"))
+
+
+def pipe_alive(handle):
+    """Мост: браузер ещё держит канал stdin? (Windows) False — браузер закрыл соединение."""
+    waiting = wintypes.DWORD()
+    if _k32.PeekNamedPipe(wintypes.HANDLE(handle), None, 0, None, ctypes.byref(waiting), None):
+        return True
+    return ctypes.get_last_error() != _ERROR_BROKEN_PIPE
+
+
+def _install_native_host_windows(executable):
+    """Windows: описание моста — файлом в папке программы, путь к нему — в реестре браузеров."""
+    import winreg
+    temp = os.path.normcase(os.path.realpath(tempfile.gettempdir()))
+    if os.path.normcase(os.path.realpath(str(executable))).startswith(temp):
+        return []  # запуск из временной папки (например, из архива) — путь скоро пропадёт
+    manifest = {
+        "name": HOST_NAME,
+        "description": "WhoKey password manager bridge",
+        "path": str(executable),
+        "type": "stdio",
+        "allowed_origins": [f"chrome-extension://{EXTENSION_ID}/"],
+    }
+    folder = app_data_dir() / "native-host"
+    target = folder / f"{HOST_NAME}.json"
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        text = json.dumps(manifest, indent=2)
+        if not target.exists() or target.read_text(encoding="utf-8") != text:
+            fd, tmp = tempfile.mkstemp(dir=folder, prefix=".whokey-", suffix=".json")
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(text)
+            os.replace(tmp, target)
+    except OSError:
+        return []
+    done = []
+    for browser in WINDOWS_BROWSER_KEYS:
+        try:
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER,
+                                  f"Software\\{browser}\\NativeMessagingHosts\\{HOST_NAME}") as key:
+                winreg.SetValueEx(key, "", 0, winreg.REG_SZ, str(target))
             done.append(browser)
         except OSError:
             pass

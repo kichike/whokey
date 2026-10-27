@@ -157,6 +157,22 @@ Use it anyway?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Settings</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Sign in with Touch ID</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Touch ID:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master password:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>WhoKey</source>
         <translation type="unfinished"></translation>
     </message>
@@ -190,6 +206,14 @@ Use it anyway?</source>
     </message>
     <message>
         <source>Open</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unlock with Touch ID</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The Mac was restarted: enter the master password once, then Touch ID will work again.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -265,6 +289,30 @@ Restore from it? If you create a new vault, the old backup will be kept under an
     </message>
     <message>
         <source>This folder seems to be synced with iCloud: the encrypted vault and its old versions will be stored in the cloud.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Touch ID</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unlock WhoKey with Touch ID next time?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The vault key will be kept in the macOS Keychain, and WhoKey will ask for your fingerprint before using it. After the Mac restarts, the master password is needed once. You can turn it off in Settings (⌘,).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>macOS did not allow saving the key to the Keychain. Touch ID is off.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>open your password vault</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Touch ID could not open the vault. Enter the master password.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

@@ -1,12 +1,13 @@
-"""Окна поверх главного: запись (добавить / изменить), генератор, смена мастер-пароля."""
+"""Окна поверх главного: запись (добавить / изменить), генератор, смена мастер-пароля, настройки."""
 
-from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
-                               QPushButton, QVBoxLayout)
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
+                               QLabel, QLineEdit, QPushButton, QVBoxLayout)
 
 import sites
 from clipboard import CLEAR_AFTER
 from generator import weakness_reasons
-from gui import theme
+from gui import i18n, theme, touchid
 from gui.widgets import ClipboardCountdown, GeneratorPanel, PasswordField, StrengthBar, ask_yes, show_error, weakness_text
 from gui.i18n import tr
 from vault import SaveError
@@ -191,4 +192,70 @@ class ChangeMasterDialog(QDialog):
         except SaveError as error:
             show_error(self, tr("⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.").format(error=error))
             return
+        # ключ сменился — старый, сохранённый для Touch ID, стираем; при следующем
+        # входе по новому паролю WhoKey снова предложит включить Touch ID
+        touchid.forget(self.vault.path)
+        touchid.set_offered(self.vault.path, False)
         super().accept()
+
+
+class SettingsDialog(QDialog):
+    """Настройки (⌘, на Mac, Ctrl+, на Windows): язык, вход по Touch ID, смена мастер-пароля."""
+
+    language_chosen = Signal(str)  # окна пересоздаются на новом языке — это делает app.py
+
+    def __init__(self, parent, vault, change_master):
+        """change_master — смена мастер-пароля главного окна (там же сообщения об ошибках)."""
+        super().__init__(parent)
+        self.setWindowTitle(tr("Settings"))
+        self.resize(460, 1)
+        self.vault = vault
+        self.change_master = change_master
+
+        form = QFormLayout()
+        form.setSpacing(14)
+        language = theme.rounded_popup(QComboBox())
+        for code, name in i18n.LANGUAGES:
+            language.addItem(name, code)
+        language.setCurrentIndex([code for code, _ in i18n.LANGUAGES].index(i18n.LANG))
+        language.view().setMinimumWidth(language.view().sizeHintForColumn(0) + 48)
+        language.currentIndexChanged.connect(lambda i: self._choose_language(language.itemData(i)))
+        form.addRow(tr("Language:"), language)
+
+        self.touch_id = None
+        if touchid.available():
+            self.touch_id = QCheckBox(tr("Sign in with Touch ID"))
+            self.touch_id.setChecked(touchid.is_enabled(vault.path))
+            self.touch_id.toggled.connect(self._touch_id_toggled)
+            form.addRow(tr("Touch ID:"), self.touch_id)
+
+        change = QPushButton(tr("Change master password"))
+        change.clicked.connect(self._change_master)
+        form.addRow(tr("Master password:"), change)
+
+        close = QDialogButtonBox(QDialogButtonBox.Close)
+        close.button(QDialogButtonBox.Close).setText(tr("Close"))
+        close.rejected.connect(self.reject)
+        column = QVBoxLayout(self)
+        column.addLayout(form)
+        column.addWidget(close)
+
+    def _choose_language(self, code):
+        self.reject()
+        self.language_chosen.emit(code)
+
+    def _touch_id_toggled(self, checked):
+        touchid.set_offered(self.vault.path)  # выбор сделан — при входе больше не спрашиваем
+        if not checked:
+            touchid.forget(self.vault.path)
+        elif not touchid.save_key(self.vault.path, self.vault.key):
+            show_error(self, tr("macOS did not allow saving the key to the Keychain. Touch ID is off."))
+            self.touch_id.setChecked(False)
+
+    def _change_master(self):
+        had_touch_id = touchid.is_enabled(self.vault.path)
+        self.change_master()
+        # после смены пароля старый ключ стёрт; раз Touch ID был включён — кладём новый
+        if had_touch_id and not touchid.is_enabled(self.vault.path):
+            touchid.save_key(self.vault.path, self.vault.key)
+            touchid.set_offered(self.vault.path)

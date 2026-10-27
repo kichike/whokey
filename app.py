@@ -27,6 +27,7 @@ if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1].startswith("chro
 
 from PySide6.QtCore import QLocale, QSettings, QStandardPaths, QTimer
 from PySide6.QtGui import QIcon
+from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
 import bridge_protocol
@@ -99,11 +100,24 @@ class Controller:
 
     def show_main(self, vault):
         self.settings.setValue("vault_path", str(vault.path))
-        window = MainWindow(vault, self.clipboard)
-        self._replace_window(window)
+        window = self._new_main(vault)
         self.bridge = BridgeServer(vault, window, self.settings)
         self.bridge.start()
         self.autolock.start()
+
+    def _new_main(self, vault):
+        window = MainWindow(vault, self.clipboard)
+        window.language_changed.connect(lambda code: self.change_language(vault, code))
+        self._replace_window(window)
+        return window
+
+    def change_language(self, vault, code):
+        """Язык из настроек: главное окно пересоздаётся с новыми надписями, хранилище остаётся открытым."""
+        set_language(code)
+        self.settings.setValue("language", i18n.LANG)
+        window = self._new_main(vault)
+        if self.bridge is not None:
+            self.bridge.window = window  # окошки расширения — поверх нового окна
 
     def stop_bridge(self):
         if self.bridge is not None:
@@ -127,8 +141,50 @@ class Controller:
         QTimer.singleShot(0, lambda: self.show_login(path))
 
 
+INSTANCE_NAME = "whokey-instance-" + bridge_protocol._user_tag()
+
+
+def hand_over_to_running():
+    """Windows: WhoKey уже открыт — показать его окно вместо второй копии. True — выходим.
+
+    На Mac вторую копию не даёт открыть сама система; на Windows её запустил бы,
+    например, мост расширения, пока окно входа уже открыто.
+    """
+    sock = QLocalSocket()
+    sock.connectToServer(INSTANCE_NAME)
+    if not sock.waitForConnected(500):
+        return False
+    import ctypes
+    ctypes.windll.user32.AllowSetForegroundWindow(-1)  # иначе Windows не даст первой копии выйти вперёд
+    sock.write(b"show\n")
+    sock.waitForBytesWritten(500)
+    sock.disconnectFromServer()
+    return True
+
+
+def listen_for_second_copy(controller):
+    """Windows: вторая копия просит показать окно — выводим его вперёд."""
+    server = QLocalServer()
+    server.setSocketOptions(QLocalServer.UserAccessOption)  # только этот пользователь
+    if not server.listen(INSTANCE_NAME):
+        return server
+
+    def show():
+        while server.hasPendingConnections():
+            server.nextPendingConnection().deleteLater()
+        window = controller.window
+        if window is not None:
+            window.showNormal()
+            window.raise_()
+            window.activateWindow()
+    server.newConnection.connect(show)
+    return server
+
+
 def main():
     app = QApplication(sys.argv)
+    if sys.platform == "win32" and hand_over_to_running():
+        return
     # APP_NAME — имя папки с данными, его не меняем (иначе «потеряется» уже
     # созданное хранилище); видимое название программы — WhoKey
     app.setApplicationName(APP_NAME)
@@ -147,6 +203,8 @@ def main():
     sys.excepthook = on_error
 
     controller = Controller()
+    if sys.platform == "win32":
+        controller.instance_server = listen_for_second_copy(controller)  # держим, пока программа работает
 
     # что бы ни случилось — при выходе не оставляем пароль в буфере обмена
     app.aboutToQuit.connect(controller.clipboard.clear_now)

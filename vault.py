@@ -354,10 +354,20 @@ class Vault:
     def open(cls, path, password):
         """Открывает хранилище. WrongPassword — если пароль не подошёл."""
         salt, params, token = _read_header(path)
-        key = derive_key(password, salt, params)
+        return cls._decrypt(path, derive_key(password, salt, params), salt, params, token)
+
+    @classmethod
+    def open_with_key(cls, path, key):
+        """Открывает хранилище готовым ключом (вход по Touch ID: ключ хранится в Связке ключей).
+        WrongPassword — если ключ не подошёл (например, мастер-пароль сменили)."""
+        salt, params, token = _read_header(path)
+        return cls._decrypt(path, key, salt, params, token)
+
+    @classmethod
+    def _decrypt(cls, path, key, salt, params, token):
         try:
             data = Fernet(key).decrypt(token)
-        except InvalidToken:
+        except (InvalidToken, ValueError, TypeError):  # ValueError, TypeError — ключ не того вида
             raise WrongPassword()
         try:
             content = json.loads(data.decode("utf-8"))
@@ -372,6 +382,11 @@ class Vault:
         vault = cls(path, key, salt, params, entries)
         vault.bridge_keys = bridge_keys
         return vault
+
+    @property
+    def key(self):
+        """Ключ шифрования — чтобы положить его в Связку ключей для входа по Touch ID."""
+        return self._key
 
     def check_password(self, password):
         """Верный ли мастер-пароль — без повторного чтения файла."""

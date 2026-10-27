@@ -166,6 +166,22 @@ Use it anyway?</source>
         <translation>⚠ Не удалось сохранить: {error}. Изменение не применено, файл на диске не тронут.</translation>
     </message>
     <message>
+        <source>Settings</source>
+        <translation>Настройки</translation>
+    </message>
+    <message>
+        <source>Sign in with Touch ID</source>
+        <translation>Входить по Touch ID</translation>
+    </message>
+    <message>
+        <source>Touch ID:</source>
+        <translation>Touch ID:</translation>
+    </message>
+    <message>
+        <source>Master password:</source>
+        <translation>Мастер-пароль:</translation>
+    </message>
+    <message>
         <source>WhoKey</source>
         <translation>WhoKey</translation>
     </message>
@@ -200,6 +216,14 @@ Use it anyway?</source>
     <message>
         <source>Open</source>
         <translation>Открыть</translation>
+    </message>
+    <message>
+        <source>Unlock with Touch ID</source>
+        <translation>Открыть по Touch ID</translation>
+    </message>
+    <message>
+        <source>The Mac was restarted: enter the master password once, then Touch ID will work again.</source>
+        <translation>Mac перезагружался: введите мастер-пароль один раз, и Touch ID снова заработает.</translation>
     </message>
     <message>
         <source>The main file {name} was not found, but there is a backup {backup}.
@@ -278,6 +302,30 @@ Restore from it? If you create a new vault, the old backup will be kept under an
     <message>
         <source>This folder seems to be synced with iCloud: the encrypted vault and its old versions will be stored in the cloud.</source>
         <translation>Похоже, эта папка синхронизируется с iCloud: зашифрованное хранилище и его старые версии будут лежать в облаке.</translation>
+    </message>
+    <message>
+        <source>Touch ID</source>
+        <translation>Touch ID</translation>
+    </message>
+    <message>
+        <source>Unlock WhoKey with Touch ID next time?</source>
+        <translation>Открывать WhoKey по Touch ID в следующий раз?</translation>
+    </message>
+    <message>
+        <source>The vault key will be kept in the macOS Keychain, and WhoKey will ask for your fingerprint before using it. After the Mac restarts, the master password is needed once. You can turn it off in Settings (⌘,).</source>
+        <translation>Ключ хранилища будет лежать в Связке ключей macOS, а WhoKey будет спрашивать отпечаток пальца, прежде чем им воспользоваться. После перезагрузки Mac один раз понадобится мастер-пароль. Выключить можно в Настройках (⌘,).</translation>
+    </message>
+    <message>
+        <source>macOS did not allow saving the key to the Keychain. Touch ID is off.</source>
+        <translation>macOS не разрешила сохранить ключ в Связку ключей. Touch ID выключен.</translation>
+    </message>
+    <message>
+        <source>open your password vault</source>
+        <translation>открыть хранилище паролей</translation>
+    </message>
+    <message>
+        <source>Touch ID could not open the vault. Enter the master password.</source>
+        <translation>Не получилось открыть хранилище по Touch ID. Введите мастер-пароль.</translation>
     </message>
     <message>
         <source>Right-click an entry for actions. Double-click to edit.</source>

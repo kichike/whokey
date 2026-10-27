@@ -50,6 +50,21 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "dist\WhoKey\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+; Мост для расширения браузера: WhoKey сам прописывает себя в браузерах при запуске
+; (bridge_protocol.install_native_host). Здесь — только чтобы при удалении
+; WhoKey эти записи и описание моста не остались.
+[Registry]
+Root: HKCU; Subkey: "Software\Google\Chrome\NativeMessagingHosts\ru.edu.whokey"; Flags: uninsdeletekey dontcreatekey
+Root: HKCU; Subkey: "Software\Chromium\NativeMessagingHosts\ru.edu.whokey"; Flags: uninsdeletekey dontcreatekey
+Root: HKCU; Subkey: "Software\Microsoft\Edge\NativeMessagingHosts\ru.edu.whokey"; Flags: uninsdeletekey dontcreatekey
+Root: HKCU; Subkey: "Software\BraveSoftware\Brave-Browser\NativeMessagingHosts\ru.edu.whokey"; Flags: uninsdeletekey dontcreatekey
+Root: HKCU; Subkey: "Software\Vivaldi\NativeMessagingHosts\ru.edu.whokey"; Flags: uninsdeletekey dontcreatekey
+Root: HKCU; Subkey: "Software\Yandex\YandexBrowser\NativeMessagingHosts\ru.edu.whokey"; Flags: uninsdeletekey dontcreatekey
+
+[UninstallDelete]
+; только описание моста — хранилище и настройки в той же папке не трогаем
+Type: filesandordirs; Name: "{userappdata}\EduPasswords\native-host"
+
 [Icons]
 Name: "{autoprograms}\WhoKey"; Filename: "{app}\WhoKey.exe"
 Name: "{autodesktop}\WhoKey"; Filename: "{app}\WhoKey.exe"; Tasks: desktopicon

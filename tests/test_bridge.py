@@ -1,7 +1,8 @@
 """Расширение браузера: мост, сервер внутри WhoKey и атаки из ревью безопасности.
 
 Запуск: python -m unittest discover tests
-Тесты с сокетом macOS на других системах пропускаются. Настоящее хранилище,
+Тесты с сокетом macOS и с каналом Windows идут каждый на своей системе
+(Windows — на машине GitHub Actions). Настоящее хранилище,
 настройки и сокет WhoKey не трогаются: всё во временных папках.
 """
 
@@ -14,6 +15,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import types
 import unittest
@@ -33,6 +35,7 @@ from vault import Vault  # noqa: E402
 
 APP = QApplication.instance() or QApplication([])
 MAC = sys.platform == "darwin"
+WINDOWS = sys.platform == "win32"
 PASSWORD = "Зелёный-Кит-Летит-2026!"
 
 
@@ -279,6 +282,138 @@ class NativeHost(unittest.TestCase):
         self.assertEqual(victim.read_text(), "не трогать")
         manifest = json.loads((folder / f"{P.HOST_NAME}.json").read_text())
         self.assertEqual(manifest["allowed_origins"], [f"chrome-extension://{P.EXTENSION_ID}/"])
+
+
+def pump(seconds):
+    """Даёт серверу поработать (он в этом же процессе)."""
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        QCoreApplication.processEvents(QEventLoop.AllEvents, 50)
+
+
+@unittest.skipUnless(WINDOWS, "именованный канал — только Windows")
+class WindowsPipe(unittest.TestCase):
+    """Настоящий канал Windows: проверка собеседника в обе стороны, тайм-ауты, отказ в обслуживании."""
+
+    def setUp(self):
+        self.name = "whokey-test-" + os.urandom(6).hex()
+        self._real = P.socket_address
+        P.socket_address = lambda: self.name
+
+    def tearDown(self):
+        P.socket_address = self._real
+
+    def request(self, raw, wait=3.0):
+        pipe = P.WinPipe(self.name)
+        # пишем из отдельного потока: сервер в этом же процессе и читает, только пока мы его «качаем»
+        writer = threading.Thread(target=pipe.write, args=(raw,), daemon=True)
+        writer.start()
+        data, end = b"", time.monotonic() + wait
+        try:
+            while b"\n" not in data and time.monotonic() < end:
+                pump(0.05)
+                try:
+                    data += pipe.read_available()
+                except OSError:
+                    break
+        finally:
+            pipe.close()
+        return json.loads(data.split(b"\n")[0]) if data.strip() else None
+
+    def powershell(self, script):
+        return subprocess.Popen(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+    def test_own_program_is_trusted_and_others_are_not(self):
+        server, *_ = make_server()
+        self.assertTrue(server.start())
+        self.assertEqual(self.request(b'{"type": "ping"}\n'), {"status": "ok"})
+        # чужая программа (PowerShell) получает только «не доверяю»
+        client = self.powershell(
+            f"$p = New-Object System.IO.Pipes.NamedPipeClientStream('.', '{self.name}', 'InOut'); "
+            "$p.Connect(5000); $w = New-Object System.IO.StreamWriter($p); $w.AutoFlush = $true; "
+            "$w.WriteLine('{\"type\": \"ping\"}'); $r = New-Object System.IO.StreamReader($p); "
+            "Write-Output $r.ReadLine()")
+        end = time.monotonic() + 20
+        while client.poll() is None and time.monotonic() < end:
+            pump(0.1)
+        out = client.communicate(timeout=5)[0]
+        self.assertIn(b"untrusted", out)
+        self.assertNotIn(b"ok", out.replace(b"untrusted", b""))
+        server.stop()
+
+    def test_fake_whokey_gets_nothing(self):
+        # пока WhoKey закрыт, чужая программа открыла канал с его именем
+        rogue = self.powershell(
+            f"$s = New-Object System.IO.Pipes.NamedPipeServerStream('{self.name}', 'InOut'); "
+            "$s.WaitForConnection(); $r = New-Object System.IO.StreamReader($s); "
+            "Write-Output ('got: ' + $r.ReadLine())")
+        path = "\\\\.\\pipe\\" + self.name
+        for _ in range(100):  # ждём, пока канал появится (не подключаясь к нему)
+            if P._k32.WaitNamedPipeW(path, 100):
+                break
+            time.sleep(0.1)
+        with self.assertRaises(P.PeerError):
+            P.ask_app({"type": "fill", "key": "REAL-KEY", "url": "https://mail.ru"}, timeout=3)
+        out = rogue.communicate(timeout=20)[0]
+        self.assertNotIn(b"REAL-KEY", out)
+
+    def test_slow_human_over_pair_dialog(self):
+        server, *_ = make_server(delay_ms=B.REQUEST_TIMEOUT_MS + 1500)
+        server.start()
+        r = self.request(b'{"type": "pair", "code": "4821"}\n', wait=10)
+        self.assertEqual(r["status"], "ok")
+        server.stop()
+
+    def test_deep_json_and_many_connections(self):
+        server, *_ = make_server()
+        server.start()
+        self.assertEqual(self.request(b"[" * 30000 + b"\n"), {"status": "error"})
+        pipes = []
+        for _ in range(30):
+            try:
+                pipes.append(P.WinPipe(self.name))
+            except OSError:
+                break
+            pump(0.02)
+        pump(1.0)
+        for pipe in pipes:
+            pipe.close()
+        pump(2.5)
+        self.assertEqual(self.request(b'{"type": "ping"}\n'), {"status": "ok"})
+        server.stop()
+
+    def test_browser_left_is_noticed(self):
+        # мост ждёт мастер-пароль, а браузер закрыл соединение — мост не должен висеть 90 секунд
+        read_end, write_end = os.pipe()
+        stdin = os.fdopen(read_end, "rb")
+        start = time.monotonic()
+        self.assertFalse(H.browser_left(stdin, 0.5))  # браузер ещё на связи
+        os.close(write_end)
+        self.assertTrue(H.browser_left(stdin, 5))
+        self.assertLess(time.monotonic() - start, 3)
+        stdin.close()
+
+    def test_registry_and_temporary_paths(self):
+        import winreg
+        exe = Path(sys.executable)
+        try:
+            done = P.install_native_host(exe)
+            self.assertIn("Google\\Chrome", done)
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                f"Software\\Google\\Chrome\\NativeMessagingHosts\\{P.HOST_NAME}") as key:
+                manifest_path = winreg.QueryValueEx(key, "")[0]
+            manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+            self.assertEqual(manifest["path"], str(exe))
+            self.assertEqual(manifest["allowed_origins"], [f"chrome-extension://{P.EXTENSION_ID}/"])
+            self.assertEqual(P.install_native_host(Path(tempfile.gettempdir()) / "WhoKey.exe"), [])
+        finally:
+            for browser in P.WINDOWS_BROWSER_KEYS:
+                try:
+                    winreg.DeleteKey(winreg.HKEY_CURRENT_USER,
+                                     f"Software\\{browser}\\NativeMessagingHosts\\{P.HOST_NAME}")
+                except OSError:
+                    pass
 
 
 class Autolock(unittest.TestCase):

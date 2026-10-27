@@ -4,10 +4,10 @@
 import math
 
 from PySide6.QtCore import QElapsedTimer, QRectF, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QIcon, QKeySequence, QLinearGradient, QPainter
+from PySide6.QtGui import QColor, QIcon, QKeySequence, QLinearGradient, QPainter, QPalette
 from PySide6.QtWidgets import (QCheckBox, QHBoxLayout, QLabel, QLineEdit, QMenu, QMessageBox,
-                               QProgressBar, QPushButton, QSpinBox, QToolButton,
-                               QVBoxLayout, QWidget)
+                               QProgressBar, QPushButton, QSpinBox, QStyle, QStyledItemDelegate,
+                               QStyleOptionViewItem, QToolButton, QVBoxLayout, QWidget)
 
 from generator import MAX_LENGTH, MIN_LENGTH, entropy_bits, estimate_bits, generate_password
 from gui import theme
@@ -115,6 +115,48 @@ def verdict(bits):
     if bits >= 45:
         return tr("medium"), WARNING
     return tr("weak"), BAD
+
+
+class RoundedRowDelegate(QStyledItemDelegate):
+    """Выделенная строка таблицы — одной скруглённой плашкой, а не прямоугольником.
+
+    Qt красит выделение в каждой ячейке отдельно и скруглить может только
+    ячейку, поэтому плашку на всю строку рисуем сами: каждая ячейка рисует
+    свой кусок общей скруглённой плашки (обрезанный по границам ячейки).
+    """
+
+    RADIUS = 10
+    INSET = 4  # отступ плашки от краёв таблицы, чтобы были видны скругления
+
+    def paint(self, painter, option, index):
+        if option.state & QStyle.State_Selected:
+            viewport = option.widget.viewport() if option.widget else None
+            width = viewport.width() if viewport else option.rect.right()
+            row = QRectF(self.INSET, option.rect.top() + 1,
+                         width - 2 * self.INSET, option.rect.height() - 2)
+            fill = QColor(theme.ACC)
+            fill.setAlpha(115)
+            painter.save()
+            painter.setRenderHint(QPainter.Antialiasing)
+            painter.setClipRect(option.rect)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(fill)
+            painter.drawRoundedRect(row, self.RADIUS, self.RADIUS)
+            painter.restore()
+            # остальное (текст) — как обычно, но без стандартной прямоугольной заливки
+            option = QStyleOptionViewItem(option)
+            option.state &= ~QStyle.State_Selected
+            self._selected = True  # для initStyleOption: текст выделенной строки — белый
+        super().paint(painter, option, index)
+        self._selected = False
+
+    _selected = False
+
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+        if self._selected:
+            # серые колонки (заметка, дата) на светлой плашке читались бы плохо
+            option.palette.setColor(QPalette.Text, QColor(theme.WHITE))
 
 
 class _DrainingBar(QWidget):

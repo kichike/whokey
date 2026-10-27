@@ -53,6 +53,13 @@ done
 # после удаления они ведут в никуда, убираем и их
 find "$APP" -type l ! -exec test -e {} \; -delete
 
+# Версия в «Свойствах» приложения (иначе PyInstaller пишет 0.0.0) — та же,
+# что у установщика Windows: номер версии хранится в одном месте, installer.iss
+VERSION=$(sed -n 's/^ *#define AppVersion "\(.*\)"/\1/p' "$P/installer.iss")
+[ -n "$VERSION" ] || { echo "Не нашёл AppVersion в installer.iss"; exit 1; }
+plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
+plutil -replace CFBundleVersion -string "$VERSION" "$APP/Contents/Info.plist"
+
 # Подпись «для себя» (ad-hoc): на Mac с процессором Apple без подписи программа
 # не запустится. После удаления файлов подписываем заново.
 xattr -cr "$APP"
