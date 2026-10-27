@@ -109,10 +109,12 @@ class BridgeServer(QObject):
             if not self._trusted(conn):
                 # чужая программа: ничего не читаем и не отдаём, только говорим «не доверяю» —
                 # иначе мост принял бы обрыв за «WhoKey закрыт» и открывал бы его снова
+                # удаляем, когда ответ уйдёт и канал закроется: на Windows запись идёт
+                # не сразу, и немедленное удаление обрывало бы её — ответ терялся
+                conn.disconnected.connect(conn.deleteLater)
                 conn.write(b'{"status": "untrusted"}\n')
                 conn.flush()
                 conn.disconnectFromServer()
-                conn.deleteLater()
                 continue
             self.buffers[conn] = b""
             conn.readyRead.connect(lambda c=conn: self._read(c))
