@@ -38,7 +38,7 @@ def hold_lock(path):
 
 class LoginWindow(QWidget):
     opened = Signal(object)   # хранилище открыто — передаём Vault
-    restart = Signal(object)  # сменили язык или файл — окно пересоздаётся (передаём путь)
+    restart = Signal(object)  # выбрали другой файл и т.п. — окно пересоздаётся (передаём путь)
 
     def __init__(self, path, state):
         """state — общее для пересоздаваемых окон: флаг «создать новое»
@@ -49,11 +49,10 @@ class LoginWindow(QWidget):
         self.setWindowTitle(tr("WhoKey"))
         self.resize(560, 1)  # начальная ширина, а не минимум — см. EntryDialog
 
-        # снаружи — выбор языка, внутри «карточки» с жёсткой тенью — всё остальное
+        # всё содержимое — внутри «карточки» с неоновым ореолом
         outer = QVBoxLayout(self)
         outer.setContentsMargins(40, 20, 40, 40)  # место для неонового ореола вокруг карточки
         theme.role(self, "backdrop")  # фон окна с фиолетовым заревом
-        outer.setSpacing(16)
         card = theme.role(QFrame(), "card")
         theme.neon_card(card)
         outer.addWidget(card)
@@ -81,6 +80,7 @@ class LoginWindow(QWidget):
         outer.addStretch()
 
     _touch_id_on_show = False
+    _prompt = None  # окно Touch ID, которое сейчас ждёт палец
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -310,13 +310,14 @@ class LoginWindow(QWidget):
         self.opened.emit(vault)
 
     def on_touch_id(self):
-        if not self._take_lock():
-            return
+        if self._prompt is not None or not self._take_lock():
+            return  # окно с отпечатком уже открыто (сработало само при показе окна)
         self._prompt = touchid.TouchIdPrompt(self)
         self._prompt.finished.connect(self._touch_id_answered)
         self._prompt.ask(tr("open your password vault"))
 
     def _touch_id_answered(self, success):
+        self._prompt = None
         if not success:  # отменили или палец не подошёл — остаётся вход по паролю
             self.master.setFocus()
             return

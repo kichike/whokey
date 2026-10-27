@@ -68,6 +68,12 @@ class Matching(unittest.TestCase):
         self.assertEqual(sites.normalize("https://Mail.ru:8080/login"), "mail.ru")
         self.assertEqual(sites.normalize("  "), "")
         self.assertEqual(sites.normalize("http://localhost:3000/x"), "localhost:3000")
+        # IPv6 — в скобках и с портом, и без: сохранённый адрес должен читаться заново
+        for text, saved in (("[::1]", "[::1]"), ("http://[::1]:8080/x", "[::1]:8080")):
+            with self.subTest(text=text):
+                self.assertEqual(sites.normalize(text), saved)
+                self.assertEqual(sites.normalize(saved), saved)
+        self.assertTrue(sites.matches("[::1]", "http://[::1]/login"))
         for bad in ("ru", "a..b", "http://", "http://[bad", "co.uk", "faß.de", "ex\u200dample.com"):
             with self.subTest(bad=bad):
                 self.assertIsNone(sites.normalize(bad))

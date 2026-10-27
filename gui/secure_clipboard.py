@@ -9,7 +9,8 @@
     CanIncludeInClipboardHistory = 0 и CanUploadToCloudClipboard = 0 — пароль
     не попадает в журнал Win+V и в облачный буфер;
   - Linux: x-kde-passwordManagerHint = secret (понимают Klipper и другие);
-  - macOS: org.nspasteboard.ConcealedType и TransientType. Через Qt такое имя
+  - macOS: org.nspasteboard.ConcealedType и TransientType, и «только этот Mac»
+    (без Universal Clipboard на другие устройства Apple). Через Qt такое имя
     формата не задать (QUtiMimeConverter в PySide6 нет), поэтому на macOS
     текст с пометками кладёт прямой вызов системного NSPasteboard (ctypes),
     а читает и стирает буфер — QClipboard, как на других системах.
@@ -59,8 +60,10 @@ def _copy_macos(secret):
     types = send(ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p), ctypes.c_ulong)(
         objc.objc_getClass(b"NSArray"), objc.sel_registerName(b"arrayWithObjects:count:"),
         (ctypes.c_void_p * 3)(plain, *marks), 3)
-    send(ctypes.c_long)(board, objc.sel_registerName(b"clearContents"))
-    send(ctypes.c_long, ctypes.c_void_p, ctypes.c_void_p)(board, objc.sel_registerName(b"declareTypes:owner:"), types, None)
+    # вместо clearContents: «только этот Mac» (NSPasteboardContentsCurrentHostOnly) —
+    # Universal Clipboard не отправит пароль на iPhone и другие устройства Apple
+    send(ctypes.c_long, ctypes.c_ulong)(board, objc.sel_registerName(b"prepareForNewContentsWithOptions:"), 1)
+    send(ctypes.c_long, ctypes.c_void_p, ctypes.c_void_p)(board, objc.sel_registerName(b"addTypes:owner:"), types, None)
     set_string = send(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
     if not set_string(board, objc.sel_registerName(b"setString:forType:"), nsstring(secret), plain):
         raise OSError("NSPasteboard refused the text")

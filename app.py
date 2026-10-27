@@ -28,9 +28,10 @@ if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1].startswith("chro
 from PySide6.QtCore import QLocale, QSettings, QStandardPaths, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
-from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
+from PySide6.QtWidgets import QApplication, QDialog, QMenu, QMessageBox
 
 import bridge_protocol
+from vault import SaveError
 from gui.secure_clipboard import SecureClipboard
 from gui import theme
 from gui.autolock import AutoLock
@@ -92,13 +93,22 @@ class Controller:
             old.deleteLater()
 
     def show_login(self, path):
-        self.settings.setValue("language", i18n.LANG)
         window = LoginWindow(path, self.state)
         window.restart.connect(self.show_login)
         window.opened.connect(self.show_main)
         self._replace_window(window)
 
     def show_main(self, vault):
+        if isinstance(self.window, MainWindow):
+            return  # хранилище уже открыто (например, отпечаток и пароль пришли почти одновременно)
+        self.stop_bridge()
+        if vault.header_repaired:
+            # открытая часть файла не совпала с копией внутри шифровки (испорчена или
+            # подменена) — сразу записываем правильную, чтобы мастер-пароль подходил
+            try:
+                vault.save()
+            except SaveError:
+                pass  # не вышло сейчас — исправится при следующем сохранении
         self.settings.setValue("vault_path", str(vault.path))
         window = self._new_main(vault)
         self.bridge = BridgeServer(vault, window, self.settings)
@@ -134,6 +144,8 @@ class Controller:
         for widget in QApplication.topLevelWidgets():
             if isinstance(widget, QDialog) and widget.isVisible():
                 widget.reject()
+            elif isinstance(widget, QMenu) and widget.isVisible():
+                widget.close()  # меню правого клика: иначе «Копировать пароль» сработал бы после блокировки
         self.clipboard.clear_now()
         self.state["notice"] = tr("WhoKey locked: the screen was locked or the computer slept. Enter your master password.")
         path = self.window.vault.path
@@ -141,7 +153,7 @@ class Controller:
         QTimer.singleShot(0, lambda: self.show_login(path))
 
 
-INSTANCE_NAME = "whokey-instance-" + bridge_protocol._user_tag()
+INSTANCE_NAME = "whokey-instance-" + bridge_protocol.user_tag()
 
 
 def hand_over_to_running():
@@ -158,7 +170,7 @@ def hand_over_to_running():
     kernel32.CreateMutexW.restype = ctypes.c_void_p
     kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
     ctypes.set_last_error(0)
-    handle = kernel32.CreateMutexW(None, False, "Local\\WhoKey-" + bridge_protocol._user_tag())
+    handle = kernel32.CreateMutexW(None, False, "Local\\WhoKey-" + bridge_protocol.user_tag())
     if not handle:
         return False  # мьютекс не создать — лучше запуститься, чем молча не открыться
     if ctypes.get_last_error() != 183:  # не ERROR_ALREADY_EXISTS — значит, мы первые
@@ -171,7 +183,7 @@ def hand_over_to_running():
         pid = ctypes.c_ulong()
         handle = ctypes.c_void_p(int(sock.socketDescriptor()))
         if (kernel32.GetNamedPipeServerProcessId(handle, ctypes.byref(pid))
-                and bridge_protocol._windows_program_of(pid.value) == bridge_protocol.own_program()
+                and bridge_protocol.windows_program_of(pid.value) == bridge_protocol.own_program()
                 and bridge_protocol.pipe_owner_sid(handle.value) == bridge_protocol.current_sid()):
             ctypes.windll.user32.AllowSetForegroundWindow(pid.value)
             sock.write(b"show\n")
@@ -199,7 +211,18 @@ def listen_for_second_copy(controller):
     return server
 
 
+def no_core_dumps():
+    """При падении система может сохранить снимок памяти программы на диск, а в нём —
+    мастер-пароль и пароли. Запрещаем такие снимки для WhoKey (macOS, Linux)."""
+    try:
+        import resource
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    except (ImportError, ValueError, OSError):
+        pass  # на Windows этого механизма нет
+
+
 def main():
+    no_core_dumps()
     app = QApplication(sys.argv)
     if sys.platform == "win32" and hand_over_to_running():
         return

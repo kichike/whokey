@@ -50,7 +50,9 @@ def _fingerprint(key):
 
 class BridgeServer(QObject):
     def __init__(self, vault, window, settings):
-        super().__init__(window)
+        # без родителя: окно пересоздаётся (смена языка), а сервер должен жить дальше —
+        # будь он «ребёнком» окна, Qt удалил бы его вместе со старым окном
+        super().__init__()
         self.vault, self.window, self.settings = vault, window, settings
         self.server = None
         self.buffers = {}  # соединение -> полученные байты
@@ -162,6 +164,9 @@ class BridgeServer(QObject):
         QTimer.singleShot(0, lambda: self._respond(conn, line))
 
     def _respond(self, conn, line):
+        if self.server is None:  # WhoKey успел заблокироваться — окно «разрешить?» не показываем
+            self.busy.discard(conn)
+            return
         try:
             request = json.loads(line.decode("utf-8"))
             reply = self.handle(request) if isinstance(request, dict) else {"status": "error"}
@@ -260,10 +265,6 @@ class BridgeServer(QObject):
         fingerprint = _fingerprint(key)
         # сравнение за одинаковое время — по скорости ответа ключ не подобрать
         return any(hmac.compare_digest(fingerprint, known) for known in self.vault.bridge_keys)
-
-    def forget_all(self):
-        """«Отключить расширение»: все выданные ключи перестают работать."""
-        self.vault.set_bridge_keys([])
 
     def _fill(self, request, url):
         index, login = request.get("index"), request.get("login")

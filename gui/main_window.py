@@ -10,12 +10,11 @@ import sites
 from clipboard import CLEAR_AFTER
 from gui import theme
 from gui.dialogs import ChangeMasterDialog, EntryDialog, GeneratorDialog, SettingsDialog
-from gui.widgets import ClipboardCountdown, RoundedRowDelegate, ask_yes, show_error, show_info
+from gui.widgets import REVEAL_SECONDS, ClipboardCountdown, RoundedRowDelegate, ask_yes, show_error, show_info
 from gui.i18n import tr
 from vault import SaveError
 
 HIDDEN = "••••••••"   # одинаковые точки — не выдаём даже длину пароля
-REVEAL_SECONDS = 15   # показанный пароль сам скроется через столько секунд
 COLUMNS = ["site", "login", "password", "note", "updated"]
 
 
@@ -38,6 +37,9 @@ class MainWindow(QMainWindow):
         self.vault = vault
         self.clipboard = clipboard
         self.revealed = None  # номер записи, чей пароль сейчас показан
+        self.reveal_timer = QTimer(self)
+        self.reveal_timer.setSingleShot(True)
+        self.reveal_timer.timeout.connect(self._auto_hide)
         self.setWindowTitle(tr("WhoKey") + " — " + vault.path.name)
         self.resize(960, 600)
 
@@ -268,10 +270,12 @@ class MainWindow(QMainWindow):
         self.revealed = None if self.revealed == index else index
         self.refresh(select=index)
         if self.revealed is not None:
-            QTimer.singleShot(REVEAL_SECONDS * 1000, lambda: self._auto_hide(index))
+            # один таймер окна: перезапускается при каждом показе (старый не спрячет раньше)
+            # и удаляется вместе с окном (не сработает на уже удалённой таблице)
+            self.reveal_timer.start(REVEAL_SECONDS * 1000)
 
-    def _auto_hide(self, index):
-        if self.revealed == index:
+    def _auto_hide(self):
+        if self.revealed is not None:
             self.revealed = None
             self.refresh()
 

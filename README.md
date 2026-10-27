@@ -73,6 +73,7 @@ Honest limits:
 - No password manager can fully protect you from malware already running under your user account; WhoKey makes it harder, not impossible.
 - Don't use filling on a page where you clicked through a certificate warning — the address bar shows the real site, but the page may not be.
 - Install the extension only from this repository.
+- **Touch ID** is a convenience: the vault key is kept in your login Keychain, and the fingerprint is checked by WhoKey itself (system-enforced fingerprint binding needs a paid Apple developer account). Code running as your user that can change WhoKey's files could read the key without a fingerprint. If that worries you, keep Touch ID off — the master password is always enough.
 
 ### Run from source
 
@@ -149,6 +150,7 @@ WhoKey хранит логины и пароли в одном зашифров�
 - Ни один менеджер паролей не защищает полностью от вредоносной программы, уже запущенной под вашим пользователем; WhoKey усложняет ей жизнь, но не делает это невозможным.
 - Не пользуйтесь заполнением на странице, где вы нажали «всё равно перейти» при ошибке сертификата: в адресной строке настоящий сайт, а страница может быть подменена.
 - Ставьте расширение только из этого репозитория.
+- **Touch ID** — для удобства: ключ хранилища лежит в вашей Связке ключей, а отпечаток проверяет сам WhoKey (привязку ключа к отпечатку на уровне системы macOS даёт только платная подпись разработчика Apple). Программа, запущенная от вашего имени и способная изменить файлы WhoKey, могла бы прочитать ключ без отпечатка. Если это беспокоит — не включайте Touch ID: мастер-пароля всегда достаточно.
 
 ### Запуск из исходников
 

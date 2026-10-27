@@ -129,7 +129,7 @@ class Requests(unittest.TestCase):
         self.assertEqual(len(dialogs), 1)
 
     def test_disconnect_extension(self):
-        self.server.forget_all()
+        self.vault.set_bridge_keys([])  # то же, что делает кнопка «Расширение» → «Отключить»
         self.assertEqual(self.ask(type="logins", url="https://mail.ru"), {"status": "pair_required"})
 
 

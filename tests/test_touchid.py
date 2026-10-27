@@ -37,6 +37,39 @@ class OpenWithKey(unittest.TestCase):
             Vault.open_with_key(self.path, old)
 
 
+class TamperedHeader(unittest.TestCase):
+    """Ревью безопасности: подменённая соль в открытом заголовке + вход по ключу (Touch ID)
+    раньше навсегда отрезали мастер-пароль от хранилища."""
+
+    def test_header_is_repaired_from_encrypted_copy(self):
+        import base64
+        import json
+        path = Path(tempfile.mkdtemp()) / "t.dat"
+        vault = Vault.create(path, "Зелёный-Кит-Летит-2026!")
+        key = vault.key
+        header = json.loads(path.read_text())
+        header["salt"] = base64.b64encode(b"x" * 16).decode()  # чужая соль, без пароля
+        path.write_text(json.dumps(header))
+        opened = Vault.open_with_key(path, key)
+        self.assertTrue(opened.header_repaired)
+        opened.add("GitHub", "egor", "pw")  # сохранение пишет правильную соль из шифровки
+        self.assertEqual(len(Vault.open(path, "Зелёный-Кит-Летит-2026!").entries), 1)
+
+    def test_old_vault_without_copy_still_opens(self):
+        import json
+        path = Path(tempfile.mkdtemp()) / "old.dat"
+        vault = Vault.create(path, "Зелёный-Кит-Летит-2026!")
+        from cryptography.fernet import Fernet
+        header = json.loads(path.read_text())
+        header["data"] = Fernet(vault.key).encrypt(b'{"entries": []}').decode()  # как до 1.4.2
+        path.write_text(json.dumps(header))
+        old = Vault.open(path, "Зелёный-Кит-Летит-2026!")
+        self.assertFalse(old.header_repaired)
+        old.save()
+        content = json.loads(Fernet(vault.key).decrypt(json.loads(path.read_text())["data"].encode()))
+        self.assertIn("kdf", content)  # после сохранения копия появилась
+
+
 class Availability(unittest.TestCase):
     def test_off_without_real_screen(self):
         """В автотестах (окна «без экрана») настоящее окно Touch ID не всплывает."""

@@ -9,6 +9,10 @@ on:
   push:
     branches: [main]
 
+# сборке достаточно читать код — ничего в репозитории она менять не может
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: windows-latest

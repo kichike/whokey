@@ -92,9 +92,9 @@ def normalize(text):
         return None
     host = host.rstrip(".").lower()
     if _is_ip(host) or host == "localhost":
-        if port is None:
-            return host
-        return f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+        if ":" in host:  # IPv6 — всегда в скобках, иначе адрес не прочитать заново
+            host = f"[{host}]"
+        return host if port is None else f"{host}:{port}"
     host = _idna(host)
     # одно слово без точки («ru», «com») подошло бы ко всем сайтам в этой зоне
     if not host or "." not in host or any(not part for part in host.split(".")):

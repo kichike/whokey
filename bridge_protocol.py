@@ -53,7 +53,7 @@ WINDOWS_BROWSER_KEYS = [
 ]
 
 
-def _user_tag():
+def user_tag():
     """Метка пользователя для имён каналов. На Windows — из SID учётной записи
     (переменные окружения USERNAME может подделать кто угодно)."""
     name = (current_sid() or "") if WINDOWS else str(os.getuid())
@@ -66,7 +66,7 @@ def socket_address():
     На Windows — имя именованного канала (\\\\.\\pipe\\…): своё у каждого пользователя.
     """
     if WINDOWS:
-        return "whokey-" + _user_tag()
+        return "whokey-" + user_tag()
     path = app_data_dir() / "bridge.sock"
     if len(str(path)) < 100:  # у Unix-сокета путь не длиннее ~104 символов
         return str(path)
@@ -296,7 +296,7 @@ if WINDOWS:
     _ERROR_PIPE_BUSY, _ERROR_BROKEN_PIPE = 231, 109
 
 
-def _windows_program_of(pid):
+def windows_program_of(pid):
     """Путь к программе процесса pid (Windows) или None."""
     handle = _k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
     if not handle:
@@ -314,7 +314,7 @@ def _windows_program_of(pid):
 def _windows_own_program():
     # программа процесса так, как её видит система: в виртуальном окружении
     # Scripts\python.exe лишь запускает настоящий python.exe, и пути не совпали бы
-    return _windows_program_of(os.getpid()) or os.path.normcase(os.path.realpath(sys.executable))
+    return windows_program_of(os.getpid()) or os.path.normcase(os.path.realpath(sys.executable))
 
 
 def _sid_string(sid_pointer):
@@ -376,7 +376,7 @@ def trusted_pipe_client(handle):
     pid = wintypes.ULONG()
     if not _k32.GetNamedPipeClientProcessId(handle, ctypes.byref(pid)):
         return False
-    return _windows_program_of(pid.value) == _windows_own_program()
+    return windows_program_of(pid.value) == _windows_own_program()
 
 
 class WinPipe:
@@ -400,7 +400,7 @@ class WinPipe:
         pid = wintypes.ULONG()
         if not _k32.GetNamedPipeServerProcessId(self.handle, ctypes.byref(pid)):
             return None
-        return _windows_program_of(pid.value)
+        return windows_program_of(pid.value)
 
     def write(self, data):
         while data:

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Права WhoKey при «усиленной защите среды выполнения» (hardened runtime, см. build_app.sh).
+  Защита запрещает подсовывать в WhoKey чужой код через DYLD_INSERT_LIBRARIES — так
+  чужая программа не достанет ключ Touch ID из Связки ключей от имени WhoKey.
+  disable-library-validation: подпись WhoKey самодельная (без Team ID Apple), и без этого
+  macOS не дала бы загрузить даже собственные библиотеки программы (Python, Qt).
+  allow-unsigned-executable-memory: Python (ctypes, PyObjC) создаёт мостики к системным
+  функциям в памяти — в том числе для ответа Touch ID.
+  allow-dyld-environment-variables здесь НЕТ: переменные DYLD_* для WhoKey не работают.
+-->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+</dict>
+</plist>

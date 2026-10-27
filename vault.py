@@ -187,6 +187,18 @@ def _no_constant(name):
     raise ValueError(f"{name} is not allowed")
 
 
+def _kdf_params(kdf):
+    """Настройки Argon2id из словаря — только известные и в разумных пределах."""
+    params = {}
+    for name, (low, high) in KDF_LIMITS.items():
+        value = kdf[name]
+        # именно целое число: JSON пропускает и Infinity, и true/false
+        if type(value) is not int or not low <= value <= high:
+            raise VaultError(f"bad kdf parameter {name}")
+        params[name] = value
+    return params
+
+
 def _read_header(path):
     """Проверяет открытую часть файла и возвращает (соль, настройки, шифровку)."""
     try:
@@ -201,13 +213,7 @@ def _read_header(path):
         kdf = header["kdf"]
         if kdf.get("name") != "argon2id":
             raise VaultError("unknown kdf")
-        params = {}
-        for name, (low, high) in KDF_LIMITS.items():
-            value = kdf[name]
-            # именно целое число: JSON пропускает и Infinity, и true/false
-            if type(value) is not int or not low <= value <= high:
-                raise VaultError(f"bad kdf parameter {name}")
-            params[name] = value
+        params = _kdf_params(kdf)
         salt = base64.b64decode(header["salt"], validate=True)
         if len(salt) < SALT_SIZE:
             raise VaultError("salt too short")
@@ -328,6 +334,7 @@ class Vault:
         # Лежат внутри зашифрованных данных: подменить их можно, только зная мастер-пароль
         self.bridge_keys = []
         self.backup_error = None  # почему не обновилась резервная копия (если так)
+        self.header_repaired = False  # открытый заголовок не совпал с копией внутри шифровки
         self.old_backup = None    # куда отложена чужая старая копия при создании
 
     # --- создание и открытие ---
@@ -377,10 +384,24 @@ class Vault:
             bridge_keys = content.get("bridge_keys", [])  # у хранилищ до расширения браузера его нет
             if not isinstance(bridge_keys, list) or not all(isinstance(k, str) for k in bridge_keys):
                 raise ValueError("bad bridge keys")
+            # Копия соли и настроек Argon2id внутри шифровки (с версии 1.4.2). Открытый
+            # заголовок может испортить или подменить кто угодно: тогда хранилище открылось бы
+            # ключом из Touch ID, при сохранении соль из заголовка ушла бы в файл и копию —
+            # и мастер-пароль перестал бы подходить навсегда. Верим копии внутри шифровки.
+            inner = content.get("kdf")
+            repaired = False
+            if inner is not None:
+                inner_salt = base64.b64decode(inner["salt"], validate=True)
+                inner_params = _kdf_params(inner["params"])
+                if len(inner_salt) < SALT_SIZE:
+                    raise ValueError("salt too short")
+                repaired = (inner_salt, inner_params) != (salt, params)
+                salt, params = inner_salt, inner_params
         except (ValueError, KeyError, TypeError, AttributeError, RecursionError) as error:
             raise VaultError(str(error))
         vault = cls(path, key, salt, params, entries)
         vault.bridge_keys = bridge_keys
+        vault.header_repaired = repaired  # заголовок не совпал с копией — исправится при сохранении
         return vault
 
     @property
@@ -398,7 +419,8 @@ class Vault:
 
     def _write(self, entries, key, salt, params, bridge_keys=None):
         """Шифрует записи и сохраняет файл + резервную копию. SaveError — если не вышло."""
-        content = {"entries": entries}
+        content = {"entries": entries,
+                   "kdf": {"salt": base64.b64encode(salt).decode("ascii"), "params": params}}
         bridge_keys = self.bridge_keys if bridge_keys is None else bridge_keys
         if bridge_keys:
             content["bridge_keys"] = bridge_keys

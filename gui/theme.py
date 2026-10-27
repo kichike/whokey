@@ -40,7 +40,6 @@ SURF = "#0f0f12"       # панели
 WELL = "#0b0b0d"       # «углубления»: поля ввода, шапка таблицы
 LINE = "#1f1e24"       # тонкие линии
 LINE2 = "#2c2b32"      # рамки панелей
-LINE3 = "#5b5a66"      # рамка при наведении
 TEXT = "#ecebf1"
 MUTED = "#a29fae"
 FAINT = "#6f6c7a"
@@ -48,18 +47,14 @@ ACC = "#caa7f0"        # лавандовый акцент
 ACC_DEEP = "#936fc4"
 ACC_LIGHT = "#e4cffd"
 ACC_FILL = "#312442"   # заливка акцентных кнопок и выделения
-ACC_HOVER = "#482f66"
 NEON = "#ddaaf9"       # «неон» — цвет логотипа на сайте, для свечения
 RAISED = "#1c1b21"     # обычные кнопки
-RAISED_RIM = "#3d3c45"
 TIP = "#1d1c22"        # меню и подсказки
 TIP_RIM = "#4a4952"
 OK = "#3fb950"
 WARN = "#e0b64a"
 BAD = "#f24d5c"
 BAD_INK = "#ff8a95"
-BAD_FILL = "#261a1d"
-BAD_RIM = "#7d3d46"
 
 
 
