@@ -33,7 +33,7 @@
     "message": "The page changed — open the login form and press again."
   },
   "denied": {
-    "message": "WhoKey did not allow the extension."
+    "message": "WhoKey did not allow the extension (wrong code or cancelled). Try again in a minute."
   },
   "locked": {
     "message": "WhoKey was not unlocked. Enter your master password in WhoKey and press again."
@@ -63,7 +63,7 @@
     }
   },
   "pairing": {
-    "message": "WhoKey asks to confirm the connection.\nCode: $1 — allow it if WhoKey shows the same code."
+    "message": "Enter this code in WhoKey: $1\nIt is also shown on the WhoKey icon in the toolbar."
   },
   "busy": {
     "message": "Too many requests in a row. Wait a minute."

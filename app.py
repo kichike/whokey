@@ -10,6 +10,7 @@
 Запуск: ../.venv/bin/python app.py
 """
 
+import hashlib
 import signal
 import sys
 import traceback
@@ -37,6 +38,7 @@ from gui import theme
 from gui.autolock import AutoLock
 from gui.bridge import BridgeServer
 from gui.i18n import LANGUAGES, set_language, tr
+from gui.widgets import show_error
 from gui.login import LoginWindow
 from gui.main_window import MainWindow
 from gui import i18n
@@ -110,10 +112,23 @@ class Controller:
             except SaveError:
                 pass  # не вышло сейчас — исправится при следующем сохранении
         self.settings.setValue("vault_path", str(vault.path))
+        rolled_back = self._remember_generation(vault)
         window = self._new_main(vault)
         self.bridge = BridgeServer(vault, window, self.settings)
         self.bridge.start()
         self.autolock.start()
+        if rolled_back is not None:
+            show_error(window, tr("This vault file is older than the one this computer saw last time (save {now} instead of {seen}). It may have been replaced with an old copy: entries changed since then and the browser extension access you turned off could be back.\n\nIf you did not restore an old copy yourself, check your entries and disconnect the extension (Extension button).").format(now=vault.generation, seen=rolled_back))
+
+    def _remember_generation(self, vault):
+        """Номер сохранения хранилища — в настройках (он не секретный). Если файл «моложе»
+        того, что этот компьютер уже видел, его подменили старой копией: вернулись бы
+        отозванный доступ расширения и старые записи. Возвращает прежний номер или None."""
+        key = "generation/" + hashlib.sha256(str(vault.path.resolve()).encode("utf-8")).hexdigest()
+        seen = int(self.settings.value(key, 0) or 0)
+        vault.on_saved = lambda number: self.settings.setValue(key, number)
+        self.settings.setValue(key, vault.generation)
+        return seen if vault.generation < seen else None
 
     def _new_main(self, vault):
         window = MainWindow(vault, self.clipboard)

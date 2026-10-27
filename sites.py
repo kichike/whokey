@@ -7,10 +7,12 @@
 поэтому сравниваем строго по точкам, а не «содержит ли адрес строку».
 
 Исключения (по ревью безопасности):
-  - зона целиком (`co.uk`, `com.ru`) — не адрес сайта: подошла бы ко всем сайтам зоны;
+  - зона целиком (`co.uk`, `com.ru`, `myshopify.com`) — не адрес сайта: подошла бы
+    ко всем сайтам зоны. Список зон — полный Public Suffix List (public_suffix_list.dat);
   - на сервисах, где поддомены принадлежат разным людям (`*.github.io`,
     `*.tumblr.com`), поддомены не подходят — только точный адрес;
-  - у localhost и IP-адреса учитывается порт: разные порты — разные программы;
+  - учитывается порт: разные порты — разные программы. Запись без порта подходит
+    только к сайту на обычном порту (443 для https);
   - адрес с буквами, которые Python и браузер переводят в латиницу по-разному
     (`ß`, `ς`, невидимые соединители), нужно вводить латиницей (punycode).
 
@@ -20,12 +22,14 @@
 """
 
 import ipaddress
+from pathlib import Path
 from urllib.parse import urlsplit
 
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
-# Зоны, где сайты регистрируют люди (часть Public Suffix List, publicsuffix.org).
-# Полный список — тысячи строк; здесь частые. Сама зона не может быть адресом записи.
+# Зоны, где сайты регистрируют люди: полный Public Suffix List (publicsuffix.org) —
+# в файле public_suffix_list.dat рядом. Если файла почему-то нет — хотя бы частые зоны.
+PSL_FILE = Path(__file__).resolve().parent / "public_suffix_list.dat"
 PUBLIC_SUFFIXES = {
     "co.uk", "org.uk", "ac.uk", "gov.uk", "me.uk", "ltd.uk", "plc.uk",
     "com.au", "net.au", "org.au", "co.nz", "co.jp", "ne.jp", "or.jp", "co.kr", "or.kr",
@@ -68,6 +72,39 @@ def _is_ip(host):
         return False
 
 
+def _load_psl():
+    """Правила Public Suffix List: обычные, «*.зона» (любой домен в ней — тоже зона)
+    и исключения «!домен»."""
+    exact, wildcard, exceptions = set(PUBLIC_SUFFIXES), set(), set()
+    try:
+        lines = PSL_FILE.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return exact, wildcard, exceptions
+    for line in lines:
+        if not line or line.startswith("//"):
+            continue
+        if line.startswith("!"):
+            exceptions.add(line[1:])
+        elif line.startswith("*."):
+            wildcard.add(line[2:])
+        else:
+            exact.add(line)
+    return exact, wildcard, exceptions
+
+
+_PSL = _load_psl()
+
+
+def is_public_suffix(host):
+    """Это зона целиком (`co.uk`, `github.io`, `myshopify.com`), а не адрес сайта?"""
+    exact, wildcard, exceptions = _PSL
+    if host in exceptions:
+        return False
+    if host in exact:
+        return True
+    return "." in host and host.split(".", 1)[1] in wildcard
+
+
 def _shared(host):
     return any(host == s or host.endswith("." + s) for s in SHARED_HOSTS)
 
@@ -99,8 +136,11 @@ def normalize(text):
     # одно слово без точки («ru», «com») подошло бы ко всем сайтам в этой зоне
     if not host or "." not in host or any(not part for part in host.split(".")):
         return None
-    if host in PUBLIC_SUFFIXES:
+    if is_public_suffix(host):
         return None
+    # необычный порт — часть адреса: example.com:8443 — другая программа, чем example.com
+    if port is not None and port not in (443, 80):
+        return f"{host}:{port}"
     return host
 
 
@@ -137,6 +177,14 @@ def matches(site, url):
             return host == site_host and (site_port is None or site_port == _page_port(url))
         except ValueError:
             return False
+    try:
+        page_port = _page_port(url)
+    except ValueError:
+        return False
+    # у записи без порта — только обычный порт https (у страницы по http localhost
+    # сюда не дойдёт: это обычный домен, а по http он не заполняется)
+    if page_port != (site_port or 443):
+        return False
     if host == site_host:
         return True
     return host.endswith("." + site_host) and not _shared(site_host)

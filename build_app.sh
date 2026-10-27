@@ -27,6 +27,7 @@ for f in "$P"/translations/*.qm; do DATA+=(--add-data "${f}:translations"); done
 "$VENV/bin/pyinstaller" --noconfirm --windowed --log-level WARN \
   --name WhoKey --icon "$P/gui/assets/WhoKey.icns" --osx-bundle-identifier ru.edu.whokey \
   --add-data "$P/gui/fonts:gui/fonts" \
+  --add-data "$P/public_suffix_list.dat:." \
   "${DATA[@]}" \
   --paths "$P" \
   --exclude-module tkinter --exclude-module matplotlib --exclude-module pandas --exclude-module numpy \

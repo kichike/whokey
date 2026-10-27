@@ -60,6 +60,30 @@ class ControllerFlow(unittest.TestCase):
         self.assertIsNone(c.bridge)
         self.assertIsInstance(c.window, LoginWindow)
 
+    def test_old_copy_of_the_file_is_noticed(self):
+        """Ревью безопасности: подменённая старая копия возвращала отозванный доступ расширения."""
+        import shutil
+        warnings = []
+        real_error, A.show_error = A.show_error, lambda parent, text: warnings.append(text)
+        try:
+            c = self.controller
+            old_copy = self.vault.path.with_suffix(".old")
+            shutil.copy(self.vault.path, old_copy)  # кто-то сохранил копию «на потом»
+            c.show_main(self.vault)
+            self.vault.set_bridge_keys(["отпечаток"])  # потом подключили расширение...
+            self.vault.set_bridge_keys([])            # ...и отключили его
+            c.lock()
+            settle()
+            shutil.copy(old_copy, self.vault.path)    # файл подменили старой копией
+            c.show_main(Vault.open(self.vault.path, "Зелёный-Кит-Летит-2026!"))
+            self.assertEqual(len(warnings), 1)
+            c.lock()
+            settle()
+            c.show_main(Vault.open(self.vault.path, "Зелёный-Кит-Летит-2026!"))
+            self.assertEqual(len(warnings), 1, "предупреждаем один раз, а не при каждом открытии")
+        finally:
+            A.show_error = real_error
+
     def test_second_open_is_ignored(self):
         c = self.controller
         c.show_main(self.vault)

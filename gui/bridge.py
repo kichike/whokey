@@ -15,7 +15,8 @@ WhoKey сам.
   - на странице без https (кроме localhost) не отдаётся ничего;
   - ограничены число соединений, время на запрос и частота запросов: никто
     не может «завалить» WhoKey или перебрать адреса, чтобы вытащить пароли;
-  - каждая выдача пароля видна в строке состояния главного окна.
+  - каждая выдача пароля видна в строке состояния главного окна и записывается
+    в журнал внутри хранилища (кнопка «Расширение»).
 Сеть не используется: сокет — файл в папке программы, доступный только владельцу
 (на Windows — именованный канал, открытый только для текущего пользователя).
 """
@@ -32,14 +33,15 @@ from PySide6.QtNetwork import QLocalServer
 
 import bridge_protocol as P
 import sites
-from gui.widgets import ask_yes
+from gui.widgets import ask_code
 from gui.i18n import tr
 from vault import SaveError
 
 OLD_KEYS_SETTING = "bridge/keys"  # раньше отпечатки лежали в открытых настройках — удаляем
 MAX_CONNECTIONS = 8                # больше одновременно не бывает: один браузер, один мост
 REQUEST_TIMEOUT_MS = 5000          # соединение без запроса дольше этого закрывается
-PAIR_COOLDOWN = 10                 # секунд после отказа — новые запросы разрешения не показываем
+PAIR_COOLDOWN = 10                 # секунд после отказа — новые запросы разрешения не показываем;
+PAIR_COOLDOWN_MAX = 600            # после каждого следующего отказа пауза вдвое длиннее, до 10 минут
 RATE_LIMIT = {"logins": 30, "fill": 10}  # запросов в минуту
 CLOSE_AFTER_MS = 2000              # после ответа: сколько ждём, пока собеседник закроет соединение
 
@@ -60,6 +62,7 @@ class BridgeServer(QObject):
         self.closing = set()  # ответ отправлен — ждём, пока собеседник закроет соединение
         self.pairing = False      # окно «разрешить?» уже открыто
         self.denied_at = None     # когда в последний раз отказали в разрешении (None — не отказывали)
+        self.denials = 0          # отказов подряд — от них растёт пауза
         self.recent = {kind: [] for kind in RATE_LIMIT}  # время последних запросов
         settings.remove(OLD_KEYS_SETTING)
         # если сервер почему-то перестал слушать (например, кончились дескрипторы) — поднять снова
@@ -234,12 +237,19 @@ class BridgeServer(QObject):
         return {"status": "error"}
 
     def _pair(self, request):
-        """Первое подключение расширения — спросить человека, сверив код из окошка расширения."""
+        """Первое подключение расширения: человек вводит в WhoKey код со значка расширения.
+
+        Код придумывает расширение и показывает на своём значке в браузере (и в окошке).
+        Чужая программа может прислать запрос со своим кодом, но показать его на значке
+        нашего расширения не может — человеку нечего будет ввести, и доступ она не получит.
+        Раньше WhoKey сам показывал код и спрашивал «Да / Нет» — нажать «Да» не глядя было легко.
+        """
         code = request.get("code")
         if not (isinstance(code, str) and len(code) == 4 and code.isdigit() and code.isascii()):
             return {"status": "error"}
         # не «0.0»: time.monotonic() у Python на Mac отсчитывается почти от нуля при запуске программы
-        recently_denied = self.denied_at is not None and time.monotonic() - self.denied_at < PAIR_COOLDOWN
+        pause = min(PAIR_COOLDOWN * 2 ** max(self.denials - 1, 0), PAIR_COOLDOWN_MAX)
+        recently_denied = self.denied_at is not None and time.monotonic() - self.denied_at < pause
         if self.pairing or recently_denied:
             return {"status": "denied"}  # окно уже открыто или только что отказали — не заваливаем окнами
         self.pairing = True
@@ -247,9 +257,12 @@ class BridgeServer(QObject):
             self.window.showNormal()
             self.window.raise_()
             self.window.activateWindow()
-            if not ask_yes(self.window, tr("Browser extension"), tr("The WhoKey browser extension asks for access to your passwords.\nIt will be able to fill the login and password on websites listed in your entries.\n\nCode: {code}\nAllow only if the extension popup shows the same code.").format(code=code)):
+            typed = ask_code(self.window, tr("Browser extension"), tr("The WhoKey browser extension asks for access to your passwords.\nIt will be able to fill the login and password on websites listed in your entries.\n\nEnter the 4-digit code shown on the WhoKey icon in your browser.\nIf you did not just click the extension, press Cancel."))
+            if typed is None or not hmac.compare_digest(typed.encode(), code.encode()):
                 self.denied_at = time.monotonic()
+                self.denials += 1
                 return {"status": "denied"}
+            self.denials = 0
             key = P.new_key()
             try:
                 self.vault.set_bridge_keys(self.vault.bridge_keys + [_fingerprint(key)])
@@ -275,6 +288,12 @@ class BridgeServer(QObject):
         # WhoKey сам перепроверяет, что страница подходит записи, и что это та же запись
         if entry["login"] != login or not sites.matches(entry.get("url", ""), url):
             return {"status": "not_found"}
-        self.window.statusBar().showMessage(
-            tr("Password for {site} sent to the browser").format(site=sites.page_host(url)), 8000)
+        host = sites.page_host(url)
+        # журнал выдач: даже если пароль утащит не настоящее расширение (а программа,
+        # укравшая его ключ), человек увидит, кто и когда получил пароли (кнопка «Расширение»)
+        try:
+            self.vault.log_access(host, entry["login"])
+        except SaveError:
+            pass  # не записалось (например, полон диск) — пароль всё равно нужен
+        self.window.statusBar().showMessage(tr("Password for {site} sent to the browser").format(site=host), 8000)
         return {"status": "ok", "login": entry["login"], "password": entry["password"]}

@@ -10,6 +10,14 @@ Maybe a drive is not connected. The default vault is shown; to go back, connect 
 Возможно, не подключён диск. Открыто хранилище по умолчанию; чтобы вернуться к прежнему, подключите диск и нажмите «Другой файл…».</translation>
     </message>
     <message>
+        <source>This vault file is older than the one this computer saw last time (save {now} instead of {seen}). It may have been replaced with an old copy: entries changed since then and the browser extension access you turned off could be back.
+
+If you did not restore an old copy yourself, check your entries and disconnect the extension (Extension button).</source>
+        <translation>Этот файл хранилища старше, чем тот, что этот компьютер видел в прошлый раз (сохранение {now} вместо {seen}). Возможно, его подменили старой копией: могли вернуться записи, изменённые с тех пор, и отключённый доступ расширения.
+
+Если вы сами не восстанавливали старую копию, проверьте записи и отключите расширение (кнопка «Расширение»).</translation>
+    </message>
+    <message>
         <source>WhoKey locked: the screen was locked or the computer slept. Enter your master password.</source>
         <translation>WhoKey заблокирован: экран был заблокирован или компьютер спал. Введите мастер-пароль.</translation>
     </message>
@@ -31,13 +39,13 @@ The vault file is intact: changes are written via a temporary file.</source>
         <source>The WhoKey browser extension asks for access to your passwords.
 It will be able to fill the login and password on websites listed in your entries.
 
-Code: {code}
-Allow only if the extension popup shows the same code.</source>
+Enter the 4-digit code shown on the WhoKey icon in your browser.
+If you did not just click the extension, press Cancel.</source>
         <translation>Расширение WhoKey для браузера просит доступ к паролям.
-Оно сможет заполнять логин и пароль на сайтах, адрес которых указан в записях.
+Оно сможет заполнять логин и пароль на сайтах из ваших записей.
 
-Код: {code}
-Разрешай, только если в окошке расширения тот же код.</translation>
+Введите 4-значный код со значка WhoKey в браузере.
+Если вы сейчас не нажимали на расширение, нажмите «Отмена».</translation>
     </message>
     <message>
         <source>Password for {site} sent to the browser</source>
@@ -180,6 +188,38 @@ Use it anyway?</source>
     <message>
         <source>Master password:</source>
         <translation>Мастер-пароль:</translation>
+    </message>
+    <message>
+        <source>Passwords sent to the browser (newest first):</source>
+        <translation>Пароли, отправленные в браузер (сначала новые):</translation>
+    </message>
+    <message>
+        <source>When</source>
+        <translation>Когда</translation>
+    </message>
+    <message>
+        <source>Nothing has been sent yet.</source>
+        <translation>Пока ничего не отправлялось.</translation>
+    </message>
+    <message>
+        <source>Clear log</source>
+        <translation>Очистить журнал</translation>
+    </message>
+    <message>
+        <source>Disconnect extension</source>
+        <translation>Отключить расширение</translation>
+    </message>
+    <message>
+        <source>The browser extension is connected.</source>
+        <translation>Расширение для браузера подключено.</translation>
+    </message>
+    <message>
+        <source>The browser extension is not connected.</source>
+        <translation>Расширение для браузера не подключено.</translation>
+    </message>
+    <message>
+        <source>How to install it: &lt;a href=&quot;{url}&quot;&gt;README on GitHub&lt;/a&gt;.</source>
+        <translation>Как установить: &lt;a href=&quot;{url}&quot;&gt;README на GitHub&lt;/a&gt;.</translation>
     </message>
     <message>
         <source>WhoKey</source>
@@ -408,20 +448,10 @@ This cannot be undone.</source>
         <translation>Не получилось скопировать пароль в буфер обмена.</translation>
     </message>
     <message>
-        <source>The browser extension is not connected.
-How to install it — see the README on GitHub.</source>
-        <translation>Расширение для браузера не подключено.
-Как его поставить — в README на GitHub.</translation>
-    </message>
-    <message>
         <source>Disconnect the browser extension?
 It will no longer receive passwords. To connect it again, WhoKey will ask for permission once more.</source>
         <translation>Отключить расширение браузера?
 Оно больше не сможет получать пароли. Чтобы подключить снова, WhoKey ещё раз спросит разрешение.</translation>
-    </message>
-    <message>
-        <source>Extension disconnected</source>
-        <translation>Расширение отключено</translation>
     </message>
     <message>
         <source>Master password changed, vault re-encrypted.</source>
@@ -482,6 +512,10 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
     <message>
         <source>Yes</source>
         <translation>Да</translation>
+    </message>
+    <message>
+        <source>Allow</source>
+        <translation>Разрешить</translation>
     </message>
     <message>
         <source>contains a very common word or pattern (qwerty, 123456, password...)</source>

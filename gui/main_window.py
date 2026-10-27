@@ -9,8 +9,8 @@ from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderVi
 import sites
 from clipboard import CLEAR_AFTER
 from gui import theme
-from gui.dialogs import ChangeMasterDialog, EntryDialog, GeneratorDialog, SettingsDialog
-from gui.widgets import REVEAL_SECONDS, ClipboardCountdown, RoundedRowDelegate, ask_yes, show_error, show_info
+from gui.dialogs import ChangeMasterDialog, EntryDialog, ExtensionDialog, GeneratorDialog, SettingsDialog
+from gui.widgets import REVEAL_SECONDS, ClipboardCountdown, RoundedRowDelegate, ask_yes, show_error
 from gui.i18n import tr
 from vault import SaveError
 
@@ -301,14 +301,8 @@ class MainWindow(QMainWindow):
         return True
 
     def extension(self):
-        """Расширение браузера: подключено ли — и кнопка «отключить»."""
-        if not self.vault.bridge_keys:
-            show_info(self, tr("Extension"), tr("The browser extension is not connected.\nHow to install it — see the README on GitHub."))
-            return
-        if not ask_yes(self, tr("Extension"), tr("Disconnect the browser extension?\nIt will no longer receive passwords. To connect it again, WhoKey will ask for permission once more.")):
-            return
-        if self._save(lambda: self.vault.set_bridge_keys([])):
-            self.statusBar().showMessage(tr("Extension disconnected"), 8000)
+        """Расширение браузера: подключено ли, журнал выдач паролей, «Отключить»."""
+        ExtensionDialog(self, self.vault, self._save).exec()
 
     def open_generator(self):
         GeneratorDialog(self, self.copy_password).exec()

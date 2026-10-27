@@ -334,6 +334,30 @@ def ask_yes(parent, title, text):
     return box.clickedButton() is yes
 
 
+def ask_code(parent, title, text):
+    """Окно ввода 4-значного кода. Возвращает введённые цифры или None (отмена)."""
+    box = _message(parent, title, text, "?", theme.NEON)
+    edit = QLineEdit()
+    edit.setMaxLength(4)
+    edit.setInputMask("9999;_")  # только цифры
+    edit.setAlignment(Qt.AlignCenter)
+    font = edit.font()
+    font.setPixelSize(28)
+    font.setLetterSpacing(font.AbsoluteSpacing, 8)
+    edit.setFont(font)
+    edit.setFixedWidth(180)
+    # поле — в разметку QMessageBox, под текстом
+    box.layout().addWidget(edit, box.layout().rowCount(), 0, 1, box.layout().columnCount(), Qt.AlignCenter)
+    cancel = box.addButton(tr("Cancel"), QMessageBox.RejectRole)
+    allow = box.addButton(tr("Allow"), QMessageBox.AcceptRole)
+    box.setDefaultButton(allow)
+    QTimer.singleShot(0, edit.setFocus)
+    box.exec()
+    if box.clickedButton() is not allow:
+        return None
+    return edit.text().strip()
+
+
 def show_error(parent, text):
     _message(parent, tr("Error"), text, "!", theme.BAD_INK).exec()
 

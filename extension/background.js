@@ -71,11 +71,15 @@ async function api(message) {
   let reply = await request({ ...message, key: pairKey || "" });
   if (reply.status !== "pair_required") return reply;
   const waited = reply.waited;
-  // код сопряжения: окошко и WhoKey показывают одни и те же 4 цифры — человек сверяет,
-  // что разрешение просит именно это расширение, а не чужая программа
+  // код сопряжения: расширение показывает его на своём значке (он виден, даже когда
+  // окошко закрылось) и в окошке, а человек вводит его в WhoKey. Чужая программа может
+  // попросить доступ со своим кодом, но показать его на нашем значке не может
   const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 10000).padStart(4, "0");
+  chrome.action.setBadgeBackgroundColor({ color: "#936fc4" });
+  chrome.action.setBadgeText({ text: code });
   chrome.runtime.sendMessage({ kind: "pairing", code }).catch(() => {});
   const pair = await request({ type: "pair", code });
+  chrome.action.setBadgeText({ text: "" });
   if (pair.status !== "ok") return { ...pair, waited: waited || pair.waited };
   await chrome.storage.local.set({ pairKey: pair.key });
   reply = await request({ ...message, key: pair.key });

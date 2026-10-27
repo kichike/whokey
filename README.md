@@ -172,5 +172,5 @@ python3 -m venv .venv
 
 ---
 
-The MesloLGS Nerd Font is used under the Apache License 2.0 (`gui/fonts/LICENSE.txt`).
-Шрифт MesloLGS Nerd Font распространяется по лицензии Apache 2.0 (`gui/fonts/LICENSE.txt`).
+The MesloLGS Nerd Font is used under the Apache License 2.0 (`gui/fonts/LICENSE.txt`). `public_suffix_list.dat` is the [Public Suffix List](https://publicsuffix.org/) under the Mozilla Public License 2.0.
+Шрифт MesloLGS Nerd Font распространяется по лицензии Apache 2.0 (`gui/fonts/LICENSE.txt`). `public_suffix_list.dat` — [Public Suffix List](https://publicsuffix.org/) по лицензии Mozilla Public License 2.0.

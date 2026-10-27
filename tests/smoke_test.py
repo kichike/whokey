@@ -193,7 +193,8 @@ def run():
     for name, make in (("entry", lambda: Dg.EntryDialog(main, main.vault.entries[0])),
                        ("generator", lambda: Dg.GeneratorDialog(main, lambda text: True)),
                        ("change_master", lambda: Dg.ChangeMasterDialog(main, main.vault)),
-                       ("settings", lambda: Dg.SettingsDialog(main, main.vault, main.change_master))):
+                       ("settings", lambda: Dg.SettingsDialog(main, main.vault, main.change_master)),
+                       ("extension", lambda: Dg.ExtensionDialog(main, main.vault, main._save))):
         dialog = make()
         dialog.show()
         for edit in dialog.findChildren(QLineEdit)[:2]:

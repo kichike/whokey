@@ -30,6 +30,7 @@ args = [
     "--noconfirm", "--windowed", "--log-level", "WARN",
     "--name", "WhoKey", "--icon", str(ASSETS / "WhoKey.ico"),
     *data(HERE / "gui" / "fonts", "gui/fonts"),
+    *data(HERE / "public_suffix_list.dat", "."),  # список зон для sites.py
     # картинки, которые нужны окнам: галочка, стрелки, «глаз», иконка окна
     *[arg for svg in sorted(ASSETS.glob("*.svg")) for arg in data(svg, "gui/assets")],
     *data(ASSETS / "icon.png", "gui/assets"),

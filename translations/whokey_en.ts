@@ -9,6 +9,12 @@ Maybe a drive is not connected. The default vault is shown; to go back, connect 
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>This vault file is older than the one this computer saw last time (save {now} instead of {seen}). It may have been replaced with an old copy: entries changed since then and the browser extension access you turned off could be back.
+
+If you did not restore an old copy yourself, check your entries and disconnect the extension (Extension button).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>WhoKey locked: the screen was locked or the computer slept. Enter your master password.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -29,8 +35,8 @@ The vault file is intact: changes are written via a temporary file.</source>
         <source>The WhoKey browser extension asks for access to your passwords.
 It will be able to fill the login and password on websites listed in your entries.
 
-Code: {code}
-Allow only if the extension popup shows the same code.</source>
+Enter the 4-digit code shown on the WhoKey icon in your browser.
+If you did not just click the extension, press Cancel.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -170,6 +176,38 @@ Use it anyway?</source>
     </message>
     <message>
         <source>Master password:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Passwords sent to the browser (newest first):</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>When</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Nothing has been sent yet.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear log</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disconnect extension</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The browser extension is connected.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The browser extension is not connected.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>How to install it: &lt;a href=&quot;{url}&quot;&gt;README on GitHub&lt;/a&gt;.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -394,17 +432,8 @@ This cannot be undone.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>The browser extension is not connected.
-How to install it — see the README on GitHub.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Disconnect the browser extension?
 It will no longer receive passwords. To connect it again, WhoKey will ask for permission once more.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Extension disconnected</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -465,6 +494,10 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
     </message>
     <message>
         <source>Yes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Allow</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

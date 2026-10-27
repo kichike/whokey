@@ -50,6 +50,7 @@ SALT_SIZE = 16  # 128 бит — как в документации cryptography
 # подменённый файл мог бы уронить программу (lanes = 0) или заставить её
 # занять всю память. Верхний предел памяти — 256 МБ.
 KDF_LIMITS = {"iterations": (1, 10), "lanes": (1, 16), "memory_cost": (2 ** 13, 2 ** 18)}
+ACCESS_LOG_SIZE = 200  # столько последних выдач паролей расширению помнит журнал
 MAX_FILE_SIZE = 10 * 1024 * 1024  # хранилище больше 10 МБ (~25 000 записей) — точно не наше
 
 ENTRY_FIELDS = ["site", "login", "password", "note", "created", "updated"]
@@ -335,6 +336,11 @@ class Vault:
         self.bridge_keys = []
         self.backup_error = None  # почему не обновилась резервная копия (если так)
         self.header_repaired = False  # открытый заголовок не совпал с копией внутри шифровки
+        # кому и когда расширение браузера получило пароль: [{"time", "site", "login"}], новые в конце
+        self.access_log = []
+        # номер сохранения (растёт при каждой записи) — чтобы заметить подмену файла старой копией
+        self.generation = 0
+        self.on_saved = None  # вызывается с номером после каждой записи (WhoKey запоминает его)
         self.old_backup = None    # куда отложена чужая старая копия при создании
 
     # --- создание и открытие ---
@@ -384,6 +390,15 @@ class Vault:
             bridge_keys = content.get("bridge_keys", [])  # у хранилищ до расширения браузера его нет
             if not isinstance(bridge_keys, list) or not all(isinstance(k, str) for k in bridge_keys):
                 raise ValueError("bad bridge keys")
+            # журнал выдач паролей расширению и номер сохранения (с версии 1.4.2)
+            access_log = content.get("access_log", [])
+            if not isinstance(access_log, list) or not all(
+                    isinstance(item, dict) and all(isinstance(item.get(k), str) for k in ("time", "site", "login"))
+                    for item in access_log):
+                raise ValueError("bad access log")
+            generation = content.get("generation", 0)
+            if type(generation) is not int or generation < 0:
+                raise ValueError("bad generation")
             # Копия соли и настроек Argon2id внутри шифровки (с версии 1.4.2). Открытый
             # заголовок может испортить или подменить кто угодно: тогда хранилище открылось бы
             # ключом из Touch ID, при сохранении соль из заголовка ушла бы в файл и копию —
@@ -401,6 +416,8 @@ class Vault:
             raise VaultError(str(error))
         vault = cls(path, key, salt, params, entries)
         vault.bridge_keys = bridge_keys
+        vault.access_log = access_log[-ACCESS_LOG_SIZE:]
+        vault.generation = generation
         vault.header_repaired = repaired  # заголовок не совпал с копией — исправится при сохранении
         return vault
 
@@ -417,13 +434,18 @@ class Vault:
 
     # --- сохранение ---
 
-    def _write(self, entries, key, salt, params, bridge_keys=None):
+    def _write(self, entries, key, salt, params, bridge_keys=None, access_log=None):
         """Шифрует записи и сохраняет файл + резервную копию. SaveError — если не вышло."""
+        generation = self.generation + 1
         content = {"entries": entries,
-                   "kdf": {"salt": base64.b64encode(salt).decode("ascii"), "params": params}}
+                   "kdf": {"salt": base64.b64encode(salt).decode("ascii"), "params": params},
+                   "generation": generation}
         bridge_keys = self.bridge_keys if bridge_keys is None else bridge_keys
         if bridge_keys:
             content["bridge_keys"] = bridge_keys
+        access_log = self.access_log if access_log is None else access_log
+        if access_log:
+            content["access_log"] = access_log
         data = json.dumps(content, ensure_ascii=False).encode("utf-8")
         header = {
             "format": FORMAT,
@@ -439,6 +461,9 @@ class Vault:
             _write_file(self.path, text)
         except OSError as error:
             raise SaveError(error.strerror or str(error))
+        self.generation = generation
+        if self.on_saved is not None:
+            self.on_saved(generation)
         # Резервная копия — та же зашифрованная версия. Если не записалась,
         # это не повод отменять уже сохранённое изменение, но человек должен
         # об этом узнать (менеджер покажет предупреждение).
@@ -480,6 +505,16 @@ class Vault:
     def _commit(self, entries):
         self._write(entries, self._key, self._salt, self._params)
         self.entries = entries
+
+    def log_access(self, site, login):
+        """Запись в журнал: расширение получило пароль от site для login. SaveError — если не записалось."""
+        log = (self.access_log + [{"time": _now(), "site": site, "login": login}])[-ACCESS_LOG_SIZE:]
+        self._write(self.entries, self._key, self._salt, self._params, access_log=log)
+        self.access_log = log
+
+    def clear_access_log(self):
+        self._write(self.entries, self._key, self._salt, self._params, access_log=[])
+        self.access_log = []
 
     def set_bridge_keys(self, keys):
         """Разрешённые расширения браузера: сначала на диск, потом в память. SaveError — если не вышло."""

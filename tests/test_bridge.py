@@ -39,8 +39,9 @@ WINDOWS = sys.platform == "win32"
 PASSWORD = "Зелёный-Кит-Летит-2026!"
 
 
-def make_server(answer=True, delay_ms=0):
-    """Сервер с тестовым хранилищем; окно «разрешить?» отвечает само (через delay_ms)."""
+def make_server(answer="4821", delay_ms=0):
+    """Сервер с тестовым хранилищем; «человек» вводит в окне WhoKey код answer
+    (None — нажал «Отмена»), подумав delay_ms."""
     folder = Path(tempfile.mkdtemp())
     vault = Vault.create(folder / "v.dat", PASSWORD)
     vault.add("Почта", "egor@mail.ru", "PASS-mail", "", url="mail.ru")
@@ -55,7 +56,7 @@ def make_server(answer=True, delay_ms=0):
             QTimer.singleShot(delay_ms, loop.quit)
             loop.exec()
         return answer
-    B.ask_yes = ask
+    B.ask_code = ask
     settings = QSettings(str(folder / "s.ini"), QSettings.IniFormat)
     return B.BridgeServer(vault, QMainWindow(), settings), vault, settings, dialogs
 
@@ -70,8 +71,9 @@ class Requests(unittest.TestCase):
     def ask(self, **request):
         return self.server.handle({"key": self.key, **request})
 
-    def test_pairing_shows_code_and_needs_it(self):
-        self.assertIn("4821", self.dialogs[0])
+    def test_pairing_needs_the_code_typed_in_whokey(self):
+        # код из запроса в окне WhoKey не показывается: его надо ввести со значка расширения
+        self.assertNotIn("4821", self.dialogs[0])
         self.assertEqual(self.server.handle({"type": "pair"})["status"], "error")
         self.assertEqual(self.server.handle({"type": "pair", "code": "12a4"})["status"], "error")
 
@@ -122,8 +124,23 @@ class Requests(unittest.TestCase):
         self.assertEqual(statuses.count("ok"), B.RATE_LIMIT["fill"])
         self.assertIn("busy", statuses)
 
+    def test_wrong_code_is_denied_and_pause_grows(self):
+        # чужая программа прислала свой код, а человек ввёл код со значка — не совпало
+        server, vault, _, dialogs = make_server(answer="4821")
+        self.assertEqual(server.handle({"type": "pair", "code": "1111"})["status"], "denied")
+        self.assertEqual(vault.bridge_keys, [])
+        self.assertEqual(server.handle({"type": "pair", "code": "4821"})["status"], "denied")  # пауза 10 с
+        server.denied_at -= 11  # прошло 11 секунд
+        self.assertEqual(server.handle({"type": "pair", "code": "2222"})["status"], "denied")
+        server.denied_at -= 11  # после второго отказа пауза уже 20 секунд
+        self.assertEqual(server.handle({"type": "pair", "code": "4821"})["status"], "denied")
+        self.assertEqual(len(dialogs), 2)
+        server.denied_at -= 10
+        self.assertEqual(server.handle({"type": "pair", "code": "4821"})["status"], "ok")
+        self.assertEqual(server.denials, 0)  # удачное подключение сбрасывает паузу
+
     def test_no_dialog_flood_after_denial(self):
-        server, _, _, dialogs = make_server(answer=False)
+        server, _, _, dialogs = make_server(answer=None)
         self.assertEqual(server.handle({"type": "pair", "code": "1111"})["status"], "denied")
         self.assertEqual(server.handle({"type": "pair", "code": "2222"})["status"], "denied")
         self.assertEqual(len(dialogs), 1)

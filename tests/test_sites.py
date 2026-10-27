@@ -64,8 +64,24 @@ class Matching(unittest.TestCase):
         page = "https://" + "госуслуги.рф".encode("idna").decode() + "/login"
         self.assertTrue(sites.matches("госуслуги.рф", page))
 
+    def test_full_public_suffix_list(self):
+        """Ревью безопасности: в старом коротком списке не было, например, myshopify.com и eu.org."""
+        for zone in ("myshopify.com", "pythonanywhere.com", "eu.org", "com.de", "github.io", "co.uk"):
+            with self.subTest(zone=zone):
+                self.assertIsNone(sites.normalize(zone))
+        self.assertEqual(sites.normalize("shop.myshopify.com"), "shop.myshopify.com")
+        self.assertFalse(sites.matches("shop.myshopify.com", "https://evil.myshopify.com"))
+        self.assertTrue(sites.matches("shop.myshopify.com", "https://shop.myshopify.com/login"))
+
+    def test_ports(self):
+        self.assertFalse(sites.matches("example.com", "https://example.com:8443/login"))
+        self.assertTrue(sites.matches("example.com:8443", "https://example.com:8443/login"))
+        self.assertFalse(sites.matches("example.com:8443", "https://example.com/login"))
+        self.assertTrue(sites.matches("example.com", "https://example.com:443/login"))
+
     def test_normalize(self):
-        self.assertEqual(sites.normalize("https://Mail.ru:8080/login"), "mail.ru")
+        self.assertEqual(sites.normalize("https://Mail.ru:8080/login"), "mail.ru:8080")  # необычный порт — часть адреса
+        self.assertEqual(sites.normalize("https://Mail.ru:443/login"), "mail.ru")
         self.assertEqual(sites.normalize("  "), "")
         self.assertEqual(sites.normalize("http://localhost:3000/x"), "localhost:3000")
         # IPv6 — в скобках и с портом, и без: сохранённый адрес должен читаться заново

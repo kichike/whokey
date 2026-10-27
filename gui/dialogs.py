@@ -1,8 +1,10 @@
-"""Окна поверх главного: запись (добавить / изменить), генератор, смена мастер-пароля, настройки."""
+"""Окна поверх главного: запись (добавить / изменить), генератор, смена мастер-пароля,
+настройки, расширение браузера (журнал выдач паролей)."""
 
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-                               QLabel, QLineEdit, QPushButton, QVBoxLayout)
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+                               QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPushButton,
+                               QTableWidget, QTableWidgetItem, QVBoxLayout)
 
 import sites
 from clipboard import CLEAR_AFTER
@@ -259,3 +261,79 @@ class SettingsDialog(QDialog):
         if had_touch_id and not touchid.is_enabled(self.vault.path):
             touchid.save_key(self.vault.path, self.vault.key)
             touchid.set_offered(self.vault.path)
+
+
+README_URL = "https://github.com/kichike/whokey#browser-extension"
+
+
+class ExtensionDialog(QDialog):
+    """Расширение браузера: подключено ли, журнал выдач паролей и кнопка «Отключить»."""
+
+    def __init__(self, parent, vault, save):
+        """save — сохранение главного окна (там же сообщения об ошибках записи)."""
+        super().__init__(parent)
+        self.setWindowTitle(tr("Extension"))
+        self.resize(620, 460)
+        self.vault, self.save = vault, save
+
+        column = QVBoxLayout(self)
+        self.status = QLabel()
+        self.status.setWordWrap(True)
+        self.status.setTextFormat(Qt.RichText)
+        self.status.setOpenExternalLinks(True)
+        column.addWidget(self.status)
+
+        column.addWidget(theme.role(QLabel(tr("Passwords sent to the browser (newest first):")), "muted"))
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels([tr("When"), tr("Website"), tr("Login")])
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.table.setShowGrid(False)
+        self.table.verticalHeader().setVisible(False)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        column.addWidget(self.table, 1)
+        self.empty = theme.role(QLabel(tr("Nothing has been sent yet.")), "muted")
+        column.addWidget(self.empty)
+
+        row = QHBoxLayout()
+        self.clear_button = QPushButton(tr("Clear log"))
+        self.clear_button.clicked.connect(self._clear)
+        self.disconnect_button = QPushButton(tr("Disconnect extension"))
+        self.disconnect_button.clicked.connect(self._disconnect)
+        close = QPushButton(tr("Close"))
+        close.clicked.connect(self.reject)
+        row.addWidget(self.clear_button)
+        row.addWidget(self.disconnect_button)
+        row.addStretch()
+        row.addWidget(close)
+        column.addLayout(row)
+        self._refresh()
+
+    def _refresh(self):
+        connected = bool(self.vault.bridge_keys)
+        if connected:
+            self.status.setText(tr("The browser extension is connected."))
+        else:
+            self.status.setText(tr("The browser extension is not connected.") + " "
+                                + tr('How to install it: <a href="{url}">README on GitHub</a>.').format(url=README_URL))
+        self.disconnect_button.setEnabled(connected)
+        log = list(reversed(self.vault.access_log))
+        self.table.setRowCount(len(log))
+        for row, item in enumerate(log):
+            for col, key in enumerate(("time", "site", "login")):
+                self.table.setItem(row, col, QTableWidgetItem(item[key]))
+        self.table.setVisible(bool(log))
+        self.empty.setVisible(not log)
+        self.clear_button.setEnabled(bool(log))
+
+    def _clear(self):
+        if self.save(self.vault.clear_access_log):
+            self._refresh()
+
+    def _disconnect(self):
+        if not ask_yes(self, tr("Extension"), tr("Disconnect the browser extension?\nIt will no longer receive passwords. To connect it again, WhoKey will ask for permission once more.")):
+            return
+        if self.save(lambda: self.vault.set_bridge_keys([])):
+            self._refresh()
