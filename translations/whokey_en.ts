@@ -9,7 +9,7 @@ Maybe a drive is not connected. The default vault is shown; to go back, connect 
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>WhoKey locked: the screen was locked or the Mac slept. Enter your master password.</source>
+        <source>WhoKey locked: the screen was locked or the computer slept. Enter your master password.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

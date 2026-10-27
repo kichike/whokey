@@ -10,8 +10,8 @@ Maybe a drive is not connected. The default vault is shown; to go back, connect 
 Возможно, не подключён диск. Открыто хранилище по умолчанию; чтобы вернуться к прежнему, подключите диск и нажмите «Другой файл…».</translation>
     </message>
     <message>
-        <source>WhoKey locked: the screen was locked or the Mac slept. Enter your master password.</source>
-        <translation>WhoKey заблокирован: экран был заблокирован или Mac спал. Введите мастер-пароль.</translation>
+        <source>WhoKey locked: the screen was locked or the computer slept. Enter your master password.</source>
+        <translation>WhoKey заблокирован: экран был заблокирован или компьютер спал. Введите мастер-пароль.</translation>
     </message>
     <message>
         <source>Error</source>

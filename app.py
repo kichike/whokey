@@ -135,7 +135,7 @@ class Controller:
             if isinstance(widget, QDialog) and widget.isVisible():
                 widget.reject()
         self.clipboard.clear_now()
-        self.state["notice"] = tr("WhoKey locked: the screen was locked or the Mac slept. Enter your master password.")
+        self.state["notice"] = tr("WhoKey locked: the screen was locked or the computer slept. Enter your master password.")
         path = self.window.vault.path
         # окно меняем, когда закроются окошки (их циклы событий ещё работают)
         QTimer.singleShot(0, lambda: self.show_login(path))

@@ -30,7 +30,7 @@ from PySide6.QtWidgets import QApplication, QMainWindow  # noqa: E402
 import bridge_host as H  # noqa: E402
 import bridge_protocol as P  # noqa: E402
 import gui.bridge as B  # noqa: E402
-from gui.autolock import AutoLock  # noqa: E402
+from gui.autolock import AutoLock, monotonic, screen_locked  # noqa: E402
 from vault import Vault  # noqa: E402
 
 APP = QApplication.instance() or QApplication([])
@@ -421,12 +421,19 @@ class Autolock(unittest.TestCase):
         events = []
         lock = AutoLock()
         lock.lock.connect(lambda: events.append(1))
-        lock._clocks = (time.time() - 3, time.monotonic() - 3)
+        lock._clocks = (time.time() - 3, monotonic() - 3)
         lock._check()
         self.assertEqual(events, [])
-        lock._clocks = (time.time() - 100, time.monotonic() - 1)
+        lock._clocks = (time.time() - 100, monotonic() - 1)
         lock._check()
         self.assertEqual(events, [1])
+
+    @unittest.skipUnless(WINDOWS, "Windows: состояние сеанса и часы без сна")
+    def test_windows_session_and_clock(self):
+        self.assertFalse(screen_locked())  # на машине сборки экран не заблокирован
+        first = monotonic()
+        time.sleep(0.2)
+        self.assertAlmostEqual(monotonic() - first, 0.2, delta=0.15)  # часы идут как обычно
 
 
 if __name__ == "__main__":

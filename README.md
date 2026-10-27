@@ -32,7 +32,7 @@ WhoKey keeps your logins in one encrypted file that only opens with your master 
 - **Backup copy:** a hidden backup sits next to the vault, so you only see one file. If the vault gets damaged, WhoKey offers to restore it.
 - **Browser extension** (macOS and Windows, Chromium browsers): fills your login and password on websites — see below.
 - **Touch ID** on Mac: unlock WhoKey with your fingerprint (turn it on or off in **Settings**, ⌘,).
-- **Auto-lock** when the screen is locked or the Mac goes to sleep (on Windows — after sleep).
+- **Auto-lock** when the screen is locked or the computer goes to sleep.
 - **English and Russian** interface.
 
 By default the vault lives in `~/Library/Application Support/EduPasswords/vault.dat` on macOS (not synced to iCloud) and in `%APPDATA%\EduPasswords\vault.dat` on Windows. You can choose another file in the login window.
@@ -108,7 +108,7 @@ WhoKey хранит логины и пароли в одном зашифров�
 - **Резервная копия:** скрытая копия лежит рядом с хранилищем, так что в папке виден один файл. Если хранилище испортится, WhoKey предложит восстановить его.
 - **Расширение для браузера** (macOS и Windows, браузеры на Chromium): заполняет логин и пароль на сайтах — подробнее ниже.
 - **Touch ID** на Mac: WhoKey открывается по отпечатку пальца (включается и выключается в **Настройках**, ⌘,).
-- **Автоблокировка** при блокировке экрана и сне Mac (на Windows — после сна).
+- **Автоблокировка** при блокировке экрана и сне компьютера.
 - Интерфейс на **русском и английском**.
 
 По умолчанию хранилище лежит в `~/Library/Application Support/EduPasswords/vault.dat` на macOS (эта папка не синхронизируется с iCloud) и в `%APPDATA%\EduPasswords\vault.dat` на Windows. Другой файл можно выбрать в окне входа.
