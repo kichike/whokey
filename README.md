@@ -87,6 +87,10 @@ On Windows, use `.venv\Scripts\python app.py`.
 
 To build the installers yourself: on macOS run `./build_dmg.sh`; on Windows run `python build_windows.py`, then compile `installer.iss` with [Inno Setup](https://jrsoftware.org/isinfo.php). Both appear in `dist/`. GitHub Actions builds and tests the Windows version automatically. Tests: `python -m unittest discover tests`.
 
+### Contact
+
+Questions and ideas — write me on Telegram: [@kichik_e](https://t.me/kichik_e)
+
 ---
 
 ## Русский
@@ -157,6 +161,10 @@ python3 -m venv .venv
 На Windows: `.venv\Scripts\python app.py`.
 
 Чтобы самому собрать установщики: на macOS запустите `./build_dmg.sh`; на Windows — `python build_windows.py`, а потом соберите `installer.iss` в [Inno Setup](https://jrsoftware.org/isinfo.php). Оба появятся в папке `dist/`. Windows-версию GitHub Actions собирает и проверяет автоматически. Тесты: `python -m unittest discover tests`.
+
+### Связь
+
+Вопросы и идеи — пишите в Telegram: [@kichik_e](https://t.me/kichik_e)
 
 ---
 
