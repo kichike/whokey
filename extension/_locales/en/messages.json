@@ -54,7 +54,13 @@
     "message": "Something went wrong. Try again."
   },
   "hint": {
-    "message": "⌘⇧L (Ctrl+Shift+L) opens this popup from the keyboard"
+    "message": "$KEY$ opens this popup from the keyboard",
+    "placeholders": {
+      "key": {
+        "content": "$1",
+        "example": "Ctrl+Shift+L"
+      }
+    }
   },
   "pairing": {
     "message": "WhoKey asks to confirm the connection.\nCode: $1 — allow it if WhoKey shows the same code."
@@ -69,6 +75,12 @@
     "message": "Another program answered instead of WhoKey — nothing was sent. Restart WhoKey."
   },
   "ambiguous": {
-    "message": "There are several password fields on the page — press ⌘⇧L (Ctrl+Shift+L) again and choose the account."
+    "message": "There are several password fields on the page — press $KEY$ again and choose the account.",
+    "placeholders": {
+      "key": {
+        "content": "$1",
+        "example": "Ctrl+Shift+L"
+      }
+    }
   }
 }

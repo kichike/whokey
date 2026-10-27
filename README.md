@@ -28,7 +28,7 @@ WhoKey keeps your logins in one encrypted file that only opens with your master 
 - **Clipboard:** copied passwords are wiped after 30 seconds and when the app quits — a draining neon bar shows how much time is left. Clipboard history (Win+V, Raycast, Maccy…) and cloud clipboard are told to skip them.
 - **Hidden by default:** a password you reveal hides itself again after 15 seconds.
 - **Password generator** with length, letters, digits and symbols, plus a rough strength meter.
-- **Search,** and right-click actions on any entry: show, copy password, copy login, edit, delete.
+- **Search,** and right-click actions on any entry: show, copy password, copy login, open the website (⌘O / Ctrl+O), edit, delete.
 - **Backup copy:** a hidden backup sits next to the vault, so you only see one file. If the vault gets damaged, WhoKey offers to restore it.
 - **Browser extension** (macOS and Windows, Chromium browsers): fills your login and password on websites — see below.
 - **Touch ID** on Mac: unlock WhoKey with your fingerprint (turn it on or off in **Settings**, ⌘,).
@@ -104,7 +104,7 @@ WhoKey хранит логины и пароли в одном зашифров�
 - **Буфер обмена:** скопированный пароль стирается через 30 секунд и при выходе из программы, неоновая полоска показывает, сколько осталось. Журналу буфера (Win+V, Raycast, Maccy…) и облачному буферу запрещено его запоминать.
 - **Пароли скрыты:** показанный пароль сам прячется через 15 секунд.
 - **Генератор паролей:** длина, буквы, цифры, символы и примерная шкала надёжности.
-- **Поиск** и действия с записью по правому клику: показать, скопировать пароль или логин, изменить, удалить.
+- **Поиск** и действия с записью по правому клику: показать, скопировать пароль или логин, открыть сайт (⌘O / Ctrl+O), изменить, удалить.
 - **Резервная копия:** скрытая копия лежит рядом с хранилищем, так что в папке виден один файл. Если хранилище испортится, WhoKey предложит восстановить его.
 - **Расширение для браузера** (macOS и Windows, браузеры на Chromium): заполняет логин и пароль на сайтах — подробнее ниже.
 - **Touch ID** на Mac: WhoKey открывается по отпечатку пальца (включается и выключается в **Настройках**, ⌘,).

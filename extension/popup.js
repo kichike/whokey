@@ -29,9 +29,23 @@ const TEXTS = {
   cancelled: ["connecting", ""],
 };
 
+// Горячая клавиша окошка так, как её показывает сам браузер на этой системе
+// (⇧⌘L на Mac, Ctrl+Shift+L на Windows; человек мог назначить и свою)
+let shortcut = "";
+
+async function loadShortcut() {
+  try {
+    const commands = await chrome.commands.getAll();
+    const action = commands.find((c) => c.name === "_execute_action");
+    if (action && action.shortcut) return action.shortcut;
+  } catch (e) { /* нет доступа к списку — подставим обычную */ }
+  const { os } = await chrome.runtime.getPlatformInfo();
+  return os === "mac" ? "⌘⇧L" : "Ctrl+Shift+L";
+}
+
 function showResult(reply, host) {
   const [key, kind] = TEXTS[reply.status] || ["error", "bad"];
-  status(msg(key, host), kind);
+  status(msg(key, key === "ambiguous" ? shortcut : host), kind);
   if (reply.status === "filled" || reply.status === "filled_login") setTimeout(() => window.close(), 700);
 }
 
@@ -72,7 +86,8 @@ function showItems(tab, url, host, items) {
 }
 
 async function main() {
-  $("hint").textContent = msg("hint");
+  shortcut = await loadShortcut();
+  $("hint").textContent = msg("hint", shortcut);
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const url = tab && tab.url ? tab.url : "";
   let host = "";

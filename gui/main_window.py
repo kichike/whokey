@@ -1,11 +1,12 @@
 """Главное окно: поиск, таблица записей и меню действий по правому клику."""
 
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFontDatabase, QGuiApplication, QKeySequence, QShortcut
+from PySide6.QtCore import Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QColor, QDesktopServices, QFontDatabase, QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderView, QLabel,
                                QLineEdit, QMainWindow, QMenu, QPushButton, QStackedWidget,
                                QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
+import sites
 from clipboard import CLEAR_AFTER
 from gui import theme
 from gui.dialogs import ChangeMasterDialog, EntryDialog, GeneratorDialog, SettingsDialog
@@ -16,6 +17,17 @@ from vault import SaveError
 HIDDEN = "••••••••"   # одинаковые точки — не выдаём даже длину пароля
 REVEAL_SECONDS = 15   # показанный пароль сам скроется через столько секунд
 COLUMNS = ["site", "login", "password", "note", "updated"]
+
+
+def site_link(entry):
+    """Ссылка на сайт записи: из «Адреса сайта», а если он пуст — из названия,
+    если оно похоже на адрес (github.com). None — открыть нечего («госуслуги»)."""
+    for text in (entry.get("url", ""), entry.get("site", "")):
+        host = sites.normalize(text)
+        if host and ("." in host.split(":")[0] or host.startswith("localhost")):
+            scheme = "http" if host.startswith(("localhost", "127.", "[::1]")) else "https"
+            return f"{scheme}://{host}"
+    return None
 
 
 class MainWindow(QMainWindow):
@@ -56,6 +68,7 @@ class MainWindow(QMainWindow):
         # срабатывали бы во всём окне: Enter в поиске открывал бы правку записи,
         # а ⌘C в поиске копировал бы пароль вместо набранного текста.
         for keys, handler in [(QKeySequence.Copy, self.copy),
+                              (QKeySequence.Open, self.open_website),  # ⌘O / Ctrl+O
                               (QKeySequence(Qt.Key_Backspace), self.delete),
                               (QKeySequence(Qt.Key_Return), self.edit)]:
             QShortcut(keys, self.table, handler).setContext(Qt.WidgetShortcut)
@@ -143,6 +156,8 @@ class MainWindow(QMainWindow):
         menu.addAction(tr("Copy password"), self.copy)
         login = menu.addAction(tr("Copy login"), self.copy_login)
         login.setEnabled(bool(entry["login"]))
+        website = menu.addAction(tr("Open website"), self.open_website)
+        website.setEnabled(site_link(entry) is not None)
         menu.addSeparator()
         menu.addAction(tr("Edit…"), self.edit)
         menu.addAction(tr("Delete"), self.delete)
@@ -293,6 +308,15 @@ class MainWindow(QMainWindow):
 
     def open_generator(self):
         GeneratorDialog(self, self.copy_password).exec()
+
+    def open_website(self):
+        """Открывает сайт записи в браузере по умолчанию."""
+        index = self.selected_index()
+        if index is None:
+            return
+        link = site_link(self.vault.entries[index])
+        if link is not None:
+            QDesktopServices.openUrl(QUrl(link))
 
     def open_settings(self):
         dialog = SettingsDialog(self, self.vault, self.change_master)

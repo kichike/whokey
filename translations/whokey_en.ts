@@ -356,6 +356,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Open website</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Edit…</source>
         <translation type="unfinished"></translation>
     </message>

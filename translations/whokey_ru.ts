@@ -368,6 +368,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation>Копировать логин</translation>
     </message>
     <message>
+        <source>Open website</source>
+        <translation>Открыть сайт</translation>
+    </message>
+    <message>
         <source>Edit…</source>
         <translation>Изменить…</translation>
     </message>

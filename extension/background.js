@@ -88,6 +88,19 @@ async function api(message) {
 // только получает логин и пароль и находит поля. Вставляет «волной»: буквы
 // бегут по очереди, поле подсвечивается неоном WhoKey (см. type ниже).
 async function fillInPage(expectedOrigin, login, password, auto) {
+  // Заполняем сами после ожидания WhoKey, а окно браузера сейчас закрыто окном
+  // WhoKey (человек только что вводил мастер-пароль). Такая страница для браузера
+  // «скрыта», и проверка видимости ниже не нашла бы ни одного поля. Ждём, пока
+  // человек вернётся к странице (не дольше 2 минут), и только тогда ищем поля.
+  if (auto && document.visibilityState !== "visible") {
+    await new Promise((resolve) => {
+      const done = () => { document.removeEventListener("visibilitychange", check); resolve(); };
+      const check = () => { if (document.visibilityState === "visible") done(); };
+      document.addEventListener("visibilitychange", check);
+      setTimeout(done, 120000);
+    });
+    await new Promise((resolve) => requestAnimationFrame(() => resolve())); // дать странице отрисоваться
+  }
   // страница успела смениться (перешли на другой сайт) — не заполняем
   if (location.origin !== expectedOrigin) return { ok: false, reason: "moved" };
   // поле должно быть по-настоящему видно человеку: не прозрачное (и не внутри
