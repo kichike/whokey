@@ -86,7 +86,7 @@ async function api(message) {
 
 // Эта функция выполняется ВНУТРИ страницы. Она ничего не знает о WhoKey —
 // только получает логин и пароль и находит поля. Вставляет «волной»: буквы
-// бегут по очереди, поле подсвечивается неоном WhoKey (см. type ниже).
+// бегут по очереди (см. type ниже), стиль полей страницы не меняется.
 async function fillInPage(expectedOrigin, login, password, auto) {
   // Заполняем сами после ожидания WhoKey, а окно браузера сейчас закрыто окном
   // WhoKey (человек только что вводил мастер-пароль). Такая страница для браузера
@@ -153,23 +153,14 @@ async function fillInPage(expectedOrigin, login, password, auto) {
   }
   if (!passwordField && !loginField) return { ok: false, reason: "no_field" };
 
-  // Анимация «волной». Если в системе включено «Уменьшить движение» — сразу целиком.
+  // Анимация «волной»: буквы вписываются по одной. Если в системе включено
+  // «Уменьшить движение» — сразу целиком. Стиль полей страницы не меняем:
+  // подсветка поверх чужого оформления (свои рамки, скругления, обёртки)
+  // на части сайтов выглядела криво.
   const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const glow = (el, on) => {
-    if (on) {
-      el.dataset.whokeyShadow = el.style.boxShadow;
-      el.dataset.whokeyTransition = el.style.transition;
-      el.style.transition = "box-shadow 0.25s ease";
-      el.style.boxShadow = "0 0 0 2px #caa7f0, 0 0 16px 2px rgba(221, 170, 249, 0.75)";
-    } else {
-      el.style.boxShadow = el.dataset.whokeyShadow || "";
-      setTimeout(() => { el.style.transition = el.dataset.whokeyTransition || ""; }, 300);
-    }
-  };
   const type = async (el, value) => {
     if (calm || !value) return set(el, value);
-    glow(el, true);
     // вся строка укладывается примерно в 0,25 с, даже длинный пароль
     const step = Math.max(8, Math.min(35, 250 / value.length));
     for (let i = 1; i <= value.length; i++) {
@@ -177,7 +168,6 @@ async function fillInPage(expectedOrigin, login, password, auto) {
       set(el, value.slice(0, i), i === value.length);
       await sleep(step);
     }
-    setTimeout(() => glow(el, false), 350);
   };
   if (loginField && login) await type(loginField, login);
   if (passwordField) await type(passwordField, password);
