@@ -65,20 +65,34 @@ def _query(path):
             Security.kSecAttrAccount: account}
 
 
+# macOS отказала в доступе к записи (человек нажал «Запретить» в окне Связки ключей
+# или закрыл его). До конца работы WhoKey к Связке ключей больше не обращаемся —
+# иначе окна с паролем Mac появлялись бы снова и снова.
+_refused = False
+_REFUSED = {-128, -25293, -25308}  # отменено, нет доступа, нельзя спрашивать человека
+
+
+def _check(status):
+    global _refused
+    if status in _REFUSED:
+        _refused = True
+    return status
+
+
 def _boot_of_record(path):
     """Отметка «после какой загрузки Mac сохранён ключ» — или None, если ключа нет.
 
     Читается из открытого поля записи (комментарий), без самого ключа: такое
-    чтение macOS разрешает без вопросов. Иначе после каждого обновления WhoKey
-    (подпись меняется) macOS спрашивала бы пароль Mac на каждую проверку.
+    чтение macOS разрешает без вопросов. Само содержимое (ключ) читается только
+    в load_key — после отпечатка пальца.
     """
-    if Security is None:
+    if Security is None or _refused:
         return None
     query = _query(path)
     query[Security.kSecReturnAttributes] = True
     query[Security.kSecMatchLimit] = Security.kSecMatchLimitOne
     status, attributes = Security.SecItemCopyMatching(query, None)
-    if status != 0 or attributes is None:
+    if _check(status) != 0 or attributes is None:
         return None
     try:
         return int(attributes.get(Security.kSecAttrComment) or 0)
@@ -86,14 +100,23 @@ def _boot_of_record(path):
         return 0
 
 
+def state(path):
+    """None — Touch ID выключен; "fresh" — можно входить; "stale" — Mac перезагружался,
+    сначала мастер-пароль. Одно обращение к Связке ключей вместо нескольких."""
+    boot = _boot_of_record(path)
+    if boot is None:
+        return None
+    return "fresh" if boot == boot_time() else "stale"
+
+
 def is_enabled(path):
     """Включён ли вход по Touch ID для этого файла хранилища."""
-    return _boot_of_record(path) is not None
+    return state(path) is not None
 
 
 def is_fresh(path):
     """Ключ сохранён после последней загрузки Mac (иначе — сначала мастер-пароль)."""
-    return _boot_of_record(path) == boot_time()
+    return state(path) == "fresh"
 
 
 def load_key(path):
@@ -108,29 +131,34 @@ def load_key(path):
     query[Security.kSecReturnData] = True
     query[Security.kSecMatchLimit] = Security.kSecMatchLimitOne
     status, data = Security.SecItemCopyMatching(query, None)
-    if status != 0 or data is None:
+    if _check(status) != 0 or data is None:
         return None
     return bytes(data)
 
 
 def save_key(path, key):
-    """Кладёт ключ в Связку ключей (или обновляет). False — если macOS не дала."""
-    if Security is None:
+    """Кладёт ключ в Связку ключей (или обновляет — одним обращением). False — если macOS не дала."""
+    if Security is None or _refused:
         return False
-    forget(path)
+    data = NSData.dataWithBytes_length_(key, len(key))
+    comment = str(boot_time())  # открытое поле: без ключа
+    if _boot_of_record(path) is not None:
+        status = Security.SecItemUpdate(_query(path), {Security.kSecValueData: data,
+                                                       Security.kSecAttrComment: comment})
+        return _check(status) == 0
     item = _query(path)
-    item[Security.kSecValueData] = NSData.dataWithBytes_length_(key, len(key))
-    item[Security.kSecAttrComment] = str(boot_time())  # открытое поле: без ключа
+    item[Security.kSecValueData] = data
+    item[Security.kSecAttrComment] = comment
     item[Security.kSecAttrLabel] = "WhoKey (Touch ID)"
     item[Security.kSecAttrAccessible] = Security.kSecAttrAccessibleWhenUnlockedThisDeviceOnly
     status, _item = Security.SecItemAdd(item, None)
-    return status == 0
+    return _check(status) == 0
 
 
 def forget(path):
     """Выключает вход по Touch ID для этого файла: ключ стирается из Связки ключей."""
-    if Security is not None:
-        Security.SecItemDelete(_query(path))
+    if Security is not None and not _refused:
+        _check(Security.SecItemDelete(_query(path)))
 
 
 def _settings_key(path):

@@ -138,11 +138,11 @@ class LoginWindow(QWidget):
             self._build_touch_id(column)
 
     def _build_touch_id(self, column):
-        enabled = touchid.is_enabled(self.path)
-        if enabled and touchid.is_fresh(self.path):
+        state = touchid.state(self.path)
+        if state == "fresh":
             column.addWidget(self._button(tr("Unlock with Touch ID"), self.on_touch_id))
             self._touch_id_on_show = True  # палец спрашиваем сразу, как окно появится
-        elif enabled:
+        elif state == "stale":
             hint = theme.role(QLabel(tr("The Mac was restarted: enter the master password once, then Touch ID will work again.")), "muted")
             hint.setWordWrap(True)
             column.addWidget(hint)
@@ -297,9 +297,12 @@ class LoginWindow(QWidget):
     def _finish(self, vault):
         """Хранилище открыто мастер-паролем: обновить ключ для Touch ID или предложить его."""
         if touchid.available():
-            if touchid.is_enabled(self.path):
-                touchid.save_key(self.path, vault.key)  # заодно отметка «после этой загрузки Mac»
-            elif not touchid.was_offered(self.path):
+            state = touchid.state(self.path)
+            if state == "stale":
+                # Mac перезагружался — обновить отметку загрузки (ключ тот же). Если всё
+                # свежее, Связку ключей не трогаем вовсе: меньше поводов для окон macOS
+                touchid.save_key(self.path, vault.key)
+            elif state is None and not touchid.was_offered(self.path):
                 touchid.set_offered(self.path)
                 if ask_yes(self, tr("Touch ID"), tr("Unlock WhoKey with Touch ID next time?") + "\n\n" + tr("The vault key will be kept in the macOS Keychain, and WhoKey will ask for your fingerprint before using it. After the Mac restarts, the master password is needed once. You can turn it off in Settings (⌘,).")):
                     if not touchid.save_key(self.path, vault.key):

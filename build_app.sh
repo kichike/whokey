@@ -63,7 +63,15 @@ plutil -replace CFBundleVersion -string "$VERSION" "$APP/Contents/Info.plist"
 # Подпись «для себя» (ad-hoc): на Mac с процессором Apple без подписи программа
 # не запустится. После удаления файлов подписываем заново.
 xattr -cr "$APP"
-codesign -s - --force --deep "$APP"
+# Постоянный сертификат «WhoKey Code Signing» (создаётся один раз: ./make_signing_identity.sh) —
+# тогда macOS узнаёт WhoKey и после обновлений (Touch ID не просит пароль Mac).
+# Нет сертификата — подпись «для себя» (ad-hoc), как раньше.
+SIGN="-"
+if security find-identity -v -p codesigning | grep -q "WhoKey Code Signing"; then
+  SIGN="WhoKey Code Signing"
+fi
+echo "Подпись: ${SIGN/-/ad-hoc}"
+codesign -s "$SIGN" --force --deep "$APP"
 codesign --verify --deep --strict "$APP"
 
 # Устанавливаем в ~/Applications — личную папку программ (её видно в Launchpad)
