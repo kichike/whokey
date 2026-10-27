@@ -14,7 +14,8 @@ body {
   margin: 0;
   width: 320px;
   padding: 16px;
-  font: 13px/1.4 -apple-system, "Inter", "Segoe UI", sans-serif;
+  /* тот же моноширинный шрифт, что в окне WhoKey (если он установлен), иначе системный */
+  font: 13px/1.4 "MesloLGS Nerd Font", "MesloLGS NF", Menlo, Consolas, monospace;
   color: var(--text);
   background: radial-gradient(120% 90% at 50% -15%, #3f2160 0%, #1a1024 45%, var(--bg) 100%);
 }
@@ -51,3 +52,14 @@ button .login { display: block; font-weight: 600; }
 button .site { display: block; color: var(--muted); font-size: 12px; }
 button .num { float: right; color: var(--muted); }
 footer { margin-top: 12px; color: var(--muted); font-size: 11px; }
+[hidden] { display: none !important; }
+#code {
+  margin: 4px 0 12px;
+  text-align: center;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 10px;
+  color: var(--neon);
+  text-shadow: 0 0 12px rgba(221, 170, 249, 0.6);
+}
+#add { text-align: center; font-weight: 600; }

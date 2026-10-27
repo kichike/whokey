@@ -41,7 +41,7 @@ from gui.i18n import LANGUAGES, set_language, tr
 from gui.widgets import show_error
 from gui.login import LoginWindow
 from gui.main_window import MainWindow
-from gui import i18n
+from gui import i18n, prefs
 
 APP_NAME = "EduPasswords"
 
@@ -133,6 +133,7 @@ class Controller:
     def _new_main(self, vault):
         window = MainWindow(vault, self.clipboard)
         window.language_changed.connect(lambda code: self.change_language(vault, code))
+        window.lock_requested.connect(lambda: self.lock("manual"))
         self._replace_window(window)
         return window
 
@@ -149,8 +150,9 @@ class Controller:
             self.bridge.stop()
             self.bridge = None
 
-    def lock(self):
-        """Автоблокировка: закрыть хранилище и вернуть окно входа."""
+    def lock(self, reason="system"):
+        """Блокировка: закрыть хранилище и вернуть окно входа.
+        reason — "system" (экран, сон), "idle" (бездействие) или "manual" (кнопка, ⌘L)."""
         if not isinstance(self.window, MainWindow):
             return
         self.autolock.stop()
@@ -162,7 +164,12 @@ class Controller:
             elif isinstance(widget, QMenu) and widget.isVisible():
                 widget.close()  # меню правого клика: иначе «Копировать пароль» сработал бы после блокировки
         self.clipboard.clear_now()
-        self.state["notice"] = tr("WhoKey locked: the screen was locked or the computer slept. Enter your master password.")
+        if reason == "manual":
+            self.state["notice"] = tr("WhoKey is locked. Enter your master password.")
+        elif reason == "idle":
+            self.state["notice"] = tr("WhoKey locked after {n} min without use. Enter your master password.").format(n=prefs.idle_lock_minutes())
+        else:
+            self.state["notice"] = tr("WhoKey locked: the screen was locked or the computer slept. Enter your master password.")
         path = self.window.vault.path
         # окно меняем, когда закроются окошки (их циклы событий ещё работают)
         QTimer.singleShot(0, lambda: self.show_login(path))

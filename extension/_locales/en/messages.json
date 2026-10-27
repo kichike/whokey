@@ -9,13 +9,16 @@
     "message": "Connecting to WhoKey…"
   },
   "waiting": {
-    "message": "Opening WhoKey — enter your master password.\nI will fill in as soon as it opens."
+    "message": "Opening WhoKey — enter your master password.\nAs soon as it opens, the form will be filled in."
   },
   "choose": {
     "message": "Choose an account:"
   },
   "no_entries": {
-    "message": "No entries for $1.\nIn WhoKey, open the entry and set its “Website”."
+    "message": "WhoKey has no entries for $1 yet."
+  },
+  "add_entry": {
+    "message": "Add to WhoKey"
   },
   "filling": {
     "message": "Filling…"
@@ -47,6 +50,9 @@
   "bad_page": {
     "message": "Filling only works on secure websites (https)."
   },
+  "not_a_site": {
+    "message": "Open the website's login page."
+  },
   "not_found": {
     "message": "Entry not found — it may have just changed. Open the popup again."
   },
@@ -63,7 +69,7 @@
     }
   },
   "pairing": {
-    "message": "Enter this code in WhoKey: $1\nIt is also shown on the WhoKey icon in the toolbar."
+    "message": "Enter this code in WhoKey (it is also shown on the WhoKey icon in the toolbar):"
   },
   "busy": {
     "message": "Too many requests in a row. Wait a minute."

@@ -7,6 +7,9 @@ const msg = (key, ...subs) => chrome.i18n.getMessage(key, subs) || key;
 function status(text, kind = "") {
   $("status").textContent = text;
   $("status").className = kind;
+  $("code").hidden = true;
+  // подсказка про горячую клавишу — только когда всё в порядке, под ошибкой она лишняя
+  $("hint").hidden = kind === "bad";
 }
 
 // Что сказать человеку по ответу фоновой части
@@ -54,6 +57,16 @@ function showItems(tab, url, host, items) {
   list.textContent = "";
   if (!items.length) {
     status(msg("no_entries", host));
+    const add = $("add");
+    add.textContent = msg("add_entry");
+    add.hidden = false;
+    add.addEventListener("click", async () => {
+      add.disabled = true;
+      const reply = await chrome.runtime.sendMessage({ kind: "show", url });
+      if (reply.status === "ok") window.close(); // дальше — в окне WhoKey
+      else showResult(reply, host);
+    });
+    add.focus();
     return;
   }
   status(msg("choose"));
@@ -80,12 +93,22 @@ function showItems(tab, url, host, items) {
   });
   list.querySelector("button").focus(); // Enter — первый аккаунт
   document.addEventListener("keydown", (event) => {
+    const buttons = [...list.querySelectorAll("button")];
+    // ↑ ↓ — по списку аккаунтов (по кругу), цифры 1–9 — сразу нужный
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      const now = buttons.indexOf(document.activeElement);
+      buttons[(now + step + buttons.length) % buttons.length].focus();
+      return;
+    }
     const n = Number(event.key);
-    if (n >= 1 && n <= items.length) list.querySelectorAll("button")[n - 1].click();
+    if (n >= 1 && n <= items.length) buttons[n - 1].click();
   });
 }
 
 async function main() {
+  document.documentElement.lang = chrome.i18n.getUILanguage();
   shortcut = await loadShortcut();
   $("hint").textContent = msg("hint", shortcut);
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -95,16 +118,24 @@ async function main() {
     const parsed = new URL(url);
     host = parsed.hostname;
     const local = ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
-    if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && local)) throw new Error("bad page");
+    if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && local)) {
+      // http — сайт без защиты; chrome://, новая вкладка, файл — вовсе не сайт
+      status(msg(parsed.protocol === "http:" ? "bad_page" : "not_a_site"), "bad");
+      return;
+    }
   } catch (e) {
-    status(msg("bad_page"), "bad");
+    status(msg("not_a_site"), "bad");
     return;
   }
   $("host").textContent = host;
   status(msg("connecting"));
   chrome.runtime.onMessage.addListener((message) => {
     if (message.kind === "waiting") status(msg("waiting"));
-    if (message.kind === "pairing") status(msg("pairing", message.code), "good");
+    if (message.kind === "pairing") {
+      status(msg("pairing"), "good");
+      $("code").textContent = message.code; // крупно — его вводят в окне WhoKey
+      $("code").hidden = false;
+    }
   });
   const reply = await chrome.runtime.sendMessage({ kind: "open", tabId: tab.id, url });
   if (reply.status === "ok") showItems(tab, url, host, reply.items);

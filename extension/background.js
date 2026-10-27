@@ -227,5 +227,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     fill(message.tabId, message.url, message.index, message.login).then(sendResponse);
     return true;
   }
+  if (message.kind === "show") {
+    // «Добавить в WhoKey»: WhoKey откроет новую запись с адресом этого сайта
+    api({ type: "show", url: message.url }).then(sendResponse);
+    return true;
+  }
   return false;
 });

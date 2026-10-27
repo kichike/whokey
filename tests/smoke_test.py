@@ -101,6 +101,9 @@ from PySide6.QtCore import QPoint, QTimer  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication, QLabel, QLineEdit, QPushButton  # noqa: E402
 
+from gui import prefs  # noqa: E402
+prefs.use_file(Path(tempfile.mkdtemp()) / "prefs.ini")  # настоящие настройки не трогаем
+
 app = QApplication([])
 from gui import theme  # noqa: E402
 
@@ -131,6 +134,7 @@ import gui.main_window as MW  # noqa: E402
 errors = []
 sys.excepthook = lambda kind, error, trace: errors.append(repr(error))
 L.lock = V.lock
+Dg.ask_yes = lambda *args: True  # «Закрыть без сохранения?» — да (иначе тест ждал бы ответа)
 
 
 class FakeClipboard:  # окна проверяем без настоящего буфера
@@ -194,7 +198,8 @@ def run():
                        ("generator", lambda: Dg.GeneratorDialog(main, lambda text: True)),
                        ("change_master", lambda: Dg.ChangeMasterDialog(main, main.vault)),
                        ("settings", lambda: Dg.SettingsDialog(main, main.vault, main.change_master)),
-                       ("extension", lambda: Dg.ExtensionDialog(main, main.vault, main._save))):
+                       ("extension", lambda: Dg.ExtensionDialog(main, main.vault, main._save)),
+                       ("export", lambda: Dg.ExportDialog(main, main.vault))):
         dialog = make()
         dialog.show()
         for edit in dialog.findChildren(QLineEdit)[:2]:

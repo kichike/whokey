@@ -3,13 +3,12 @@
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
-                               QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPushButton,
+                               QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPlainTextEdit, QPushButton,
                                QTableWidget, QTableWidgetItem, QVBoxLayout)
 
 import sites
-from clipboard import CLEAR_AFTER
 from generator import weakness_reasons
-from gui import i18n, theme, touchid
+from gui import i18n, prefs, theme, touchid
 from gui.widgets import ClipboardCountdown, GeneratorPanel, PasswordField, StrengthBar, ask_yes, show_error, weakness_text
 from gui.i18n import tr
 from vault import SaveError
@@ -35,7 +34,8 @@ class EntryDialog(QDialog):
     def __init__(self, parent, entry=None, copy_password=None):
         """copy_password — как копировать пароль из поля (через буфер с автоочисткой)."""
         super().__init__(parent)
-        self.setWindowTitle(tr("Edit entry") if entry else tr("New entry"))
+        # у записи из расширения уже вписан адрес, но она новая: «изменить» — только сохранённую
+        self.setWindowTitle(tr("Edit entry") if entry and "created" in entry else tr("New entry"))
         # начальная ширина, а не жёсткий минимум: с жёстким минимумом Qt перестаёт
         # расширять окно под содержимое и сжимает кнопки (на Windows шрифт шире —
         # «Сгенерировать» обрезалось до «нериров»)
@@ -51,7 +51,10 @@ class EntryDialog(QDialog):
         self.password.setText(entry["password"])
         self.strength = StrengthBar()
         self.generator = GeneratorPanel()
-        self.note = QLineEdit(entry["note"])
+        # заметка — в несколько строк: туда помещаются, например, коды восстановления
+        self.note = QPlainTextEdit(entry["note"])
+        self.note.setTabChangesFocus(True)  # Tab переходит дальше, а не вставляет табуляцию
+        self.note.setFixedHeight(self.note.fontMetrics().lineSpacing() * 4 + 20)
 
         self._generated = None  # точная надёжность для только что сгенерированного
         self.password.textChanged.connect(self._on_password_changed)
@@ -59,8 +62,8 @@ class EntryDialog(QDialog):
         self._on_password_changed(entry["password"])
 
         form = QFormLayout()
-        form.addRow(tr("Site"), self.site)
-        form.addRow(tr("Website"), self.url)
+        form.addRow(tr("Name"), self.site)
+        form.addRow(tr("Website address"), self.url)
         form.addRow(tr("Login"), self.login)
         form.addRow(tr("Password"), self.password)
         form.addRow("", self.strength)
@@ -73,6 +76,7 @@ class EntryDialog(QDialog):
         column.addLayout(form)
         column.addWidget(self.error)
         column.addWidget(_buttons(self, tr("Save")))
+        self._initial = self.values(normalize=False)  # чтобы при закрытии понять, было ли что-то изменено
 
     def _on_generated(self, password, bits):
         self._generated = (password, bits)
@@ -84,22 +88,34 @@ class EntryDialog(QDialog):
         else:
             self.strength.show_for(text)
 
+    def _problem(self, field, text):
+        """Ошибка: текст внизу и красная рамка у поля, которое нужно исправить."""
+        for widget in (self.site, self.password.edit, self.url):
+            theme.mark_invalid(widget, widget is field)
+        self.error.setText(text)
+        field.setFocus()
+
     def accept(self):
         if not self.site.text().strip():
-            self.error.setText(tr("Site is required."))
-            return
+            return self._problem(self.site, tr("Name is required."))
         if not self.password.text():
-            self.error.setText(tr("Password cannot be empty."))
-            return
+            return self._problem(self.password.edit, tr("Password cannot be empty."))
         if sites.normalize(self.url.text()) is None:
-            self.error.setText(tr("This does not look like a website address. Example: mail.ru"))
-            return
+            return self._problem(self.url, tr("This does not look like a website address. Example: mail.ru"))
         super().accept()
 
-    def values(self):
+    def reject(self):
+        """Esc или «Отмена» при несохранённых изменениях — сначала спросить."""
+        if self.values(normalize=False) != self._initial and not ask_yes(
+                self, tr("Unsaved changes"), tr("Close without saving the changes?")):
+            return
+        super().reject()
+
+    def values(self, normalize=True):
+        url = sites.normalize(self.url.text()) if normalize else self.url.text().strip()
         return {"site": self.site.text().strip(), "login": self.login.text().strip(),
-                "password": self.password.text(), "note": self.note.text().strip(),
-                "url": sites.normalize(self.url.text())}
+                "password": self.password.text(), "note": self.note.toPlainText().strip(),
+                "url": url}
 
 
 class GeneratorDialog(QDialog):
@@ -114,6 +130,7 @@ class GeneratorDialog(QDialog):
         self.generator = GeneratorPanel()
         self.result = PasswordField(copy_password=self._copy)
         self.result.edit.setReadOnly(True)
+        self.result.show_always()  # пароль ещё нигде не сохранён — прятать его незачем
         self.strength = StrengthBar()
         self.generator.generated.connect(self._on_generated)
 
@@ -127,19 +144,23 @@ class GeneratorDialog(QDialog):
         column.addWidget(self.result)
         column.addWidget(self.strength)
         # до копирования — подсказка, после — на её месте таймер с убывающей полоской
-        self.note = theme.role(QLabel(tr("A copied password is removed from the clipboard after {sec} s.").format(sec=CLEAR_AFTER)), "muted")
+        self.note = theme.role(QLabel(tr("A copied password is removed from the clipboard after {sec} s.").format(sec=prefs.clear_after())), "muted")
         self.countdown = ClipboardCountdown()
         self.countdown.finished.connect(self.note.show)
         column.addWidget(self.note)
         column.addWidget(self.countdown)
-        column.addWidget(copy)
-        column.addWidget(close)
+        buttons = QHBoxLayout()
+        buttons.addStretch()
+        buttons.addWidget(close)
+        buttons.addWidget(copy)
+        column.addLayout(buttons)
+        copy.setDefault(True)
         self.generator.generate()
 
     def _copy(self, password):
         if self.copy_password(password):
             self.note.hide()
-            self.countdown.start(CLEAR_AFTER)
+            self.countdown.start(prefs.clear_after())
 
     def _on_generated(self, password, bits):
         self.result.setText(password)
@@ -155,20 +176,27 @@ class ChangeMasterDialog(QDialog):
         self.resize(480, 1)  # начальная ширина, см. EntryDialog
         self.vault = vault
 
-        self.current = PasswordField(tr("Current master password"))
-        self.new = PasswordField(tr("New master password"))
-        self.repeat = PasswordField(tr("Repeat master password"))
+        self.current = PasswordField()
+        self.new = PasswordField()
+        self.repeat = PasswordField()
         self.strength = StrengthBar(tr("Type a master password"))
         self.new.textChanged.connect(self.strength.show_for)
-        rules = QLabel(tr("Choose a master password: at least 12 characters. It cannot be recovered — if you forget it, your passwords are lost."))
+        rules = theme.role(QLabel(tr("Choose a master password: at least 12 characters. It cannot be recovered — if you forget it, your passwords are lost.")), "muted")
         rules.setWordWrap(True)
         self.error = QLabel()
         self.error.setWordWrap(True)
         theme.role(self.error, "error")
 
+        # подписи слева у каждого поля; полоска надёжности — сразу под новым паролем
+        form = QFormLayout()
+        form.addRow(tr("Current:"), self.current)
+        form.addRow(tr("New:"), self.new)
+        form.addRow("", self.strength)
+        form.addRow(tr("Repeat:"), self.repeat)
         column = QVBoxLayout(self)
-        for widget in (self.current, rules, self.new, self.repeat, self.strength, self.error):
-            column.addWidget(widget)
+        column.addWidget(rules)
+        column.addLayout(form)
+        column.addWidget(self.error)
         column.addWidget(_buttons(self, tr("Save")))
         self.current.setFocus()
 
@@ -178,16 +206,18 @@ class ChangeMasterDialog(QDialog):
             self.current.clear()
             return
         password = self.new.text()
+        # порядок проверок: длина → совпадение → слабость (о слабости спрашиваем последней)
         if len(password) < MASTER_MIN_LENGTH:
-            self.error.setText(tr("Too short: {n} characters, at least 12 required.").format(n=len(password)))
-            return
-        reasons = [r for r in weakness_reasons(password) if r != "weak_short"]
-        if reasons and not ask_yes(self, tr("Weak password"),
-                                   tr("The password is weak:\n{reasons}\n\nUse it anyway?").format(reasons=weakness_text(reasons))):
+            self.error.setText(self.tr("Too short: %n characters, at least 12 required.", "", len(password)))
             return
         if self.repeat.text() != password:
             self.error.setText(tr("Passwords don't match, try again."))
             self.repeat.clear()
+            self.repeat.setFocus()
+            return
+        reasons = [r for r in weakness_reasons(password) if r != "weak_short"]
+        if reasons and not ask_yes(self, tr("Weak password"),
+                                   tr("The password is weak:\n{reasons}\n\nUse it anyway?").format(reasons=weakness_text(reasons))):
             return
         try:
             self.vault.change_password(password)
@@ -201,8 +231,42 @@ class ChangeMasterDialog(QDialog):
         super().accept()
 
 
+class ExportDialog(QDialog):
+    """Перед экспортом в CSV: предупреждение, что файл не зашифрован, и мастер-пароль ещё раз —
+    чтобы все пароли разом не выгрузил тот, кто просто подошёл к открытому WhoKey."""
+
+    def __init__(self, parent, vault):
+        super().__init__(parent)
+        self.setWindowTitle(tr("Export to CSV"))
+        self.resize(480, 1)
+        self.vault = vault
+        warning = QLabel(tr("The CSV file is plain text: all your passwords in it are NOT encrypted, and anyone who opens the file can read them. "
+                            "Import it where you need it and then delete it (and empty the Trash)."))
+        warning.setWordWrap(True)
+        # с переносом строк Qt иначе считает высоту окна по неверной ширине и обрезает текст
+        warning.setMinimumWidth(440)
+        warning.setMinimumHeight(warning.heightForWidth(440))
+        self.master = PasswordField(tr("Master password"))
+        self.error = theme.role(QLabel(), "error")
+        column = QVBoxLayout(self)
+        column.addWidget(warning)
+        column.addWidget(self.master)
+        column.addWidget(self.error)
+        column.addWidget(_buttons(self, tr("Export…")))
+        self.master.setFocus()
+
+    def accept(self):
+        if not self.vault.check_password(self.master.text()):
+            self.error.setText(tr("Wrong master password."))
+            self.master.clear()
+            return
+        self.master.clear()
+        super().accept()
+
+
 class SettingsDialog(QDialog):
-    """Настройки (⌘, на Mac, Ctrl+, на Windows): язык, вход по Touch ID, смена мастер-пароля."""
+    """Настройки (⌘, на Mac, Ctrl+, на Windows): язык, время очистки буфера и показа
+    пароля, автоблокировка, вход по Touch ID, смена мастер-пароля."""
 
     language_chosen = Signal(str)  # окна пересоздаются на новом языке — это делает app.py
 
@@ -224,6 +288,16 @@ class SettingsDialog(QDialog):
         language.currentIndexChanged.connect(lambda i: self._choose_language(language.itemData(i)))
         form.addRow(tr("Language:"), language)
 
+        seconds = lambda n: self.tr("%n s", "", n)  # noqa: E731 — «15 с» / «15 s»
+        minutes = lambda n: self.tr("%n min", "", n)  # noqa: E731
+        form.addRow(tr("Clear copied password after:"),
+                    self._choice("clear_after", prefs.CLEAR_CHOICES, prefs.clear_after(), seconds))
+        form.addRow(tr("Hide shown password after:"),
+                    self._choice("reveal_seconds", prefs.REVEAL_CHOICES, prefs.reveal_seconds(), seconds))
+        form.addRow(tr("Lock when not used for:"),
+                    self._choice("idle_lock_minutes", prefs.IDLE_CHOICES, prefs.idle_lock_minutes(),
+                                 lambda n: minutes(n) if n else tr("never")))
+
         self.touch_id = None
         if touchid.available():
             self.touch_id = QCheckBox(tr("Sign in with Touch ID"))
@@ -242,6 +316,15 @@ class SettingsDialog(QDialog):
         column.addLayout(form)
         column.addWidget(close)
 
+    def _choice(self, name, choices, current, label):
+        combo = theme.rounded_popup(QComboBox())
+        for value in choices:
+            combo.addItem(label(value), value)
+        combo.setCurrentIndex(choices.index(current))
+        combo.view().setMinimumWidth(combo.view().sizeHintForColumn(0) + 48)
+        combo.currentIndexChanged.connect(lambda i: prefs.set_value(name, combo.itemData(i)))
+        return combo
+
     def _choose_language(self, code):
         self.reject()
         self.language_chosen.emit(code)
@@ -256,7 +339,9 @@ class SettingsDialog(QDialog):
 
     def _change_master(self):
         had_touch_id = touchid.is_enabled(self.vault.path)
+        self.hide()  # окно смены пароля — вместо Настроек, а не второе окно поверх
         self.change_master()
+        self.reject()
         # после смены пароля старый ключ стёрт; раз Touch ID был включён — кладём новый
         if had_touch_id and not touchid.is_enabled(self.vault.path):
             touchid.save_key(self.vault.path, self.vault.key)

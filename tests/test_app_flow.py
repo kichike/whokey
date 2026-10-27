@@ -20,6 +20,7 @@ APP = QApplication.instance() or QApplication([])
 
 import app as A  # noqa: E402
 import bridge_protocol as P  # noqa: E402
+from gui import prefs  # noqa: E402
 from gui.login import LoginWindow  # noqa: E402
 from gui.main_window import MainWindow  # noqa: E402
 from vault import Vault  # noqa: E402
@@ -38,6 +39,7 @@ class ControllerFlow(unittest.TestCase):
         ini = str(folder / "s.ini")
         self._real = (A.QSettings, P.socket_address, A.default_vault_path)
         A.QSettings = lambda *a: QSettings(ini, QSettings.IniFormat)
+        prefs.use_file(folder / "prefs.ini")
         A.default_vault_path = lambda: folder / "default.dat"
         address = ("whokey-test-" + os.urandom(6).hex()) if P.WINDOWS else str(folder / "b.sock")
         P.socket_address = lambda: address

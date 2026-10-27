@@ -126,10 +126,12 @@ QFrame[role="card"] {{
     background: {GLASS_PANEL}; border: 1px solid {RIM_CARD}; border-radius: {CARD_RADIUS}px; }}
 QFrame[role="card"] QLabel, QFrame[role="card"] QCheckBox {{ background: transparent; }}
 
-QLineEdit, QSpinBox {{
+QLineEdit, QSpinBox, QPlainTextEdit {{
     background: {HOLLOW}; border: 1px solid {RIM}; border-radius: {FIELD_RADIUS}px;
     padding: 7px 10px; selection-background-color: {ACC_DEEP}; }}
-QLineEdit:focus, QSpinBox:focus {{ border-color: {ACC}; }}
+QLineEdit:focus, QSpinBox:focus, QPlainTextEdit:focus {{ border-color: {ACC}; }}
+/* поле с ошибкой (mark_invalid) — красная рамка, чтобы было видно, что исправить */
+QLineEdit[invalid="true"], QPlainTextEdit[invalid="true"] {{ border-color: {BAD_INK}; }}
 QSpinBox::up-button, QSpinBox::down-button {{ border: none; background: transparent; width: 18px; }}
 QSpinBox::up-arrow {{ image: url("{ARROW_UP_FILE}"); width: 10px; height: 10px; }}
 QSpinBox::down-arrow {{ image: url("{ARROW_FILE}"); width: 10px; height: 10px; }}
@@ -144,6 +146,9 @@ QPushButton[kind="primary"] {{
     background: {GLASS_ACC}; border-color: {RIM_ACC}; color: {WHITE}; }}
 QPushButton[kind="primary"]:hover {{ background: {GLASS_ACC_HOVER}; border-color: {NEON}; }}
 QPushButton[kind="danger"] {{ background: {GLASS_BAD}; border-color: {solid(BAD_INK, 110)}; color: {BAD_INK}; }}
+/* на чём стоит фокус с клавиатуры (Tab) — видно по лавандовой рамке */
+QPushButton:focus, QToolButton:focus, QComboBox:focus {{ border: 2px solid {ACC}; }}
+QLineEdit QToolButton:focus {{ border: none; }}
 
 QToolButton {{
     background: {GLASS}; border: 1px solid {RIM};
@@ -175,6 +180,8 @@ QCheckBox {{ spacing: 6px; }}
 QCheckBox::indicator {{
     width: 16px; height: 16px; border: 1px solid {solid(WHITE, 60)}; border-radius: 5px; background: {HOLLOW}; }}
 QCheckBox::indicator:hover {{ border-color: {ACC}; }}
+QCheckBox:focus {{ color: {ACC_LIGHT}; }}
+QCheckBox::indicator:focus {{ border: 2px solid {ACC}; }}
 /* отмечено — светящаяся галочка (assets/check.svg), а не залитый квадрат */
 QCheckBox::indicator:checked {{ background: {rgba(ACC, 70)}; border-color: {ACC}; image: url("{CHECK_FILE}"); }}
 
@@ -230,7 +237,9 @@ def apply(app):
                         (QPalette.ToolTipBase, TIP), (QPalette.ToolTipText, TEXT), (QPalette.Mid, LINE2)]:
         palette.setColor(role, QColor(color))
     app.setPalette(palette)
-    app.setStyleSheet(STYLE)
+    app.setStyleSheet(STYLE + (
+        # на Mac кнопки окон в системном порядке: «Отмена» слева, главное действие справа
+        "QDialogButtonBox { button-layout: 1; }" if sys.platform == "darwin" else ""))
     global _focus_glow
     _focus_glow = _FocusGlow()  # держим ссылку, иначе Python удалит фильтр
     app.installEventFilter(_focus_glow)
@@ -433,3 +442,10 @@ def kind(button, name):
     if name == "primary":
         glow(button, ACC, radius=20, alpha=140)
     return button
+
+
+def mark_invalid(widget, invalid=True):
+    """Красная рамка у поля с ошибкой (и обратно)."""
+    widget.setProperty("invalid", invalid)
+    widget.style().unpolish(widget)
+    widget.style().polish(widget)

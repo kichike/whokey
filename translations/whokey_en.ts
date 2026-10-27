@@ -15,6 +15,14 @@ If you did not restore an old copy yourself, check your entries and disconnect t
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>WhoKey is locked. Enter your master password.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>WhoKey locked after {n} min without use. Enter your master password.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>WhoKey locked: the screen was locked or the computer slept. Enter your master password.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -60,10 +68,6 @@ If you did not just click the extension, press Cancel.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Site</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Website</source>
         <translation type="unfinished"></translation>
     </message>
@@ -81,10 +85,6 @@ If you did not just click the extension, press Cancel.</source>
     </message>
     <message>
         <source>Save</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Site is required.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -116,14 +116,6 @@ If you did not just click the extension, press Cancel.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Current master password</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>New master password</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Repeat master password</source>
         <translation type="unfinished"></translation>
     </message>
@@ -137,10 +129,6 @@ If you did not just click the extension, press Cancel.</source>
     </message>
     <message>
         <source>Wrong master password.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Too short: {n} characters, at least 12 required.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -159,11 +147,71 @@ Use it anyway?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Website address</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Name is required.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unsaved changes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Close without saving the changes?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Current:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>New:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Repeat:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Export to CSV</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The CSV file is plain text: all your passwords in it are NOT encrypted, and anyone who opens the file can read them. Import it where you need it and then delete it (and empty the Trash).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Export…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Settings</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear copied password after:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Hide shown password after:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lock when not used for:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>never</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -318,10 +366,6 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Vault created: {path}</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>The old backup was set aside as {name} (a hidden file next to the vault).</source>
         <translation type="unfinished"></translation>
     </message>
@@ -366,10 +410,6 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Search by site, login or note</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Add</source>
         <translation type="unfinished"></translation>
     </message>
@@ -398,11 +438,47 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Show / hide password</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Edit…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Delete</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>File</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import from CSV…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Export to CSV…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Settings…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lock WhoKey</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Entry</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Search by name, login or note</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Nothing found.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -429,6 +505,54 @@ This cannot be undone.</source>
     </message>
     <message>
         <source>Could not copy the password to the clipboard.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import from CSV</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>CSV files (*.csv);;All files (*)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not read the file: {error}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The file is too big for a password list.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The file is not in UTF-8 encoding. Export the passwords again or save the file as UTF-8.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No passwords found in this file. It needs columns with the name or website address and the password, as in an export from a browser, Bitwarden or KeePassXC.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>All passwords from this file are already in WhoKey.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The CSV file is not encrypted — delete it now (and empty the Trash).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>There are no entries to export yet.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>CSV files (*.csv)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not write the file: {error}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The CSV file is not encrypted — delete it as soon as you no longer need it (and empty the Trash).</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -481,6 +605,26 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Password length</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lowercase letters</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Uppercase letters</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Digits</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Symbols</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Generate</source>
         <translation type="unfinished"></translation>
     </message>
@@ -518,12 +662,77 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
     </message>
 </context>
 <context>
+    <name>ChangeMasterDialog</name>
+    <message numerus="yes">
+        <source>Too short: %n characters, at least 12 required.</source>
+        <translation>
+            <numerusform>Too short: %n character, at least 12 required.</numerusform>
+            <numerusform>Too short: %n characters, at least 12 required.</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>LoginWindow</name>
+    <message numerus="yes">
+        <source>Too short: %n characters, at least 12 required.</source>
+        <translation>
+            <numerusform>Too short: %n character, at least 12 required.</numerusform>
+            <numerusform>Too short: %n characters, at least 12 required.</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>MainWindow</name>
     <message numerus="yes">
         <source>%n entries</source>
         <translation>
             <numerusform>%n entry</numerusform>
             <numerusform>%n entries</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Add %n passwords to WhoKey?</source>
+        <translation>
+            <numerusform>Add %n password to WhoKey?</numerusform>
+            <numerusform>Add %n passwords to WhoKey?</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n are already in WhoKey and will be skipped.</source>
+        <translation>
+            <numerusform>%n is already in WhoKey and will be skipped.</numerusform>
+            <numerusform>%n are already in WhoKey and will be skipped.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Added %n passwords.</source>
+        <translation>
+            <numerusform>Added %n password.</numerusform>
+            <numerusform>Added %n passwords.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Exported %n passwords.</source>
+        <translation>
+            <numerusform>Exported %n password.</numerusform>
+            <numerusform>Exported %n passwords.</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>SettingsDialog</name>
+    <message numerus="yes">
+        <source>%n s</source>
+        <translation>
+            <numerusform>%n s</numerusform>
+            <numerusform>%n s</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n min</source>
+        <translation>
+            <numerusform>%n min</numerusform>
+            <numerusform>%n min</numerusform>
         </translation>
     </message>
 </context>

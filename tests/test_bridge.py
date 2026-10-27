@@ -118,6 +118,15 @@ class Requests(unittest.TestCase):
                         {"type": "fill", "url": ["x"]}, {"type": "???", "url": "https://mail.ru"}):
             self.assertIn(self.ask(**request)["status"], ("not_found", "bad_page", "error"))
 
+    def test_show_opens_new_entry_with_the_site(self):
+        added = []
+        self.server.window.add = lambda url="": added.append(url)
+        self.assertEqual(self.ask(type="show", url="https://www.github.com/login"), {"status": "ok"})
+        QCoreApplication.processEvents()  # окно открывается после ответа
+        self.assertEqual(added, ["github.com"])
+        self.assertEqual(self.ask(type="show", url="http://github.com")["status"], "bad_page")
+        self.assertEqual(self.server.handle({"type": "show", "url": "https://github.com"})["status"], "pair_required")
+
     def test_rate_limit(self):
         statuses = [self.ask(type="fill", url="https://mail.ru", index=0, login="egor@mail.ru")["status"]
                     for _ in range(12)]
@@ -442,13 +451,31 @@ class Autolock(unittest.TestCase):
     def test_sleep_detected(self):
         events = []
         lock = AutoLock()
-        lock.lock.connect(lambda: events.append(1))
+        lock.lock.connect(lambda reason: events.append(reason))
         lock._clocks = (time.time() - 3, monotonic() - 3)
         lock._check()
         self.assertEqual(events, [])
         lock._clocks = (time.time() - 100, monotonic() - 1)
         lock._check()
-        self.assertEqual(events, [1])
+        self.assertEqual(events, ["system"])
+
+    def test_idle_lock(self):
+        from gui import prefs
+        prefs.use_file(Path(tempfile.mkdtemp()) / "prefs.ini")
+        events = []
+        lock = AutoLock()
+        lock.lock.connect(lambda reason: events.append(reason))
+        lock._clocks = (time.time(), monotonic())
+        prefs.set_value("idle_lock_minutes", 1)
+        lock._last_input = time.monotonic() - 30
+        lock._check()
+        self.assertEqual(events, [])  # полминуты без действий — ещё рано
+        lock._last_input = time.monotonic() - 61
+        lock._check()
+        self.assertEqual(events, ["idle"])
+        prefs.set_value("idle_lock_minutes", 0)  # «не блокировать»
+        lock._check()
+        self.assertEqual(events, ["idle"])
 
     def test_windows_session_info_layout(self):
         """Ревью: флаги блокировки лежат по смещению 16 — не путать с состоянием сеанса."""

@@ -522,10 +522,12 @@ class Vault:
         self.bridge_keys = list(keys)
 
     def add(self, site, login, password, note="", url=""):
+        self.add_many([{"site": site, "login": login, "password": password, "note": note, "url": url}])
+
+    def add_many(self, entries):
+        """Несколько записей одним сохранением (импорт из CSV): либо все, либо ни одной."""
         now = _now()
-        entry = {"site": site, "login": login, "password": password,
-                 "note": note, "url": url, "created": now, "updated": now}
-        self._commit(self.entries + [entry])
+        self._commit(self.entries + [dict(entry, created=now, updated=now) for entry in entries])
 
     def update(self, index, **fields):
         entries = [dict(e) for e in self.entries]

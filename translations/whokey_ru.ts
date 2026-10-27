@@ -18,6 +18,14 @@ If you did not restore an old copy yourself, check your entries and disconnect t
 Если вы сами не восстанавливали старую копию, проверьте записи и отключите расширение (кнопка «Расширение»).</translation>
     </message>
     <message>
+        <source>WhoKey is locked. Enter your master password.</source>
+        <translation>WhoKey заблокирован. Введите мастер-пароль.</translation>
+    </message>
+    <message>
+        <source>WhoKey locked after {n} min without use. Enter your master password.</source>
+        <translation>WhoKey заблокирован: {n} мин без действий. Введите мастер-пароль.</translation>
+    </message>
+    <message>
         <source>WhoKey locked: the screen was locked or the computer slept. Enter your master password.</source>
         <translation>WhoKey заблокирован: экран был заблокирован или компьютер спал. Введите мастер-пароль.</translation>
     </message>
@@ -68,10 +76,6 @@ If you did not just click the extension, press Cancel.</source>
         <translation>mail.ru — для заполнения в браузере</translation>
     </message>
     <message>
-        <source>Site</source>
-        <translation>Сайт</translation>
-    </message>
-    <message>
         <source>Website</source>
         <translation>Адрес сайта</translation>
     </message>
@@ -90,10 +94,6 @@ If you did not just click the extension, press Cancel.</source>
     <message>
         <source>Save</source>
         <translation>Сохранить</translation>
-    </message>
-    <message>
-        <source>Site is required.</source>
-        <translation>Сайт нужно указать.</translation>
     </message>
     <message>
         <source>Password cannot be empty.</source>
@@ -124,14 +124,6 @@ If you did not just click the extension, press Cancel.</source>
         <translation>Сменить мастер-пароль</translation>
     </message>
     <message>
-        <source>Current master password</source>
-        <translation>Текущий мастер-пароль</translation>
-    </message>
-    <message>
-        <source>New master password</source>
-        <translation>Новый мастер-пароль</translation>
-    </message>
-    <message>
         <source>Repeat master password</source>
         <translation>Повторите мастер-пароль</translation>
     </message>
@@ -146,10 +138,6 @@ If you did not just click the extension, press Cancel.</source>
     <message>
         <source>Wrong master password.</source>
         <translation>Неверный мастер-пароль.</translation>
-    </message>
-    <message>
-        <source>Too short: {n} characters, at least 12 required.</source>
-        <translation>Слишком короткий: {n} симв., нужно не меньше 12.</translation>
     </message>
     <message>
         <source>Weak password</source>
@@ -170,12 +158,72 @@ Use it anyway?</source>
         <translation>Пароли не совпадают, попробуйте ещё раз.</translation>
     </message>
     <message>
+        <source>Name</source>
+        <translation>Название</translation>
+    </message>
+    <message>
+        <source>Website address</source>
+        <translation>Адрес сайта</translation>
+    </message>
+    <message>
+        <source>Name is required.</source>
+        <translation>Укажите название.</translation>
+    </message>
+    <message>
+        <source>Unsaved changes</source>
+        <translation>Изменения не сохранены</translation>
+    </message>
+    <message>
+        <source>Close without saving the changes?</source>
+        <translation>Закрыть, не сохраняя изменения?</translation>
+    </message>
+    <message>
+        <source>Current:</source>
+        <translation>Текущий:</translation>
+    </message>
+    <message>
+        <source>New:</source>
+        <translation>Новый:</translation>
+    </message>
+    <message>
+        <source>Repeat:</source>
+        <translation>Ещё раз:</translation>
+    </message>
+    <message>
         <source>⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.</source>
         <translation>⚠ Не удалось сохранить: {error}. Изменение не применено, файл на диске не тронут.</translation>
     </message>
     <message>
+        <source>Export to CSV</source>
+        <translation>Экспорт в CSV</translation>
+    </message>
+    <message>
+        <source>The CSV file is plain text: all your passwords in it are NOT encrypted, and anyone who opens the file can read them. Import it where you need it and then delete it (and empty the Trash).</source>
+        <translation>CSV-файл — обычный текст: все пароли в нём НЕ зашифрованы, их прочитает любой, кто откроет файл. Загрузите его, куда нужно, и сразу удалите (и очистите Корзину).</translation>
+    </message>
+    <message>
+        <source>Export…</source>
+        <translation>Экспортировать…</translation>
+    </message>
+    <message>
         <source>Settings</source>
         <translation>Настройки</translation>
+    </message>
+    <message>
+        <source>Clear copied password after:</source>
+        <translation>Стирать скопированный пароль через:</translation>
+    </message>
+    <message>
+        <source>Hide shown password after:</source>
+        <translation>Прятать показанный пароль через:</translation>
+    </message>
+    <message>
+        <source>Lock when not used for:</source>
+        <translation>Блокировать без действий через:</translation>
+    </message>
+    <message>
+        <source>never</source>
+        <translation>никогда</translation>
     </message>
     <message>
         <source>Sign in with Touch ID</source>
@@ -332,10 +380,6 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation>Пока окно было открыто, этот файл хранилища появился — откройте его своим мастер-паролем.</translation>
     </message>
     <message>
-        <source>Vault created: {path}</source>
-        <translation>Хранилище создано: {path}</translation>
-    </message>
-    <message>
         <source>The old backup was set aside as {name} (a hidden file next to the vault).</source>
         <translation>Старая резервная копия отложена как {name} (скрытый файл рядом с хранилищем).</translation>
     </message>
@@ -380,10 +424,6 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation>Расширение</translation>
     </message>
     <message>
-        <source>Search by site, login or note</source>
-        <translation>Поиск по сайту, логину или заметке</translation>
-    </message>
-    <message>
         <source>Add</source>
         <translation>Добавить</translation>
     </message>
@@ -412,6 +452,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation>Открыть сайт</translation>
     </message>
     <message>
+        <source>Show / hide password</source>
+        <translation>Показать / скрыть пароль</translation>
+    </message>
+    <message>
         <source>Edit…</source>
         <translation>Изменить…</translation>
     </message>
@@ -420,8 +464,88 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation>Удалить</translation>
     </message>
     <message>
+        <source>File</source>
+        <translation>Файл</translation>
+    </message>
+    <message>
+        <source>Import from CSV…</source>
+        <translation>Импорт из CSV…</translation>
+    </message>
+    <message>
+        <source>Export to CSV…</source>
+        <translation>Экспорт в CSV…</translation>
+    </message>
+    <message>
+        <source>Settings…</source>
+        <translation>Настройки…</translation>
+    </message>
+    <message>
+        <source>Lock WhoKey</source>
+        <translation>Заблокировать WhoKey</translation>
+    </message>
+    <message>
+        <source>Entry</source>
+        <translation>Запись</translation>
+    </message>
+    <message>
+        <source>Search by name, login or note</source>
+        <translation>Поиск по названию, логину или заметке</translation>
+    </message>
+    <message>
+        <source>Nothing found.</source>
+        <translation>Ничего не найдено.</translation>
+    </message>
+    <message>
         <source>Delete entry</source>
-        <translation>Удаление</translation>
+        <translation>Удалить запись</translation>
+    </message>
+    <message>
+        <source>Import from CSV</source>
+        <translation>Импорт из CSV</translation>
+    </message>
+    <message>
+        <source>CSV files (*.csv);;All files (*)</source>
+        <translation>Файлы CSV (*.csv);;Все файлы (*)</translation>
+    </message>
+    <message>
+        <source>Could not read the file: {error}</source>
+        <translation>Не удалось прочитать файл: {error}</translation>
+    </message>
+    <message>
+        <source>The file is too big for a password list.</source>
+        <translation>Файл слишком большой для списка паролей.</translation>
+    </message>
+    <message>
+        <source>The file is not in UTF-8 encoding. Export the passwords again or save the file as UTF-8.</source>
+        <translation>Файл не в кодировке UTF-8. Выгрузите пароли ещё раз или сохраните файл в UTF-8.</translation>
+    </message>
+    <message>
+        <source>No passwords found in this file. It needs columns with the name or website address and the password, as in an export from a browser, Bitwarden or KeePassXC.</source>
+        <translation>В файле не нашлось паролей. Нужны столбцы с названием или адресом сайта и паролем — как в выгрузке из браузера, Bitwarden или KeePassXC.</translation>
+    </message>
+    <message>
+        <source>All passwords from this file are already in WhoKey.</source>
+        <translation>Все пароли из этого файла уже есть в WhoKey.</translation>
+    </message>
+    <message>
+        <source>The CSV file is not encrypted — delete it now (and empty the Trash).</source>
+        <translation>CSV-файл не зашифрован — удалите его сейчас (и очистите Корзину).</translation>
+    </message>
+    <message>
+        <source>There are no entries to export yet.</source>
+        <translation>Пока нечего экспортировать — записей нет.</translation>
+    </message>
+    <message>
+        <source>CSV files (*.csv)</source>
+        <translation>Файлы CSV (*.csv)</translation>
+    </message>
+    <message>
+        <source>Could not write the file: {error}</source>
+        <translation>Не удалось записать файл: {error}</translation>
+    </message>
+    <message>
+        <source>The CSV file is not encrypted — delete it as soon as you no longer need it (and empty the Trash).</source>
+        <translation>CSV-файл не зашифрован — удалите его, как только он станет не нужен (и очистите Корзину).</translation>
     </message>
     <message>
         <source>⚠ The change is saved, but the backup was not updated: {error}.</source>
@@ -498,6 +622,26 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
         <translation>≈{bits:.0f} бит — {verdict}</translation>
     </message>
     <message>
+        <source>Password length</source>
+        <translation>Длина пароля</translation>
+    </message>
+    <message>
+        <source>Lowercase letters</source>
+        <translation>Строчные буквы</translation>
+    </message>
+    <message>
+        <source>Uppercase letters</source>
+        <translation>Заглавные буквы</translation>
+    </message>
+    <message>
+        <source>Digits</source>
+        <translation>Цифры</translation>
+    </message>
+    <message>
+        <source>Symbols</source>
+        <translation>Символы</translation>
+    </message>
+    <message>
         <source>Generate</source>
         <translation>Сгенерировать</translation>
     </message>
@@ -535,6 +679,28 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
     </message>
 </context>
 <context>
+    <name>ChangeMasterDialog</name>
+    <message numerus="yes">
+        <source>Too short: %n characters, at least 12 required.</source>
+        <translation>
+            <numerusform>Слишком короткий: %n символ, нужно не меньше 12.</numerusform>
+            <numerusform>Слишком короткий: %n символа, нужно не меньше 12.</numerusform>
+            <numerusform>Слишком короткий: %n символов, нужно не меньше 12.</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>LoginWindow</name>
+    <message numerus="yes">
+        <source>Too short: %n characters, at least 12 required.</source>
+        <translation>
+            <numerusform>Слишком короткий: %n символ, нужно не меньше 12.</numerusform>
+            <numerusform>Слишком короткий: %n символа, нужно не меньше 12.</numerusform>
+            <numerusform>Слишком короткий: %n символов, нужно не меньше 12.</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>MainWindow</name>
     <message numerus="yes">
         <source>%n entries</source>
@@ -542,6 +708,57 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
             <numerusform>%n запись</numerusform>
             <numerusform>%n записи</numerusform>
             <numerusform>%n записей</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Add %n passwords to WhoKey?</source>
+        <translation>
+            <numerusform>Добавить в WhoKey %n пароль?</numerusform>
+            <numerusform>Добавить в WhoKey %n пароля?</numerusform>
+            <numerusform>Добавить в WhoKey %n паролей?</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n are already in WhoKey and will be skipped.</source>
+        <translation>
+            <numerusform>%n уже есть в WhoKey — его пропустим.</numerusform>
+            <numerusform>%n уже есть в WhoKey — их пропустим.</numerusform>
+            <numerusform>%n уже есть в WhoKey — их пропустим.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Added %n passwords.</source>
+        <translation>
+            <numerusform>Добавлен %n пароль.</numerusform>
+            <numerusform>Добавлено %n пароля.</numerusform>
+            <numerusform>Добавлено %n паролей.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Exported %n passwords.</source>
+        <translation>
+            <numerusform>Выгружен %n пароль.</numerusform>
+            <numerusform>Выгружено %n пароля.</numerusform>
+            <numerusform>Выгружено %n паролей.</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>SettingsDialog</name>
+    <message numerus="yes">
+        <source>%n s</source>
+        <translation>
+            <numerusform>%n с</numerusform>
+            <numerusform>%n с</numerusform>
+            <numerusform>%n с</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n min</source>
+        <translation>
+            <numerusform>%n мин</numerusform>
+            <numerusform>%n мин</numerusform>
+            <numerusform>%n мин</numerusform>
         </translation>
     </message>
 </context>

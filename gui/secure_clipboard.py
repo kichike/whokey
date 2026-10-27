@@ -23,7 +23,7 @@ import sys
 from PySide6.QtCore import QMimeData, QObject, QTimer
 from PySide6.QtGui import QGuiApplication
 
-from clipboard import CLEAR_AFTER
+from gui import prefs
 
 
 def _windows_format(name):
@@ -106,7 +106,7 @@ class SecureClipboard(QObject):
         if board.text() != secret:
             return False
         self._secret = secret
-        self._timer.start(CLEAR_AFTER * 1000)
+        self._timer.start(prefs.clear_after() * 1000)  # время — в Настройках
         return True
 
     def clear(self):

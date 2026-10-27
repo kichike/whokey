@@ -20,7 +20,9 @@ import struct
 import sys
 import time
 
-from PySide6.QtCore import QObject, QTimer, Signal
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, QTimer, Signal
+
+from gui import prefs
 
 CHECK_EVERY_MS = 3000
 SLEEP_GAP = 20  # секунд «пропало» из монотонного времени — считаем, что компьютер спал
@@ -101,20 +103,35 @@ def screen_locked():
         return False
 
 
-class AutoLock(QObject):
-    """Сигнал lock — когда экран заблокировали или компьютер проснулся после сна."""
+# действия человека в окнах WhoKey: от них отсчитывается бездействие
+_INPUT_EVENTS = {QEvent.KeyPress, QEvent.MouseButtonPress, QEvent.Wheel}
 
-    lock = Signal()
+
+class AutoLock(QObject):
+    """Сигнал lock(причина) — экран заблокировали или компьютер проснулся после сна
+    ("system"), или в WhoKey долго ничего не делали ("idle", время — в Настройках)."""
+
+    lock = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._clocks = (time.time(), monotonic())
+        self._last_input = time.monotonic()
         self._timer = QTimer(self)
         self._timer.setInterval(CHECK_EVERY_MS)
         self._timer.timeout.connect(self._check)
+        app = QCoreApplication.instance()
+        if app is not None:
+            app.installEventFilter(self)  # смотрим на нажатия во всех окнах, ничего не меняя
+
+    def eventFilter(self, obj, event):
+        if event.type() in _INPUT_EVENTS:
+            self._last_input = time.monotonic()
+        return False
 
     def start(self):
         self._clocks = (time.time(), monotonic())
+        self._last_input = time.monotonic()
         self._timer.start()
 
     def stop(self):
@@ -125,4 +142,8 @@ class AutoLock(QObject):
         slept = (wall - self._clocks[0]) - (mono - self._clocks[1]) > SLEEP_GAP
         self._clocks = (wall, mono)
         if slept or screen_locked():
-            self.lock.emit()
+            self.lock.emit("system")
+            return
+        minutes = prefs.idle_lock_minutes()
+        if minutes and time.monotonic() - self._last_input > minutes * 60:
+            self.lock.emit("idle")

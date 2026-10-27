@@ -25,14 +25,15 @@ WhoKey keeps your logins in one encrypted file that only opens with your master 
 ### Features
 
 - **Encryption:** the key is derived from the master password with Argon2id, and entries are encrypted with Fernet (the `cryptography` library). Nothing is stored in plain text.
-- **Clipboard:** copied passwords are wiped after 30 seconds and when the app quits — a draining neon bar shows how much time is left. Clipboard history (Win+V, Raycast, Maccy…) and cloud clipboard are told to skip them.
-- **Hidden by default:** a password you reveal hides itself again after 15 seconds.
+- **Clipboard:** copied passwords are wiped after 30 seconds (changeable in **Settings**) and when the app quits — a draining neon bar shows how much time is left. Clipboard history (Win+V, Raycast, Maccy…) and cloud clipboard are told to skip them.
+- **Hidden by default:** a password you reveal hides itself again after 15 seconds (changeable in **Settings**).
 - **Password generator** with length, letters, digits and symbols, plus a rough strength meter.
 - **Search,** and right-click actions on any entry: show, copy password, copy login, open the website (⌘O / Ctrl+O), edit, delete.
 - **Backup copy:** a hidden backup sits next to the vault, so you only see one file. If the vault gets damaged, WhoKey offers to restore it.
 - **Browser extension** (macOS and Windows, Chromium browsers): fills your login and password on websites — see below.
 - **Touch ID** on Mac: unlock WhoKey with your fingerprint (turn it on or off in **Settings**, ⌘,).
-- **Auto-lock** when the screen is locked or the computer goes to sleep.
+- **Auto-lock** when the screen is locked, the computer goes to sleep or WhoKey is not used for a while (10 minutes by default); ⌘L / Ctrl+L locks it right away.
+- **Import and export CSV** (File menu): move your passwords from a browser, Bitwarden, KeePassXC or 1Password and back. The CSV file is not encrypted — delete it after the move.
 - **English and Russian** interface.
 
 By default the vault lives in `~/Library/Application Support/EduPasswords/vault.dat` on macOS (not synced to iCloud) and in `%APPDATA%\EduPasswords\vault.dat` on Windows. You can choose another file in the login window.
@@ -60,7 +61,7 @@ Fills the login and password on a website with one click or **⌘⇧L** (**Ctrl+
 1. Install WhoKey and open it once — it registers itself in your browsers.
 2. Download **WhoKey-extension.zip** from [Releases](../../releases) and unzip it (or use the `extension` folder of this repository).
 3. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the unzipped folder.
-4. In WhoKey, set **Website** (`github.com`) in the entries you want to fill.
+4. In WhoKey, set **Website address** (`github.com`) in the entries you want to fill.
 5. On a login page, click the WhoKey icon. The first time, WhoKey asks for permission — allow it only if the code matches the one in the extension popup.
 
 How it protects your passwords:
@@ -102,14 +103,15 @@ WhoKey хранит логины и пароли в одном зашифров�
 ### Возможности
 
 - **Шифрование:** ключ получается из мастер-пароля через Argon2id, записи шифруются Fernet (библиотека `cryptography`). Ничего не хранится открытым текстом.
-- **Буфер обмена:** скопированный пароль стирается через 30 секунд и при выходе из программы, неоновая полоска показывает, сколько осталось. Журналу буфера (Win+V, Raycast, Maccy…) и облачному буферу запрещено его запоминать.
-- **Пароли скрыты:** показанный пароль сам прячется через 15 секунд.
+- **Буфер обмена:** скопированный пароль стирается через 30 секунд (меняется в **Настройках**) и при выходе из программы, неоновая полоска показывает, сколько осталось. Журналу буфера (Win+V, Raycast, Maccy…) и облачному буферу запрещено его запоминать.
+- **Пароли скрыты:** показанный пароль сам прячется через 15 секунд (меняется в **Настройках**).
 - **Генератор паролей:** длина, буквы, цифры, символы и примерная шкала надёжности.
 - **Поиск** и действия с записью по правому клику: показать, скопировать пароль или логин, открыть сайт (⌘O / Ctrl+O), изменить, удалить.
 - **Резервная копия:** скрытая копия лежит рядом с хранилищем, так что в папке виден один файл. Если хранилище испортится, WhoKey предложит восстановить его.
 - **Расширение для браузера** (macOS и Windows, браузеры на Chromium): заполняет логин и пароль на сайтах — подробнее ниже.
 - **Touch ID** на Mac: WhoKey открывается по отпечатку пальца (включается и выключается в **Настройках**, ⌘,).
-- **Автоблокировка** при блокировке экрана и сне компьютера.
+- **Автоблокировка** при блокировке экрана, сне компьютера и если WhoKey долго не трогают (по умолчанию 10 минут); ⌘L / Ctrl+L — заблокировать сразу.
+- **Импорт и экспорт CSV** (меню «Файл»): перенос паролей из браузера, Bitwarden, KeePassXC или 1Password и обратно. CSV-файл не зашифрован — удалите его после переноса.
 - Интерфейс на **русском и английском**.
 
 По умолчанию хранилище лежит в `~/Library/Application Support/EduPasswords/vault.dat` на macOS (эта папка не синхронизируется с iCloud) и в `%APPDATA%\EduPasswords\vault.dat` на Windows. Другой файл можно выбрать в окне входа.

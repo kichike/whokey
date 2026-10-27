@@ -30,6 +30,7 @@ import time
 
 from PySide6.QtCore import QObject, QTimer
 from PySide6.QtNetwork import QLocalServer
+from PySide6.QtWidgets import QDialog
 
 import bridge_protocol as P
 import sites
@@ -42,7 +43,7 @@ MAX_CONNECTIONS = 8                # больше одновременно не 
 REQUEST_TIMEOUT_MS = 5000          # соединение без запроса дольше этого закрывается
 PAIR_COOLDOWN = 10                 # секунд после отказа — новые запросы разрешения не показываем;
 PAIR_COOLDOWN_MAX = 600            # после каждого следующего отказа пауза вдвое длиннее, до 10 минут
-RATE_LIMIT = {"logins": 30, "fill": 10}  # запросов в минуту
+RATE_LIMIT = {"logins": 30, "fill": 10, "show": 5}  # запросов в минуту
 CLOSE_AFTER_MS = 2000              # после ответа: сколько ждём, пока собеседник закроет соединение
 
 
@@ -234,7 +235,24 @@ class BridgeServer(QObject):
             return {"status": "ok", "items": items}
         if kind == "fill":
             return self._fill(request, url)
+        if kind == "show":
+            # «Добавить в WhoKey» из окошка расширения: для сайта ещё нет записи — открываем
+            # окно новой записи с уже вписанным адресом (после ответа: окно не держит мост)
+            QTimer.singleShot(0, lambda: self._show_new_entry(url))
+            return {"status": "ok"}
         return {"status": "error"}
+
+    def _show_new_entry(self, url):
+        window = self.window
+        if window is None or not hasattr(window, "add"):
+            return
+        window.showNormal()
+        window.raise_()
+        window.activateWindow()
+        if not window.findChildren(QDialog):  # уже открыто какое-то окно — второе поверх не открываем
+            address = sites.normalize(url) or ""
+            # без «www.»: запись для github.com подойдёт и www.github.com, а наоборот — нет
+            window.add(url=address[4:] if address.startswith("www.") else address)
 
     def _pair(self, request):
         """Первое подключение расширения: человек вводит в WhoKey код со значка расширения.

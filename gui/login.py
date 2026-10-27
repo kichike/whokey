@@ -73,9 +73,14 @@ class LoginWindow(QWidget):
         else:
             self._build_create(column)
 
+        # сообщение из прошлого окна («WhoKey заблокирован…») — спокойным цветом: это не ошибка
+        notice = state.pop("notice", "")
+        self.notice = theme.role(QLabel(notice), "accent")
+        self.notice.setWordWrap(True)
+        self.notice.setVisible(bool(notice))
+        column.addWidget(self.notice)
         self.error = theme.role(QLabel(), "error")
         self.error.setWordWrap(True)
-        self.error.setText(state.pop("notice", ""))
         column.addWidget(self.error)
         outer.addStretch()
 
@@ -100,9 +105,15 @@ class LoginWindow(QWidget):
         row = QHBoxLayout()
         # невидимые точки переноса после «\» и «/»: длинный путь Windows (C:\Users\…)
         # иначе не переносится и обрезается справа
-        shown = str(self.path).replace("\\", "\\\u200b").replace("/", "/\u200b")
+        # домашняя папка — как «~»: путь короче; полный — во всплывающей подсказке
+        path = str(self.path)
+        home = str(Path.home())
+        if path.startswith(home + os.sep):
+            path = "~" + path[len(home):]
+        shown = path.replace("\\", "\\\u200b").replace("/", "/\u200b")
         label = theme.role(QLabel(tr("Vault file:") + " " + shown), "muted")
         label.setWordWrap(True)
+        label.setToolTip(str(self.path))
         row.addWidget(label, 1)
         other = QPushButton(tr("Other file…"))
         other.clicked.connect(self._choose_file)
@@ -259,17 +270,19 @@ class LoginWindow(QWidget):
 
     def on_create(self):
         password = self.master.text()
+        # порядок проверок: длина → совпадение → слабость (о слабости спрашиваем последней)
         if len(password) < MASTER_MIN_LENGTH:
-            self.error.setText(tr("Too short: {n} characters, at least 12 required.").format(n=len(password)))
+            self.error.setText(self.tr("Too short: %n characters, at least 12 required.", "", len(password)))
+            return
+        if self.repeat.text() != password:
+            self.error.setText(tr("Passwords don't match, try again."))
+            self.repeat.clear()
+            self.repeat.setFocus()
             return
         # короткие уже отсеяли — остальные слабости только предупреждение
         reasons = [r for r in weakness_reasons(password) if r != "weak_short"]
         if reasons and not ask_yes(self, tr("Weak password"),
                                    tr("The password is weak:\n{reasons}\n\nUse it anyway?").format(reasons=weakness_text(reasons))):
-            return
-        if self.repeat.text() != password:
-            self.error.setText(tr("Passwords don't match, try again."))
-            self.repeat.clear()
             return
         if not self._take_lock():
             return
@@ -284,12 +297,14 @@ class LoginWindow(QWidget):
         except (SaveError, OSError) as error:
             show_error(self, tr("⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.").format(error=error))
             return
-        notes = [tr("Vault created: {path}").format(path=self.path)]
+        # «Хранилище создано» отдельным окном не сообщаем — и так видно; окно — только если есть что важное
+        notes = []
         if vault.old_backup:
             notes.append(tr("The old backup was set aside as {name} (a hidden file next to the vault).").format(name=vault.old_backup.name))
         if in_icloud_folder(self.path):
             notes.append(tr("This folder seems to be synced with iCloud: the encrypted vault and its old versions will be stored in the cloud."))
-        show_info(self, tr("WhoKey"), "\n\n".join(notes))
+        if notes:
+            show_info(self, tr("WhoKey"), "\n\n".join(notes))
         self._finish(vault)
 
     # --- Touch ID (только macOS, см. gui/touchid.py) ---

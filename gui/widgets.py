@@ -10,14 +10,13 @@ from PySide6.QtWidgets import (QCheckBox, QHBoxLayout, QLabel, QLineEdit, QMenu,
                                QStyleOptionViewItem, QToolButton, QVBoxLayout, QWidget)
 
 from generator import MAX_LENGTH, MIN_LENGTH, entropy_bits, estimate_bits, generate_password
-from gui import theme
+from gui import prefs, theme
 from gui.i18n import tr
 
 # Цвета шкалы надёжности — «светофор» из оформления: хорошо / так себе / плохо
 GOOD, WARNING, BAD = theme.OK, theme.WARN, theme.BAD
 
 
-REVEAL_SECONDS = 15  # показанный «глазом» пароль сам скроется — как в таблице
 
 
 class SecretEdit(QLineEdit):
@@ -78,7 +77,6 @@ class PasswordField(QWidget):
         self.eye.toggled.connect(self._toggle)
         self.hide_timer = QTimer(self)
         self.hide_timer.setSingleShot(True)
-        self.hide_timer.setInterval(REVEAL_SECONDS * 1000)
         self.hide_timer.timeout.connect(lambda: self.eye.setChecked(False))
 
         row = QHBoxLayout(self)
@@ -89,9 +87,14 @@ class PasswordField(QWidget):
     def _toggle(self, shown):
         self.edit.setEchoMode(QLineEdit.Normal if shown else QLineEdit.Password)
         if shown:
-            self.hide_timer.start()  # через 15 с «глаз» закроется сам
+            self.hide_timer.start(prefs.reveal_seconds() * 1000)  # «глаз» закроется сам (время — в Настройках)
         else:
             self.hide_timer.stop()
+
+    def show_always(self):
+        """Символы видны всегда, «глаза» нет — для пароля, который ещё нигде не сохранён (генератор)."""
+        self.eye.hide()
+        self.edit.setEchoMode(QLineEdit.Normal)
 
     def text(self):
         return self.edit.text()
@@ -281,13 +284,17 @@ class GeneratorPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        remembered = prefs.generator_options()  # длина и наборы символов — как в прошлый раз
         self.length = QSpinBox()
         self.length.setRange(MIN_LENGTH, MAX_LENGTH)
-        self.length.setValue(20)
+        self.length.setValue(remembered[0] if remembered else 20)
+        self.length.setToolTip(tr("Password length"))
         self.kinds = {}
-        for name, label in [("lower", "abc"), ("upper", "ABC"), ("digits", "123"), ("symbols", "!@#")]:
+        for name, label, tip in [("lower", "abc", tr("Lowercase letters")), ("upper", "ABC", tr("Uppercase letters")),
+                                 ("digits", "123", tr("Digits")), ("symbols", "!@#", tr("Symbols"))]:
             box = QCheckBox(label)
-            box.setChecked(True)
+            box.setToolTip(tip)
+            box.setChecked(remembered[1].get(name, True) if remembered else True)
             box.toggled.connect(self._update_button)
             self.kinds[name] = box
         self.button = QPushButton(tr("Generate"))
@@ -309,6 +316,7 @@ class GeneratorPanel(QWidget):
     def generate(self):
         settings = {name: box.isChecked() for name, box in self.kinds.items()}
         length = self.length.value()
+        prefs.remember_generator(length, settings)
         password = generate_password(length, **settings)
         self.generated.emit(password, entropy_bits(length, **settings))
 
@@ -348,7 +356,7 @@ def ask_code(parent, title, text):
     edit.setFixedWidth(180)
     # поле — в разметку QMessageBox, под текстом
     box.layout().addWidget(edit, box.layout().rowCount(), 0, 1, box.layout().columnCount(), Qt.AlignCenter)
-    cancel = box.addButton(tr("Cancel"), QMessageBox.RejectRole)
+    box.addButton(tr("Cancel"), QMessageBox.RejectRole)
     allow = box.addButton(tr("Allow"), QMessageBox.AcceptRole)
     box.setDefaultButton(allow)
     QTimer.singleShot(0, edit.setFocus)
