@@ -195,7 +195,7 @@ async function fill(tabId, url, index, login, auto = false) {
   }
 }
 
-// --- запросы от всплывающего окошка ---
+// --- запросы от всплывающего окошка и меню на странице ---
 
 async function open(tabId, url) {
   if (pending.length) reset(); // прошлое нажатие ещё ждёт — начинаем заново
@@ -217,8 +217,55 @@ async function open(tabId, url) {
   return { status: "ok", items };
 }
 
+// --- меню под полем пароля (inline.js рисует значок, menu.html — само меню) ---
+
+const MENU_URL = chrome.runtime.getURL("menu.html");
+
+// Закрыть меню на вкладке. Ждём ответа: прежде чем заполнять, меню должно исчезнуть —
+// иначе проверка «поле видно человеку» в fillInPage решила бы, что поле чем-то закрыто
+async function closeMenu(tabId) {
+  try {
+    await chrome.tabs.sendMessage(tabId, { kind: "menu_close" }, { frameId: 0 });
+  } catch (e) { /* страницу уже закрыли или перезагрузили */ }
+}
+
+function fromMenu(message, sender, sendResponse) {
+  // вкладку и адрес страницы сообщает сам браузер (sender), а не страница:
+  // сайт не может попросить пароль «от имени» другого сайта
+  const tabId = sender.tab.id;
+  const url = sender.tab.url;
+  if (message.kind === "menu_open") {
+    open(tabId, url).then((reply) => sendResponse({ ...reply, host: new URL(url).hostname }));
+    return true;
+  }
+  if (message.kind === "menu_fill") {
+    closeMenu(tabId)
+      .then(() => fill(tabId, url, message.index, message.login))
+      .then(sendResponse);
+    return true;
+  }
+  if (message.kind === "menu_show") {
+    api({ type: "show", url }).then((reply) => {
+      if (reply.status === "ok") closeMenu(tabId);
+      sendResponse(reply);
+    });
+    return true;
+  }
+  if (message.kind === "menu_size" || message.kind === "menu_close") {
+    chrome.tabs.sendMessage(tabId, message, { frameId: 0 }).catch(() => {});
+  }
+  return false;
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (sender.id !== chrome.runtime.id) return false; // только от своего окошка
+  if (sender.id !== chrome.runtime.id) return false; // только от своих страниц
+  if (sender.tab) {
+    // с вкладки разрешено говорить только меню (menu.html внутри страницы);
+    // значок на странице (inline.js) сам ничего не просит
+    if (!sender.url || !sender.url.startsWith(MENU_URL)) return false;
+    return fromMenu(message, sender, sendResponse);
+  }
+  // дальше — всплывающее окошко с панели браузера (у него нет вкладки)
   if (message.kind === "open") {
     open(message.tabId, message.url).then(sendResponse);
     return true; // ответ придёт позже
