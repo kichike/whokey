@@ -310,8 +310,12 @@ Use it anyway?</source>
         <translation>Открыть по Touch ID</translation>
     </message>
     <message>
-        <source>The Mac was restarted: enter the master password once, then Touch ID will work again.</source>
-        <translation>Mac перезагружался: введите мастер-пароль один раз, и Touch ID снова заработает.</translation>
+        <source>The Mac was restarted: Touch ID will be available after you enter the master password once.</source>
+        <translation>Mac перезагружался: Touch ID заработает, после того как вы один раз введёте мастер-пароль.</translation>
+    </message>
+    <message>
+        <source>Touch ID is not available right now (for example, the Mac lid is closed). Enter the master password.</source>
+        <translation>Touch ID сейчас недоступен (например, закрыта крышка Mac). Введите мастер-пароль.</translation>
     </message>
     <message>
         <source>The main file {name} was not found, but there is a backup {backup}.

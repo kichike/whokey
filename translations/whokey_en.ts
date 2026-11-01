@@ -299,7 +299,11 @@ Use it anyway?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>The Mac was restarted: enter the master password once, then Touch ID will work again.</source>
+        <source>The Mac was restarted: Touch ID will be available after you enter the master password once.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Touch ID is not available right now (for example, the Mac lid is closed). Enter the master password.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

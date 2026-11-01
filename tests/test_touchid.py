@@ -70,6 +70,40 @@ class TamperedHeader(unittest.TestCase):
         self.assertIn("kdf", content)  # после сохранения копия появилась
 
 
+class LoginHint(unittest.TestCase):
+    """Touch ID включён, но войти по нему сейчас нельзя — кнопка неактивна и есть объяснение."""
+
+    def setUp(self):
+        QApplication.instance() or QApplication([])
+        from gui import prefs
+        prefs.use_file(Path(tempfile.mkdtemp()) / "p.ini")
+        self.path = Path(tempfile.mkdtemp()) / "t.dat"
+        Vault.create(self.path, "Зелёный-Кит-Летит-2026!")
+        self._real = touchid.state, touchid.available
+
+    def tearDown(self):
+        touchid.state, touchid.available = self._real
+
+    def window(self, state, available):
+        from PySide6.QtWidgets import QLabel, QPushButton
+        from gui.login import LoginWindow
+        touchid.state, touchid.available = (lambda path: state), (lambda: available)
+        window = self.shown = LoginWindow(self.path, {})  # ссылка — иначе окно удалится вместе с кнопкой
+        button = [b for b in window.findChildren(QPushButton) if "Touch ID" in b.text()]
+        hints = [label.text() for label in window.findChildren(QLabel) if "Touch ID" in label.text()]
+        return button, hints
+
+    def test_states(self):
+        self.assertEqual(self.window(None, True), ([], []))  # выключен — ни кнопки, ни надписи
+        button, hints = self.window("fresh", True)
+        self.assertTrue(button[0].isEnabled())
+        self.assertEqual(hints, [])
+        for state, available, word in (("stale", True, "restarted"), ("fresh", False, "not available")):
+            button, hints = self.window(state, available)
+            self.assertFalse(button[0].isEnabled())
+            self.assertIn(word, hints[0])
+
+
 class Availability(unittest.TestCase):
     def test_off_without_real_screen(self):
         """В автотестах (окна «без экрана») настоящее окно Touch ID не всплывает."""

@@ -145,18 +145,29 @@ class LoginWindow(QWidget):
         column.addWidget(self.master)
         column.addWidget(self._button(tr("Open"), self.on_open, default=True))
         self.master.setFocus()
-        if touchid.available():
-            self._build_touch_id(column)
+        self._build_touch_id(column)
 
     def _build_touch_id(self, column):
-        state = touchid.state(self.path)
-        if state == "fresh":
+        state = touchid.state(self.path)  # None — Touch ID для этого файла выключен
+        if state is None:
+            return
+        ready = touchid.available()
+        if state == "fresh" and ready:
             column.addWidget(self._button(tr("Unlock with Touch ID"), self.on_touch_id))
             self._touch_id_on_show = True  # палец спрашиваем сразу, как окно появится
-        elif state == "stale":
-            hint = theme.role(QLabel(tr("The Mac was restarted: enter the master password once, then Touch ID will work again.")), "muted")
-            hint.setWordWrap(True)
-            column.addWidget(hint)
+            return
+        # Touch ID включён, но сейчас войти по нему нельзя — кнопка видна, но неактивна,
+        # и рядом объяснение: иначе непонятно, куда делся вход по пальцу
+        button = self._button(tr("Unlock with Touch ID"), self.on_touch_id)
+        button.setEnabled(False)
+        column.addWidget(button)
+        if state == "stale":
+            text = tr("The Mac was restarted: Touch ID will be available after you enter the master password once.")
+        else:
+            text = tr("Touch ID is not available right now (for example, the Mac lid is closed). Enter the master password.")
+        hint = theme.role(QLabel(text), "accent")
+        hint.setWordWrap(True)
+        column.addWidget(hint)
 
     def _build_missing(self, column):
         text = QLabel(tr("The main file {name} was not found, but there is a backup {backup}.\n\nRestore from it? If you create a new vault, the old backup will be kept under another name.").format(name=self.path.name, backup=backup_path(self.path).name))
@@ -311,17 +322,17 @@ class LoginWindow(QWidget):
 
     def _finish(self, vault):
         """Хранилище открыто мастер-паролем: обновить ключ для Touch ID или предложить его."""
-        if touchid.available():
-            state = touchid.state(self.path)
-            if state == "stale":
-                # Mac перезагружался — обновить отметку загрузки (ключ тот же). Если всё
-                # свежее, Связку ключей не трогаем вовсе: меньше поводов для окон macOS
-                touchid.save_key(self.path, vault.key)
-            elif state is None and not touchid.was_offered(self.path):
-                touchid.set_offered(self.path)
-                if ask_yes(self, tr("Touch ID"), tr("Unlock WhoKey with Touch ID next time?") + "\n\n" + tr("The vault key will be kept in the macOS Keychain, and WhoKey will ask for your fingerprint before using it. After the Mac restarts, the master password is needed once. You can turn it off in Settings (⌘,).")):
-                    if not touchid.save_key(self.path, vault.key):
-                        show_error(self, tr("macOS did not allow saving the key to the Keychain. Touch ID is off."))
+        state = touchid.state(self.path)
+        if state == "stale":
+            # Mac перезагружался — обновить отметку загрузки (ключ тот же); и при закрытой
+            # крышке тоже: откроют крышку — вход по пальцу уже будет работать.
+            # Если всё свежее, Связку ключей не трогаем вовсе: меньше поводов для окон macOS
+            touchid.save_key(self.path, vault.key)
+        elif state is None and touchid.available() and not touchid.was_offered(self.path):
+            touchid.set_offered(self.path)
+            if ask_yes(self, tr("Touch ID"), tr("Unlock WhoKey with Touch ID next time?") + "\n\n" + tr("The vault key will be kept in the macOS Keychain, and WhoKey will ask for your fingerprint before using it. After the Mac restarts, the master password is needed once. You can turn it off in Settings (⌘,).")):
+                if not touchid.save_key(self.path, vault.key):
+                    show_error(self, tr("macOS did not allow saving the key to the Keychain. Touch ID is off."))
         self.opened.emit(vault)
 
     def on_touch_id(self):
