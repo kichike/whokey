@@ -109,13 +109,20 @@ def _shared(host):
     return any(host == s or host.endswith("." + s) for s in SHARED_HOSTS)
 
 
+def _browser_slashes(text):
+    """«\\» в ссылке браузер читает как «/», а Python — как обычный символ: в
+    «https://example.com\\@evil.com» Python увидел бы сайт evil.com, а браузер — example.com.
+    Читаем как браузер, чтобы запись не привязалась к чужому сайту."""
+    return text.replace("\\", "/")
+
+
 def normalize(text):
     """Адрес сайта из того, что ввёл человек: «https://Mail.ru/login» -> «mail.ru».
 
     У localhost и IP-адреса сохраняется порт, если он указан: «localhost:3000».
     Пустая строка — адрес не задан. None — это не похоже на адрес сайта.
     """
-    text = (text or "").strip()
+    text = _browser_slashes((text or "").strip())
     if not text:
         return ""
     if "://" not in text:
@@ -153,7 +160,7 @@ def address(text):
     site = normalize(text)
     if not site:
         return site
-    text = text.strip()
+    text = _browser_slashes(text.strip())
     parts = urlsplit(text if "://" in text else "https://" + text)
     if parts.scheme not in ("http", "https"):
         return site  # ftp:// и прочее браузер с паролем не откроет — храним только сайт
@@ -169,8 +176,11 @@ def link(text):
     site = normalize(text)
     if not site:
         return None
-    if "://" in text:  # сохранена целиком (address)
-        return text.strip()
+    # сохранена целиком (address) — и только http/https: «Открыть сайт» не должно
+    # передать системе javascript:, file: или ссылку на системные настройки
+    full = address(text)
+    if full and "://" in full:
+        return full
     scheme = "http" if site.startswith(("localhost", "127.", "[::1]")) else "https"
     return f"{scheme}://{site}"
 

@@ -198,14 +198,15 @@ async function fill(tabId, url, index, login, auto = false) {
 
 // --- запросы от всплывающего окошка и меню на странице ---
 
-async function open(tabId, url) {
+async function open(tabId, url, fromMenu = false) {
   if (pending.length) reset(); // прошлое нажатие ещё ждёт — начинаем заново
   const reply = await api({ type: "logins", url });
   if (reply.status === "cancelled") return reply; // это прошлое нажатие — его окошко уже закрыто
   if (reply.status !== "ok") return reply;
   const items = reply.items;
   chrome.action.setBadgeText({ tabId, text: "" });
-  if (reply.waited && items.length === 1) {
+  // из меню на странице — никогда сами: человек выберет аккаунт в меню, оно остаётся открытым
+  if (reply.waited && items.length === 1 && !fromMenu) {
     // ждали, пока откроется WhoKey (окошко за это время закрылось) — заполняем сами
     const result = await fill(tabId, url, items[0].index, items[0].login, true);
     return { ...result, items };
@@ -220,7 +221,37 @@ async function open(tabId, url) {
 
 // --- меню под полем пароля (inline.js рисует значок, menu.html — само меню) ---
 
-const MENU_URL = chrome.runtime.getURL("menu.html");
+// Меню встроено в страницу по «одноразовому» адресу (use_dynamic_url в manifest.json):
+// он меняется в каждом сеансе браузера, так что сайт не может встроить меню сам.
+// Поэтому узнаём меню не по полному адресу, а так: это страница нашего расширения
+// (sender.id проверен выше) с путём /menu.html
+function isMenu(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "chrome-extension:" && parsed.pathname === "/menu.html";
+  } catch (e) {
+    return false;
+  }
+}
+
+// Меню можно открыть только сразу после настоящего нажатия на значок WhoKey в поле.
+// Без этого любой сайт (или реклама на нём) мог бы встроить невидимое меню и без
+// единого нажатия открывать WhoKey, просить мастер-пароль и запускать сопряжение.
+// Значок (inline.js, сама страница — кадр 0) сообщает о нажатии; разрешение одноразовое
+// и живёт 3 секунды.
+const ARM_MS = 3000;
+const armed = new Map(); // вкладка -> до какого момента можно открыть меню
+
+function arm(sender) {
+  if (sender.frameId !== 0 || sender.url.startsWith("chrome-extension://")) return;
+  armed.set(sender.tab.id, Date.now() + ARM_MS);
+}
+
+function takeArm(tabId) {
+  const until = armed.get(tabId);
+  armed.delete(tabId);
+  return until !== undefined && Date.now() <= until;
+}
 
 // Закрыть меню на вкладке. Ждём ответа: прежде чем заполнять, меню должно исчезнуть —
 // иначе проверка «поле видно человеку» в fillInPage решила бы, что поле чем-то закрыто
@@ -236,10 +267,14 @@ function fromMenu(message, sender, sendResponse) {
   const tabId = sender.tab.id;
   const url = sender.tab.url;
   if (message.kind === "menu_open") {
+    if (!takeArm(tabId)) {
+      sendResponse({ status: "error" }); // меню не после нажатия на значок — не открываем
+      return false;
+    }
     const page = new URL(url);
     // адрес страницы целиком — только для значка сайта: браузер помнит значки по страницам.
     // Меню — страница самого расширения, сайт его не прочитает
-    open(tabId, url).then((reply) => sendResponse({ ...reply, host: page.hostname, page: page.origin + page.pathname }));
+    open(tabId, url, true).then((reply) => sendResponse({ ...reply, host: page.hostname, page: page.origin + page.pathname }));
     return true;
   }
   if (message.kind === "menu_fill") {
@@ -264,9 +299,14 @@ function fromMenu(message, sender, sendResponse) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id) return false; // только от своих страниц
   if (sender.tab) {
-    // с вкладки разрешено говорить только меню (menu.html внутри страницы);
-    // значок на странице (inline.js) сам ничего не просит
-    if (!sender.url || !sender.url.startsWith(MENU_URL)) return false;
+    if (!sender.url) return false;
+    // значок на странице (inline.js) сообщает только «человек нажал на меня»
+    if (message.kind === "menu_armed") {
+      arm(sender);
+      return false;
+    }
+    // всё остальное с вкладки — только от меню (menu.html внутри страницы)
+    if (!isMenu(sender.url)) return false;
     return fromMenu(message, sender, sendResponse);
   }
   // дальше — всплывающее окошко с панели браузера (у него нет вкладки)

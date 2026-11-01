@@ -76,9 +76,15 @@
     if (!menu) return;
     const box = menu.field.getBoundingClientRect();
     const width = Math.max(MENU_WIDTH, Math.min(box.width, 420));
+    const left = `${Math.min(Math.max(8, box.left), innerWidth - width - 8)}px`;
+    const top = `${box.bottom + 6}px`;
+    const moved = menu.frame.style.left !== left || menu.frame.style.top !== top;
     menu.frame.style.width = `${width}px`;
-    menu.frame.style.left = `${Math.min(Math.max(8, box.left), innerWidth - width - 8)}px`;
-    menu.frame.style.top = `${box.bottom + 6}px`;
+    menu.frame.style.left = left;
+    menu.frame.style.top = top;
+    // меню сдвинулось (страница двигает поле) — нажатия в нём снова ждут полсекунды:
+    // так сайт не «подвезёт» меню под чужое нажатие. Сообщение несёт только «сдвинулось»
+    if (moved && menu.frame.contentWindow) menu.frame.contentWindow.postMessage("whokey-moved", "*");
   }
 
   function update() {
@@ -96,7 +102,9 @@
         icon.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (event.isTrusted) toggleMenu(field);
+          if (!event.isTrusted) return;
+          // сначала «человек нажал» (фоновая часть без этого меню не откроет), потом меню
+          chrome.runtime.sendMessage({ kind: "menu_armed" }).catch(() => {}).finally(() => toggleMenu(field));
         });
         root.append(icon);
         icons.set(field, icon);

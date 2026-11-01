@@ -23,7 +23,16 @@ try {
   }, { trackVisibility: true, delay: 100, threshold: [1.0] }).observe($("menu"));
 } catch (e) { /* старый браузер без проверки видимости */ }
 
+// меню сдвинули — снова ждём полсекунды видимости (см. placeMenu в inline.js).
+// Сообщение может прислать и сама страница, но оно только откладывает нажатия
+addEventListener("message", () => {
+  if (visibleSince !== null) visibleSince = performance.now();
+  movedAt = performance.now();
+});
+let movedAt = -Infinity;
+
 function trustedClick(event) {
+  if (performance.now() - movedAt < 500) return false;
   if (!event.isTrusted) return false;
   if (!trackingWorks) return event.detail === 0 || performance.now() > 500; // Enter с клавиатуры — detail 0
   return visibleSince !== null && performance.now() - visibleSince >= 500;

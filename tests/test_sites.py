@@ -108,6 +108,13 @@ class Matching(unittest.TestCase):
         self.assertEqual(sites.link("mail.ru"), "https://mail.ru")
         self.assertEqual(sites.link("localhost:3000"), "http://localhost:3000")
         self.assertIsNone(sites.address("co.uk/path"))
+        # ревью безопасности: чужие схемы не открываются, «\\» читается как в браузере
+        for bad in ("javascript://example.com/%0aalert(1)", "file://example.com/etc/passwd",
+                    "x-apple.systempreferences://example.com/x", "smb://example.com/share"):
+            with self.subTest(bad=bad):
+                self.assertEqual(sites.link(bad), "https://example.com")
+        self.assertEqual(sites.normalize("https://example.com\\@evil.com/x"), "example.com")
+        self.assertTrue(sites.address("https://example.com\\@evil.com/x").startswith("https://example.com/"))
         self.assertEqual(sites.address(""), "")
 
 
