@@ -57,6 +57,8 @@ class ControllerFlow(unittest.TestCase):
         c.change_language(self.vault, "en")
         settle()  # старое окно удалено
         self.assertTrue(c.bridge.server.isListening(), "сервер расширения пережил смену языка")
+        from gui.dialogs import SettingsDialog
+        self.assertIsNotNone(c.window.findChild(SettingsDialog), "Настройки снова открыты на новом языке")
         c.lock()  # раньше падал на удалённом сервере, и хранилище оставалось открытым
         settle()
         self.assertIsNone(c.bridge)

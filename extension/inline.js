@@ -65,19 +65,50 @@
     return found;
   }
 
+  // что сайт показывает в этой точке (без наших значков: они лежат в host)
+  const pageAt = (x, y) => document.elementsFromPoint(x, y).find((el) => el !== host);
+  const isField = (el, field) => el && (el === field || field.contains(el));
+  // поверх поля часто лежит «плавающая» подпись — поле при этом видно
+  const isFieldOrLabel = (el, field) => isField(el, field) || (el && el.closest("label") && el.closest("label").control === field);
+
   function place(field, icon) {
     const box = field.getBoundingClientRect();
-    icon.style.left = `${box.right - SIZE - GAP}px`;
-    icon.style.top = `${box.top + (box.height - SIZE) / 2}px`;
-    icon.style.display = box.bottom < 0 || box.top > innerHeight ? "none" : "block";
+    const y = box.top + box.height / 2;
+    // поле спрятано прокруткой внутри блока или накрыто — значок не нужен
+    // (иначе он висел бы поверх чужого текста)
+    const seen = [box.left + 6, box.left + box.width / 2, box.right - 6]
+      .some((x) => x >= 0 && x <= innerWidth && isFieldOrLabel(pageAt(x, y), field));
+    if (box.bottom < 0 || box.top > innerHeight || !seen) {
+      icon.style.display = "none";
+      return;
+    }
+    // справа в поле у сайта бывает своя кнопка («показать пароль»): тогда значок левее неё
+    let x = box.right - SIZE - GAP;
+    for (let step = 0; step < 4 && !isField(pageAt(x + SIZE / 2, y), field); step++) x -= SIZE + GAP;
+    if (!isField(pageAt(x + SIZE / 2, y), field)) {
+      icon.style.display = "none";
+      return;
+    }
+    icon.style.left = `${x}px`;
+    icon.style.top = `${y - SIZE / 2}px`;
+    icon.style.display = "block";
   }
 
   function placeMenu() {
     if (!menu) return;
     const box = menu.field.getBoundingClientRect();
     const width = Math.max(MENU_WIDTH, Math.min(box.width, 420));
+    // меню целиком на экране: под полем, а если там мало места — над ним; не выше 360 точек
+    // (длинный список прокручивается внутри). Обрезанное краем окна меню не принимало
+    // бы нажатий — защита от подвоха засчитывает только полностью видимое
+    const below = innerHeight - box.bottom - 12;
+    const above = box.top - 12;
+    const wanted = Math.min(menu.wanted, 360);
+    const down = below >= wanted || below >= above;
+    const height = Math.max(40, Math.min(wanted, down ? below : above));
+    menu.frame.style.height = `${height}px`;
     const left = `${Math.min(Math.max(8, box.left), innerWidth - width - 8)}px`;
-    const top = `${box.bottom + 6}px`;
+    const top = `${down ? box.bottom + 6 : box.top - 6 - height}px`;
     const moved = menu.frame.style.left !== left || menu.frame.style.top !== top;
     menu.frame.style.width = `${width}px`;
     menu.frame.style.left = left;
@@ -119,11 +150,14 @@
   function toggleMenu(field) {
     if (menu && menu.field === field) return closeMenu();
     closeMenu();
+    // отметка для вставки пароля (fillInPage в background.js): заполнять эту форму, а не первую.
+    // Живёт в изолированном мире расширения — сайт её не видит
+    globalThis.__whokeyTarget = field;
     const frame = document.createElement("iframe");
     frame.src = chrome.runtime.getURL("menu.html");
     frame.style.height = "120px"; // точную высоту меню сообщит само (menu_size)
     root.append(frame);
-    menu = { frame, field };
+    menu = { frame, field, wanted: 120 };
     placeMenu();
   }
 
@@ -135,8 +169,12 @@
   // сообщения приходят только от самого расширения (страница их послать не может)
   chrome.runtime.onMessage.addListener((message) => {
     if (message.kind === "menu_close") closeMenu();
+    // visibility, а не display: фрейм не перезагружается, а нажатия сквозь спрятанный не попадают
+    if (message.kind === "menu_hide" && menu) menu.frame.style.visibility = "hidden";
+    if (message.kind === "menu_unhide" && menu) menu.frame.style.visibility = "visible";
     if (message.kind === "menu_size" && menu) {
-      menu.frame.style.height = `${Math.min(Math.max(Number(message.height) || 0, 40), 360)}px`;
+      menu.wanted = Math.min(Math.max(Number(message.height) || 0, 40), 360);
+      placeMenu();
     }
   });
 

@@ -134,19 +134,32 @@ async function fillInPage(expectedOrigin, login, password, auto) {
     // «изменено» — один раз, когда значение готово, а не на каждую букву
     if (done) el.dispatchEvent(new Event("change", { bubbles: true }));
   };
+  // Поле, у которого человек нажал на значок WhoKey (inline.js). Эта функция работает в том
+  // же изолированном от сайта мире расширения, что и inline.js, поэтому видит его отметку,
+  // а сайт — нет. Отметка одноразовая
+  const target = globalThis.__whokeyTarget;
+  globalThis.__whokeyTarget = null;
   // поле могло оказаться ниже экрана — прокрутим к нему, прежде чем проверять видимость
-  const firstPassword = document.querySelector("input[type=password]");
-  if (firstPassword) firstPassword.scrollIntoView({ block: "center" });
+  const focus = target && target.isConnected ? target : document.querySelector("input[type=password]");
+  if (focus) focus.scrollIntoView({ block: "center" });
   const inputs = [...document.querySelectorAll("input")].filter(visible);
   const passwords = inputs.filter((el) => el.type === "password");
   // заполняем сами (без выбора человека), только если поле пароля одно — иначе
   // непонятно, какое из них настоящее
   if (auto && passwords.length > 1) return { ok: false, reason: "ambiguous" };
-  const passwordField = passwords[0];
   const isLoginField = (el) => ["text", "email", "tel", ""].includes(el.type)
     || el.autocomplete === "username";
+  let passwordField = passwords[0];
+  if (target && inputs.includes(target)) {
+    // форма того поля, у которого нажали: пароль — это поле или первое поле пароля после него
+    const scope = target.form ? inputs.filter((el) => el.form === target.form) : inputs;
+    const after = scope.slice(scope.indexOf(target));
+    passwordField = target.type === "password" ? target : after.find((el) => el.type === "password");
+  }
   let loginField = null;
-  if (passwordField) {
+  if (target && !passwordField && isLoginField(target)) {
+    loginField = target; // вход в два шага: сейчас только логин
+  } else if (passwordField) {
     // логин — последнее подходящее поле ПЕРЕД паролем (в той же форме, если она есть)
     const scope = passwordField.form ? inputs.filter((el) => el.form === passwordField.form) : inputs;
     const before = scope.slice(0, scope.indexOf(passwordField));
@@ -253,13 +266,15 @@ function takeArm(tabId) {
   return until !== undefined && Date.now() <= until;
 }
 
-// Закрыть меню на вкладке. Ждём ответа: прежде чем заполнять, меню должно исчезнуть —
-// иначе проверка «поле видно человеку» в fillInPage решила бы, что поле чем-то закрыто
-async function closeMenu(tabId) {
+// Команда меню на вкладке: menu_close — закрыть, menu_hide / menu_unhide — спрятать и
+// показать снова. Ждём ответа: прежде чем заполнять, меню должно исчезнуть — иначе
+// проверка «поле видно человеку» в fillInPage решила бы, что поле чем-то закрыто
+async function menuCommand(tabId, kind) {
   try {
-    await chrome.tabs.sendMessage(tabId, { kind: "menu_close" }, { frameId: 0 });
+    await chrome.tabs.sendMessage(tabId, { kind }, { frameId: 0 });
   } catch (e) { /* страницу уже закрыли или перезагрузили */ }
 }
+const closeMenu = (tabId) => menuCommand(tabId, "menu_close");
 
 function fromMenu(message, sender, sendResponse) {
   // вкладку и адрес страницы сообщает сам браузер (sender), а не страница:
@@ -278,9 +293,15 @@ function fromMenu(message, sender, sendResponse) {
     return true;
   }
   if (message.kind === "menu_fill") {
-    closeMenu(tabId)
+    // на время вставки меню прячем; получилось — закрываем, нет — показываем снова
+    // с объяснением, и аккаунт можно выбрать ещё раз
+    menuCommand(tabId, "menu_hide")
       .then(() => fill(tabId, url, message.index, message.login))
-      .then(sendResponse);
+      .then(async (reply) => {
+        const done = reply.status === "filled" || reply.status === "filled_login";
+        if (!done) await menuCommand(tabId, "menu_unhide");
+        sendResponse(reply);
+      });
     return true;
   }
   if (message.kind === "menu_show") {

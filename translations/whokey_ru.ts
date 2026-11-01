@@ -166,6 +166,16 @@ Use it anyway?</source>
         <translation>Адрес сайта</translation>
     </message>
     <message>
+        <source>Replace password</source>
+        <translation>Заменить пароль</translation>
+    </message>
+    <message>
+        <source>Replace the saved password with a new one?
+After saving, the old password cannot be recovered.</source>
+        <translation>Заменить сохранённый пароль новым?
+После сохранения старый пароль не вернуть.</translation>
+    </message>
+    <message>
         <source>Name is required.</source>
         <translation>Укажите название.</translation>
     </message>

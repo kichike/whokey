@@ -56,6 +56,9 @@
   "not_found": {
     "message": "Entry not found — it may have just changed. Open the popup again."
   },
+  "menu_not_found": {
+    "message": "Entry not found — it may have just changed. Choose the account again."
+  },
   "error": {
     "message": "Something went wrong. Try again."
   },

@@ -144,6 +144,9 @@ class Controller:
         window = self._new_main(vault)
         if self.bridge is not None:
             self.bridge.window = window  # окошки расширения — поверх нового окна
+        # язык меняли в «Настройках» — они открываются снова, уже на новом языке,
+        # а не закрываются посреди работы
+        QTimer.singleShot(0, window.open_settings)
 
     def stop_bridge(self):
         if self.bridge is not None:

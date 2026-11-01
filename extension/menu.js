@@ -41,7 +41,7 @@ function trustedClick(event) {
 // высоту меню знает только оно само — сообщаем странице, какой сделать фрейм
 function resize() {
   // высота содержимого, а не документа: документ не бывает ниже самого фрейма
-  send({ kind: "menu_size", height: Math.ceil($("menu").getBoundingClientRect().height) });
+  send({ kind: "menu_size", height: Math.ceil($("menu").scrollHeight) });
 }
 
 const TEXTS = {
@@ -129,7 +129,10 @@ async function siteIcon(avatar) {
 
 function showResult(reply) {
   const [key, kind] = TEXTS[reply.status] || ["error", "bad"];
-  status(msg(key, pageHost), kind);
+  // «откройте окошко ещё раз» — про окошко на панели; в меню аккаунт выбирают заново
+  status(msg(key === "not_found" ? "menu_not_found" : key, pageHost), kind);
+  // не получилось — аккаунты снова можно выбрать («нажмите ещё раз»)
+  document.querySelectorAll("#items button").forEach((b) => (b.disabled = false));
   if (reply.status === "filled" || reply.status === "filled_login") setTimeout(() => send({ kind: "menu_close" }), 600);
 }
 

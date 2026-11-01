@@ -343,11 +343,15 @@ def _message(parent, title, text, symbol, color):
     return box
 
 
-def ask_yes(parent, title, text):
+def ask_yes(parent, title, text, danger=None):
+    """Вопрос «Да / Нет». danger — надпись красной кнопки для необратимого действия
+    («Удалить»): тогда кнопки «Отмена» и «Удалить» — сразу понятно, что произойдёт."""
     box = _message(parent, title, text, "?", theme.NEON)
     # свои кнопки: стандартные Yes/No Qt без перевода показал бы по-английски
-    no = box.addButton(tr("No"), QMessageBox.RejectRole)
-    yes = box.addButton(tr("Yes"), QMessageBox.AcceptRole)
+    no = box.addButton(tr("Cancel") if danger else tr("No"), QMessageBox.RejectRole)
+    yes = box.addButton(danger or tr("Yes"), QMessageBox.AcceptRole)
+    if danger:
+        theme.kind(yes, "danger")
     box.setDefaultButton(no)  # Enter по ошибке не удалит запись
     box.exec()
     return box.clickedButton() is yes

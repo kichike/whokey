@@ -192,6 +192,9 @@ class MainWindow(QMainWindow):
     def _table_card(self):
         """Таблица в «карточке» с неоновым ореолом; если записей нет — подсказка вместо неё."""
         self.table = QTableWidget(0, len(COLUMNS))
+        # Tab — к следующему элементу окна, а не по ячейкам (иначе из таблицы не выйти)
+        self.table.setTabKeyNavigation(False)
+        self.table.itemSelectionChanged.connect(self._remember_choice)
         self.table.setHorizontalHeaderLabels(
             [tr("Name"), tr("Login"), tr("Password"), tr("Note"), tr("Updated")])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -259,10 +262,19 @@ class MainWindow(QMainWindow):
             return None
         return self.table.item(rows[0].row(), 0).data(Qt.UserRole)
 
+    _chosen = None  # последняя выбранная запись — чтобы выделение пережило поиск без результатов
+
+    def _remember_choice(self):
+        index = self.selected_index()
+        if index is not None:
+            self._chosen = index
+
     def refresh(self, select=None):
         """Перерисовывает таблицу. select — номер записи, которую выделить."""
         if select is None:
             select = self.selected_index()
+        if select is None:
+            select = self._chosen
         query = self.search.text().strip()
         indexes = self.vault.search(query) if query else range(len(self.vault.entries))
 
@@ -355,11 +367,12 @@ class MainWindow(QMainWindow):
         # без логина — без пустых скобок «()»
         question = (tr("Delete \"{site}\" ({login})?\nThis cannot be undone.").format(site=entry["site"], login=entry["login"]) if entry["login"]
                     else tr("Delete \"{site}\"?\nThis cannot be undone.").format(site=entry["site"]))
-        if not ask_yes(self, tr("Delete entry"), question):
+        if not ask_yes(self, tr("Delete entry"), question, danger=tr("Delete")):
             return
         if self._save(lambda: self.vault.delete(index)):
             # номера записей после удалённой сдвинулись — показанный пароль прячем
             self.revealed = None
+            self._chosen = None
             self.refresh(select=-1)
 
     def toggle_reveal(self):
@@ -470,9 +483,14 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(QUrl(link))
 
     def open_settings(self):
+        if self.findChild(SettingsDialog):
+            return  # уже открыты (⌘, нажали второй раз)
         dialog = SettingsDialog(self, self.vault, self.change_master)
         dialog.language_chosen.connect(self.language_changed)
-        dialog.exec()
+        # open(), а не exec(): окно поверх главного, но не останавливает программу —
+        # так его можно открыть заново сразу после смены языка (app.change_language)
+        dialog.setAttribute(Qt.WA_DeleteOnClose)
+        dialog.open()
 
     def change_master(self):
         if not ChangeMasterDialog(self, self.vault).exec():

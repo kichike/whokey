@@ -79,6 +79,13 @@ class EntryDialog(QDialog):
         self._initial = self.values(normalize=False)  # чтобы при закрытии понять, было ли что-то изменено
 
     def _on_generated(self, password, bits):
+        # у сохранённой записи старый пароль после «Сохранить» пропал бы насовсем — спрашиваем
+        # (один раз: дальше человек уже знает, что заменяет)
+        saved = getattr(self, "_initial", {}).get("password")
+        if saved and self.password.text() == saved and not ask_yes(
+                self, tr("Replace password"),
+                tr("Replace the saved password with a new one?\nAfter saving, the old password cannot be recovered.")):
+            return
         self._generated = (password, bits)
         self.password.setText(password)
 

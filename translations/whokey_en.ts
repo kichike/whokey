@@ -155,6 +155,15 @@ Use it anyway?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Replace password</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Replace the saved password with a new one?
+After saving, the old password cannot be recovered.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Name is required.</source>
         <translation type="unfinished"></translation>
     </message>

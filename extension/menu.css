@@ -8,12 +8,13 @@
   --bad: #ff8a95;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; background: var(--bg); overflow: hidden; }
+html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
 body {
   font: 13px/1.35 "MesloLGS Nerd Font", "MesloLGS NF", Menlo, Consolas, monospace;
   color: var(--text);
 }
-main { padding: 6px; }
+/* меню — во весь фрейм; длинный список прокручивается внутри */
+main { padding: 6px; height: 100%; overflow-y: auto; }
 [hidden] { display: none !important; }
 #status { margin: 6px 8px; color: var(--muted); white-space: pre-line; }
 #status:empty { display: none; }
