@@ -32,7 +32,9 @@ button:hover, button:focus-visible { outline: none; background: rgba(202, 167, 2
   display: grid; place-items: center; font-weight: 800; color: #1a1024;
   background: linear-gradient(160deg, #ecd2ff, #a77fd6);
 }
-.avatar.icon { background: #fff; padding: 4px; }   /* лого сайта на светлой плашке, как в Bitwarden */
+.avatar.icon { padding: 4px; }
+.avatar.dark { background: #fff; }      /* тёмное лого — на белой плашке, как в Bitwarden */
+.avatar.light { background: #2c2536; }  /* светлое (белый кот GitHub) — на тёмной */
 .avatar img { width: 22px; height: 22px; display: block; }
 .text { min-width: 0; }
 .site, .login { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

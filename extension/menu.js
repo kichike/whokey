@@ -72,6 +72,23 @@ function pixels(img) {
   return context.getImageData(0, 0, 32, 32).data.join(",");
 }
 
+// Светлый значок (белый кот GitHub в тёмной теме) на белой плашке не виден —
+// для него плашка тёмная. Светлый — если средняя яркость видимых точек высокая
+function isLight(img) {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 32;
+  const context = canvas.getContext("2d");
+  context.drawImage(img, 0, 0, 32, 32);
+  const data = context.getImageData(0, 0, 32, 32).data;
+  let sum = 0, count = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 128) continue; // прозрачные точки не считаем
+    sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    count++;
+  }
+  return count > 0 && sum / count > 170;
+}
+
 let iconPromise = null; // один значок на всё меню: все аккаунты в нём — с одного сайта
 
 function loadSiteIcon() {
@@ -83,7 +100,7 @@ function loadSiteIcon() {
     // сначала значок этой страницы, потом — главной страницы сайта
     for (const page of [pageUrl, new URL(pageUrl).origin + "/"]) {
       const icon = await favicon(page);
-      if (!isGlobe(icon)) return icon.src;
+      if (!isGlobe(icon)) return { src: icon.src, light: isLight(icon) };
     }
     return null;
   })();
@@ -91,13 +108,13 @@ function loadSiteIcon() {
 }
 
 async function siteIcon(avatar) {
-  const src = await loadSiteIcon();
-  if (!src) return;
+  const icon = await loadSiteIcon();
+  if (!icon) return;
   const img = new Image(32, 32);
   img.alt = "";
-  img.src = src;
+  img.src = icon.src;
   avatar.textContent = "";
-  avatar.classList.add("icon");
+  avatar.classList.add("icon", icon.light ? "light" : "dark");
   avatar.append(img);
 }
 

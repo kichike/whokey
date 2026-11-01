@@ -52,9 +52,14 @@
         || before.filter((x) => ["text", "email", "tel"].includes(x.type)).pop();
       if (login) found.add(login);
     });
-    // вход в два шага: сначала только логин (поле с autocomplete="username" или email)
-    if (!found.size) {
-      const login = inputs.find((x) => x.autocomplete === "username" || x.autocomplete === "email");
+    // вход в два шага: сначала только логин или почта (GeoGuessr, Google, Microsoft).
+    // Поле почты бывает и в подписке на рассылку или в комментариях — поэтому только
+    // на страницах, где полей ввода мало, как на странице входа
+    const textual = inputs.filter((x) => ["text", "email", "tel", ""].includes(x.type));
+    if (!found.size && textual.length <= 3) {
+      const loginLike = (x) => x.autocomplete === "username" || x.autocomplete === "email" || x.type === "email"
+        || /e-?mail|login|user/i.test(`${x.name} ${x.id}`);
+      const login = textual.find(loginLike);
       if (login) found.add(login);
     }
     return found;

@@ -153,7 +153,8 @@ async function fillInPage(expectedOrigin, login, password, auto) {
     loginField = before.filter((el) => el.autocomplete === "username").pop() || before.filter(isLoginField).pop();
   } else {
     // вход в два шага (сначала только логин): поле логина без поля пароля
-    loginField = inputs.find((el) => el.autocomplete === "username" || el.type === "email") || null;
+    loginField = inputs.find((el) => el.autocomplete === "username" || el.autocomplete === "email" || el.type === "email")
+      || inputs.find((el) => isLoginField(el) && /e-?mail|login|user/i.test(`${el.name} ${el.id}`)) || null;
   }
   if (!passwordField && !loginField) return { ok: false, reason: "no_field" };
 
