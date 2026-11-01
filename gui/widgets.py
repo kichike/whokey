@@ -121,35 +121,46 @@ def verdict(bits):
 
 
 class RoundedRowDelegate(QStyledItemDelegate):
-    """Выделенная строка таблицы — одной скруглённой плашкой, а не прямоугольником.
+    """Строки таблицы — скруглёнными плашками, а не прямоугольниками: выделенная —
+    лавандовой, а каждая вторая — едва заметной светлой («зебра»), чтобы строки
+    не сливались перед глазами.
 
-    Qt красит выделение в каждой ячейке отдельно и скруглить может только
-    ячейку, поэтому плашку на всю строку рисуем сами: каждая ячейка рисует
-    свой кусок общей скруглённой плашки (обрезанный по границам ячейки).
+    Qt красит фон в каждой ячейке отдельно и скруглить может только ячейку,
+    поэтому плашку на всю строку рисуем сами: каждая ячейка рисует свой кусок
+    общей скруглённой плашки (обрезанный по границам ячейки).
     """
 
     RADIUS = 10
     INSET = 4  # отступ плашки от краёв таблицы, чтобы были видны скругления
+    STRIPE_ALPHA = 11  # яркость «зебры»: заметно глазу, но не спорит с выделением
+
+    def _plate(self, painter, option, color):
+        viewport = option.widget.viewport() if option.widget else None
+        width = viewport.width() if viewport else option.rect.right()
+        row = QRectF(self.INSET, option.rect.top() + 1,
+                     width - 2 * self.INSET, option.rect.height() - 2)
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setClipRect(option.rect)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(color)
+        painter.drawRoundedRect(row, self.RADIUS, self.RADIUS)
+        painter.restore()
 
     def paint(self, painter, option, index):
         if option.state & QStyle.State_Selected:
-            viewport = option.widget.viewport() if option.widget else None
-            width = viewport.width() if viewport else option.rect.right()
-            row = QRectF(self.INSET, option.rect.top() + 1,
-                         width - 2 * self.INSET, option.rect.height() - 2)
             fill = QColor(theme.ACC)
             fill.setAlpha(115)
-            painter.save()
-            painter.setRenderHint(QPainter.Antialiasing)
-            painter.setClipRect(option.rect)
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(fill)
-            painter.drawRoundedRect(row, self.RADIUS, self.RADIUS)
-            painter.restore()
+            self._plate(painter, option, fill)
             # остальное (текст) — как обычно, но без стандартной прямоугольной заливки
             option = QStyleOptionViewItem(option)
             option.state &= ~QStyle.State_Selected
             self._selected = True  # для initStyleOption: текст выделенной строки — белый
+        elif index.row() % 2:
+            # после сортировки номер строки — её место на экране, так что полосы не скачут
+            stripe = QColor(theme.WHITE)
+            stripe.setAlpha(self.STRIPE_ALPHA)
+            self._plate(painter, option, stripe)
         super().paint(painter, option, index)
         self._selected = False
 

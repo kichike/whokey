@@ -121,6 +121,8 @@ class MainWindow(QMainWindow):
         self._menus()
 
         self.refresh()
+        # после входа — сразу в поиск (иначе фокус доставался первой кнопке, «Генератору»)
+        self.search.setFocus()
 
     def _menus(self):
         """Строка меню: все действия и их клавиши в одном месте (на Mac — вверху экрана)."""
