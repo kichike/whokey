@@ -91,5 +91,35 @@
         "example": "Ctrl+Shift+L"
       }
     }
+  },
+  "generate_password": {
+    "message": "🔑 Generate a strong password"
+  },
+  "generated": {
+    "message": "Password filled in. WhoKey opened a new entry with it — check it and press Save."
+  },
+  "hide_on_site": {
+    "message": "Don't show on this site"
+  },
+  "options_title": {
+    "message": "WhoKey extension settings"
+  },
+  "options_inline": {
+    "message": "Show the WhoKey icon in login fields"
+  },
+  "options_inline_hint": {
+    "message": "Turned off — fill from the WhoKey button on the browser toolbar."
+  },
+  "options_off_sites": {
+    "message": "Sites where the icon is hidden"
+  },
+  "options_none": {
+    "message": "None."
+  },
+  "options_show_again": {
+    "message": "Show again"
+  },
+  "options_link": {
+    "message": "Extension settings"
   }
 }

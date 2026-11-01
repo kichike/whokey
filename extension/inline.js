@@ -71,6 +71,17 @@
   // поверх поля часто лежит «плавающая» подпись — поле при этом видно
   const isFieldOrLabel = (el, field) => isField(el, field) || (el && el.closest("label") && el.closest("label").control === field);
 
+  // поле нового пароля (регистрация, смена пароля) — в меню будет «Сгенерировать пароль»
+  function isNewPassword(field) {
+    if (field.type !== "password") return false;
+    const mark = (field.autocomplete || "").toLowerCase();
+    if (mark === "new-password") return true;
+    if (mark === "current-password") return false;
+    const passwords = [...(field.form || document).querySelectorAll("input[type=password]")].filter(visible);
+    // пароль + повтор — регистрация; «старый, новый, повтор» — новые все, кроме первого
+    return passwords.length === 2 || (passwords.length >= 3 && passwords.indexOf(field) > 0);
+  }
+
   function place(field, icon) {
     const box = field.getBoundingClientRect();
     const y = box.top + box.height / 2;
@@ -135,7 +146,8 @@
           event.stopPropagation();
           if (!event.isTrusted) return;
           // сначала «человек нажал» (фоновая часть без этого меню не откроет), потом меню
-          chrome.runtime.sendMessage({ kind: "menu_armed" }).catch(() => {}).finally(() => toggleMenu(field));
+          chrome.runtime.sendMessage({ kind: "menu_armed", newPassword: isNewPassword(field) })
+            .catch(() => {}).finally(() => toggleMenu(field));
         });
         root.append(icon);
         icons.set(field, icon);
@@ -169,6 +181,7 @@
   // сообщения приходят только от самого расширения (страница их послать не может)
   chrome.runtime.onMessage.addListener((message) => {
     if (message.kind === "menu_close") closeMenu();
+    if (message.kind === "inline_off") stop(); // «Не показывать на этом сайте»
     // visibility, а не display: фрейм не перезагружается, а нажатия сквозь спрятанный не попадают
     if (message.kind === "menu_hide" && menu) menu.frame.style.visibility = "hidden";
     if (message.kind === "menu_unhide" && menu) menu.frame.style.visibility = "visible";
@@ -195,13 +208,35 @@
   // пересчитываем при изменениях страницы, но не чаще, чем раз в кадр
   let scheduled = false;
   const later = () => {
-    if (scheduled) return;
+    if (scheduled || stopped) return;
     scheduled = true;
     requestAnimationFrame(() => { scheduled = false; update(); });
   };
-  new MutationObserver(later).observe(document.documentElement, { childList: true, subtree: true, attributes: true });
-  addEventListener("scroll", later, true);
-  addEventListener("resize", later);
-  setInterval(later, 1000); // на случай анимаций, которые не меняют DOM
-  update();
+  const observer = new MutationObserver(later);
+  let timer = null;
+  let stopped = false;
+
+  function start() {
+    observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
+    addEventListener("scroll", later, true);
+    addEventListener("resize", later);
+    timer = setInterval(later, 1000); // на случай анимаций, которые не меняют DOM
+    update();
+  }
+
+  function stop() {
+    stopped = true;
+    observer.disconnect();
+    removeEventListener("scroll", later, true);
+    removeEventListener("resize", later);
+    clearInterval(timer);
+    closeMenu();
+    host.remove();
+    icons.clear();
+  }
+
+  // значок выключен в настройках расширения (везде или на этом сайте) — ничего не рисуем
+  chrome.runtime.sendMessage({ kind: "inline_state" })
+    .then((reply) => { if (reply && reply.show && !stopped) start(); })
+    .catch(() => {});
 })();

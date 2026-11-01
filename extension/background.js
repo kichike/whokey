@@ -7,6 +7,11 @@
 
 const HOST = "ru.edu.whokey";
 
+// Ключ сопряжения с WhoKey лежит в chrome.storage.local. По умолчанию его могут читать и
+// скрипты расширения на страницах сайтов (inline.js) — им он не нужен, а взломанная
+// вкладка могла бы его достать. Оставляем доступ только страницам самого расширения
+chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" }).catch(() => {});
+
 // --- соединение с мостом ---
 
 let port = null;
@@ -255,15 +260,86 @@ function isMenu(url) {
 const ARM_MS = 3000;
 const armed = new Map(); // вкладка -> до какого момента можно открыть меню
 
-function arm(sender) {
+function arm(sender, newPassword) {
   if (sender.frameId !== 0 || sender.url.startsWith("chrome-extension://")) return;
-  armed.set(sender.tab.id, Date.now() + ARM_MS);
+  armed.set(sender.tab.id, { until: Date.now() + ARM_MS, newPassword: newPassword === true });
 }
 
 function takeArm(tabId) {
-  const until = armed.get(tabId);
+  const record = armed.get(tabId);
   armed.delete(tabId);
-  return until !== undefined && Date.now() <= until;
+  return record !== undefined && Date.now() <= record.until ? record : null;
+}
+
+// --- где показывать значок (настройки расширения, options.html) ---
+
+async function inlineAllowed(url) {
+  const { inlineEnabled = true, inlineOff = [] } = await chrome.storage.local.get(["inlineEnabled", "inlineOff"]);
+  try {
+    return inlineEnabled && !inlineOff.includes(new URL(url).hostname);
+  } catch (e) {
+    return false;
+  }
+}
+
+async function hideOnSite(tabId, url) {
+  const { inlineOff = [] } = await chrome.storage.local.get("inlineOff");
+  const host = new URL(url).hostname;
+  if (!inlineOff.includes(host)) await chrome.storage.local.set({ inlineOff: [...inlineOff, host].sort() });
+  await menuCommand(tabId, "inline_off");
+}
+
+// Эта функция выполняется ВНУТРИ страницы: вписывает сгенерированный пароль в поля
+// нового пароля той формы, у которой нажали на значок (и в «Повторите пароль»).
+// Возвращает логин из той же формы — чтобы WhoKey открыл запись уже с ним
+function fillNewPassword(expectedOrigin, password) {
+  const target = globalThis.__whokeyTarget;
+  globalThis.__whokeyTarget = null;
+  if (location.origin !== expectedOrigin) return { ok: false, reason: "moved" };
+  if (!target || !target.isConnected || target.type !== "password") return { ok: false, reason: "no_field" };
+  const shown = (el) => !el.disabled && !el.readOnly
+    && (!el.checkVisibility || el.checkVisibility({ opacityProperty: true, visibilityProperty: true }))
+    && el.getBoundingClientRect().width >= 8;
+  const scope = [...(target.form || document).querySelectorAll("input")].filter(shown);
+  const passwords = scope.filter((el) => el.type === "password");
+  const marked = passwords.filter((el) => (el.autocomplete || "").toLowerCase() === "new-password");
+  // помеченные сайтом «новый пароль»; иначе пароль + повтор; иначе это поле и следующие
+  // (в «старый, новый, повтор» старый не трогаем)
+  const fields = marked.length ? marked
+    : passwords.length === 2 ? passwords : passwords.slice(passwords.indexOf(target));
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+  for (const el of fields) {
+    el.focus();
+    setter.call(el, password);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  const before = scope.slice(0, scope.indexOf(fields[0]));
+  const login = before.filter((el) => el.autocomplete === "username").pop()
+    || before.filter((el) => ["text", "email", "tel", ""].includes(el.type)).pop();
+  return { ok: true, login: login ? login.value.trim().slice(0, 256) : "" };
+}
+
+async function generate(tabId, url) {
+  const reply = await api({ type: "generate", url });
+  if (reply.status !== "ok") return reply;
+  await menuCommand(tabId, "menu_hide");
+  let result;
+  try {
+    [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId }, func: fillNewPassword, args: [new URL(url).origin, reply.password],
+    });
+  } catch (e) {
+    result = { ok: false, reason: "moved" };
+  }
+  if (!result || !result.ok) {
+    await menuCommand(tabId, "menu_unhide");
+    return { status: (result && result.reason) || "no_field" };
+  }
+  // пароль уже в форме — сразу сохраняем его в WhoKey (окно новой записи), чтобы не потерять
+  await closeMenu(tabId);
+  const saved = await api({ type: "show", url, login: result.login, password: reply.password });
+  return { status: saved.status === "ok" ? "generated" : saved.status };
 }
 
 // Команда меню на вкладке: menu_close — закрыть, menu_hide / menu_unhide — спрятать и
@@ -282,14 +358,24 @@ function fromMenu(message, sender, sendResponse) {
   const tabId = sender.tab.id;
   const url = sender.tab.url;
   if (message.kind === "menu_open") {
-    if (!takeArm(tabId)) {
+    const ticket = takeArm(tabId);
+    if (!ticket) {
       sendResponse({ status: "error" }); // меню не после нажатия на значок — не открываем
       return false;
     }
     const page = new URL(url);
     // адрес страницы целиком — только для значка сайта: браузер помнит значки по страницам.
     // Меню — страница самого расширения, сайт его не прочитает
-    open(tabId, url, true).then((reply) => sendResponse({ ...reply, host: page.hostname, page: page.origin + page.pathname }));
+    open(tabId, url, true).then((reply) => sendResponse({
+      ...reply, host: page.hostname, page: page.origin + page.pathname, newPassword: ticket.newPassword }));
+    return true;
+  }
+  if (message.kind === "menu_generate") {
+    generate(tabId, url).then(sendResponse);
+    return true;
+  }
+  if (message.kind === "menu_hide_site") {
+    hideOnSite(tabId, url).then(() => sendResponse({ status: "ok" }));
     return true;
   }
   if (message.kind === "menu_fill") {
@@ -322,9 +408,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (sender.tab) {
     if (!sender.url) return false;
     // значок на странице (inline.js) сообщает только «человек нажал на меня»
+    // и спрашивает, показываться ли на этом сайте
     if (message.kind === "menu_armed") {
-      arm(sender);
+      arm(sender, message.newPassword);
       return false;
+    }
+    if (message.kind === "inline_state" && sender.frameId === 0 && !isMenu(sender.url)) {
+      inlineAllowed(sender.tab.url).then((show) => sendResponse({ show }));
+      return true;
     }
     // всё остальное с вкладки — только от меню (menu.html внутри страницы)
     if (!isMenu(sender.url)) return false;

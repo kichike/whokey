@@ -111,6 +111,8 @@ async function main() {
   document.documentElement.lang = chrome.i18n.getUILanguage();
   shortcut = await loadShortcut();
   $("hint").textContent = msg("hint", shortcut);
+  $("options").textContent = msg("options_link");
+  $("options").addEventListener("click", (event) => { event.preventDefault(); chrome.runtime.openOptionsPage(); });
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const url = tab && tab.url ? tab.url : "";
   let host = "";

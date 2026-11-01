@@ -42,3 +42,5 @@ button:hover, button:focus-visible { outline: none; background: rgba(202, 167, 2
 .site { font-weight: 700; }
 .login { color: var(--muted); font-size: 12px; }
 .wide { justify-content: center; font-weight: 700; color: var(--neon); }
+#generate { margin-bottom: 4px; }
+.link { justify-content: center; padding: 6px; color: var(--muted); font-size: 11px; }

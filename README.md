@@ -34,6 +34,8 @@ WhoKey keeps your logins in one encrypted file that only opens with your master 
 - **Touch ID** on Mac: unlock WhoKey with your fingerprint (turn it on or off in **Settings**, ⌘,).
 - **Auto-lock** when the screen is locked, the computer goes to sleep or WhoKey is not used for a while (10 minutes by default); ⌘L / Ctrl+L locks it right away.
 - **Import and export CSV** (File menu): move your passwords from a browser, Bitwarden, KeePassXC or 1Password and back. The CSV file is not encrypted — delete it after the move.
+- **Encrypted copy** (File → Save encrypted copy): the vault file itself, safe to keep on a USB stick or in the cloud — it opens only with your master password.
+- **Caps Lock warning** under master password fields.
 - **English and Russian** interface.
 
 By default the vault lives in `~/Library/Application Support/EduPasswords/vault.dat` on macOS (not synced to iCloud) and in `%APPDATA%\EduPasswords\vault.dat` on Windows. You can choose another file in the login window.
@@ -63,6 +65,8 @@ Fills the login and password on a website with one click or **⌘⇧L** (**Ctrl+
 3. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the unzipped folder.
 4. In WhoKey, set **Website address** (`github.com`) in the entries you want to fill.
 5. On a login page, click the WhoKey key icon inside the password field and choose an account (or click the WhoKey icon in the toolbar). The first time, type into WhoKey the 4-digit code shown by the extension.
+6. On a sign-up or change-password form, the menu offers **Generate a strong password**: WhoKey creates it, the extension fills it in, and WhoKey opens a new entry with it so it is not lost — check it and press Save.
+7. Don't want the icon somewhere? **Don't show on this site** in the menu, or turn it off everywhere in the extension settings (link in the toolbar popup).
 
 How it protects your passwords:
 - A password is given only to its own website and its subdomains: an entry for `mail.ru` fills on `e.mail.ru`, but never on `mail.ru.evil.com` or `mai1.ru`. Only on https pages.
@@ -114,6 +118,8 @@ WhoKey хранит логины и пароли в одном зашифров�
 - **Touch ID** на Mac: WhoKey открывается по отпечатку пальца (включается и выключается в **Настройках**, ⌘,).
 - **Автоблокировка** при блокировке экрана, сне компьютера и если WhoKey долго не трогают (по умолчанию 10 минут); ⌘L / Ctrl+L — заблокировать сразу.
 - **Импорт и экспорт CSV** (меню «Файл»): перенос паролей из браузера, Bitwarden, KeePassXC или 1Password и обратно. CSV-файл не зашифрован — удалите его после переноса.
+- **Зашифрованная копия** (Файл → Сохранить зашифрованную копию): сам файл хранилища, его можно держать на флешке или в облаке — откроется только мастер-паролем.
+- **Предупреждение о Caps Lock** под полями мастер-пароля.
 - Интерфейс на **русском и английском**.
 
 По умолчанию хранилище лежит в `~/Library/Application Support/EduPasswords/vault.dat` на macOS (эта папка не синхронизируется с iCloud) и в `%APPDATA%\EduPasswords\vault.dat` на Windows. Другой файл можно выбрать в окне входа.
@@ -143,6 +149,8 @@ WhoKey хранит логины и пароли в одном зашифров�
 3. Откройте `chrome://extensions`, включите **Режим разработчика**, нажмите **Загрузить распакованное** и выберите распакованную папку.
 4. В WhoKey укажите **Адрес сайта** (`github.com`) в записях, которые хотите заполнять.
 5. На странице входа нажмите значок-ключ WhoKey в поле пароля и выберите аккаунт (или нажмите иконку WhoKey на панели браузера). В первый раз введите в WhoKey 4-значный код, который покажет расширение.
+6. На странице регистрации или смены пароля в меню есть **Сгенерировать надёжный пароль**: WhoKey создаёт пароль, расширение вписывает его, а WhoKey сразу открывает с ним новую запись, чтобы он не потерялся, — проверьте её и нажмите «Сохранить».
+7. Значок мешает? В меню есть **Не показывать на этом сайте**, а выключить его везде можно в настройках расширения (ссылка в окошке на панели браузера).
 
 Как защищены пароли:
 - Пароль выдаётся только своему сайту и его поддоменам: запись `mail.ru` заполняется на `e.mail.ru`, но никогда — на `mail.ru.evil.com` или `mai1.ru`. Только на страницах с https.

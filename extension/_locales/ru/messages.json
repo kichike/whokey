@@ -91,5 +91,35 @@
         "example": "Ctrl+Shift+L"
       }
     }
+  },
+  "generate_password": {
+    "message": "🔑 Сгенерировать надёжный пароль"
+  },
+  "generated": {
+    "message": "Пароль вписан. WhoKey открыл с ним новую запись — проверьте её и нажмите «Сохранить»."
+  },
+  "hide_on_site": {
+    "message": "Не показывать на этом сайте"
+  },
+  "options_title": {
+    "message": "Настройки расширения WhoKey"
+  },
+  "options_inline": {
+    "message": "Показывать значок WhoKey в полях входа"
+  },
+  "options_inline_hint": {
+    "message": "Выключено — заполняйте кнопкой WhoKey на панели браузера."
+  },
+  "options_off_sites": {
+    "message": "Сайты, где значок скрыт"
+  },
+  "options_none": {
+    "message": "Нет."
+  },
+  "options_show_again": {
+    "message": "Показывать снова"
+  },
+  "options_link": {
+    "message": "Настройки расширения"
   }
 }

@@ -50,6 +50,7 @@ const TEXTS = {
   not_installed: ["not_installed", "bad"], bridge_closed: ["bridge_closed", "bad"], bad_page: ["bad_page", "bad"],
   not_found: ["not_found", "bad"], error: ["error", "bad"], busy: ["busy", "bad"], timeout: ["timeout", "bad"],
   fake_app: ["fake_app", "bad"], ambiguous: ["choose", ""], cancelled: ["connecting", ""],
+  generated: ["generated", "good"],
 };
 
 function status(text, kind = "") {
@@ -215,8 +216,36 @@ async function main() {
   const reply = await send({ kind: "menu_open" });
   pageHost = reply.host || "";
   pageUrl = reply.page || "";
-  if (reply.status === "ok") showItems(reply.items, pageHost);
-  else showResult(reply);
+  if (reply.status !== "ok") return showResult(reply);
+  if (reply.newPassword) showGenerate();
+  showItems(reply.items, pageHost);
+  showHideSite();
+}
+
+// форма регистрации или смены пароля: новый пароль генерирует WhoKey, расширение
+// вписывает его в форму, а WhoKey сразу открывает новую запись — пароль не потеряется
+function showGenerate() {
+  const button = $("generate");
+  button.textContent = msg("generate_password");
+  button.hidden = false;
+  button.onclick = async (event) => {
+    if (!trustedClick(event)) return;
+    button.disabled = true;
+    status(msg("filling"));
+    const reply = await send({ kind: "menu_generate" });
+    button.disabled = false;
+    showResult(reply);
+  };
+}
+
+// «Не показывать на этом сайте» — значок пропадает сразу; вернуть — в настройках расширения
+function showHideSite() {
+  const button = $("hide_site");
+  button.textContent = msg("hide_on_site");
+  button.hidden = false;
+  button.onclick = (event) => {
+    if (trustedClick(event)) send({ kind: "menu_hide_site" });
+  };
 }
 
 main();
