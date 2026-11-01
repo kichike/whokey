@@ -1,7 +1,9 @@
 """Общие элементы окон: поле пароля с «глазом», шкала надёжности, генератор,
 и короткие функции для стандартных окошек-вопросов."""
 
+import ctypes
 import math
+import sys
 
 from PySide6.QtCore import QElapsedTimer, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QIcon, QKeySequence, QLinearGradient, QPainter, QPalette
@@ -54,12 +56,27 @@ class SecretEdit(QLineEdit):
         menu.exec(event.globalPos())
 
 
+def caps_lock_on():
+    """Включён ли Caps Lock (macOS и Windows; на остальных — «не знаем», False)."""
+    try:
+        if sys.platform == "darwin":
+            from AppKit import NSEvent  # PyObjC, ставится вместе с Touch ID (requirements.txt)
+            return bool(NSEvent.modifierFlags() & (1 << 16))  # NSEventModifierFlagCapsLock
+        if sys.platform == "win32":
+            return bool(ctypes.windll.user32.GetKeyState(0x14) & 1)  # VK_CAPITAL
+    except Exception:  # нет PyObjC или вызов не удался — просто без подсказки
+        pass
+    return False
+
+
 class PasswordField(QWidget):
     """Поле для пароля: символы скрыты, кнопка-«глаз» показывает их на 15 секунд."""
 
     textChanged = Signal(str)
 
-    def __init__(self, placeholder="", parent=None, copy_password=None):
+    def __init__(self, placeholder="", parent=None, copy_password=None, master=False):
+        """master=True — поле мастер-пароля: под ним предупреждение, если включён Caps Lock
+        (неверный мастер-пароль из-за заглавных букв — самая частая ошибка)."""
         super().__init__(parent)
         self.edit = SecretEdit(copy_password)
         self.edit.setEchoMode(QLineEdit.Password)
@@ -79,10 +96,38 @@ class PasswordField(QWidget):
         self.hide_timer.setSingleShot(True)
         self.hide_timer.timeout.connect(lambda: self.eye.setChecked(False))
 
-        row = QHBoxLayout(self)
-        row.setContentsMargins(0, 0, 0, 0)
+        column = QVBoxLayout(self)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(4)
+        row = QHBoxLayout()
         row.addWidget(self.edit)
         row.addWidget(self.eye)
+        column.addLayout(row)
+        self.caps = theme.role(QLabel(tr("Caps Lock is on")), "error")
+        self.caps.hide()
+        column.addWidget(self.caps)
+        if master:
+            # Qt не сообщает о Caps Lock сам — пока поле в фокусе, проверяем пару раз в секунду
+            self.caps_timer = QTimer(self)
+            self.caps_timer.timeout.connect(self._check_caps)
+            self.caps_timer.start(300)
+
+    def _check_caps(self):
+        shown = self.edit.hasFocus() and caps_lock_on()
+        if shown != self.caps.isVisible():
+            self.caps.setVisible(shown)
+            QTimer.singleShot(0, self._fit_window)
+
+    def _fit_window(self):
+        """Строка про Caps Lock добавилась — окно подрастает, а не сплющивает поля."""
+        window = self.window()
+        layout = window.layout()
+        if layout is None:
+            return
+        need = layout.totalHeightForWidth(window.width()) if layout.hasHeightForWidth() else layout.totalSizeHint().height()
+        if window.height() < need:
+            window.setMinimumHeight(need)
+            window.resize(window.width(), need)
 
     def _toggle(self, shown):
         self.edit.setEchoMode(QLineEdit.Normal if shown else QLineEdit.Password)

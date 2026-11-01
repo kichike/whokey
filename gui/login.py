@@ -140,7 +140,7 @@ class LoginWindow(QWidget):
     # --- три режима окна ---
 
     def _build_open(self, column):
-        self.master = PasswordField(tr("Master password"))
+        self.master = PasswordField(tr("Master password"), master=True)
         self.master.edit.returnPressed.connect(self.on_open)
         column.addWidget(self.master)
         column.addWidget(self._button(tr("Open"), self.on_open, default=True))
@@ -173,7 +173,7 @@ class LoginWindow(QWidget):
         text = QLabel(tr("The main file {name} was not found, but there is a backup {backup}.\n\nRestore from it? If you create a new vault, the old backup will be kept under another name.").format(name=self.path.name, backup=backup_path(self.path).name))
         text.setWordWrap(True)
         column.addWidget(text)
-        self.master = PasswordField(tr("Master password"))
+        self.master = PasswordField(tr("Master password"), master=True)
         self.master.edit.returnPressed.connect(self.on_restore)
         column.addWidget(self.master)
         row = QHBoxLayout()
@@ -187,8 +187,8 @@ class LoginWindow(QWidget):
         hint = QLabel(tr("There is no vault yet — let's create one.") + "\n" + tr("Choose a master password: at least 12 characters. It cannot be recovered — if you forget it, your passwords are lost."))
         hint.setWordWrap(True)
         column.addWidget(hint)
-        self.master = PasswordField(tr("Master password"))
-        self.repeat = PasswordField(tr("Repeat master password"))
+        self.master = PasswordField(tr("Master password"), master=True)
+        self.repeat = PasswordField(tr("Repeat master password"), master=True)
         self.repeat.edit.returnPressed.connect(self.on_create)
         self.strength = StrengthBar(tr("Type a master password"))
         self.master.textChanged.connect(self.strength.show_for)

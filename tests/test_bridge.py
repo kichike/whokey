@@ -120,12 +120,27 @@ class Requests(unittest.TestCase):
 
     def test_show_opens_new_entry_with_the_site(self):
         added = []
-        self.server.window.add = lambda url="": added.append(url)
+        self.server.window.add = lambda url="", **_: added.append(url)
         self.assertEqual(self.ask(type="show", url="https://www.github.com/login"), {"status": "ok"})
         QCoreApplication.processEvents()  # окно открывается после ответа
         self.assertEqual(added, ["github.com"])
         self.assertEqual(self.ask(type="show", url="http://github.com")["status"], "bad_page")
         self.assertEqual(self.server.handle({"type": "show", "url": "https://github.com"})["status"], "pair_required")
+
+    def test_generate_and_show_with_login_and_password(self):
+        reply = self.ask(type="generate", url="https://github.com/signup")
+        self.assertEqual(reply["status"], "ok")
+        self.assertGreaterEqual(len(reply["password"]), 12)
+        self.assertNotEqual(reply["password"], self.ask(type="generate", url="https://github.com")["password"])
+        self.assertEqual(self.server.handle({"type": "generate", "url": "https://github.com"})["status"], "pair_required")
+        self.assertEqual(self.ask(type="generate", url="http://github.com")["status"], "bad_page")
+        added = []
+        self.server.window.add = lambda url="", login="", password="": added.append((url, login, password))
+        self.assertEqual(self.ask(type="show", url="https://github.com", login="egor", password="Нов-ый1!"), {"status": "ok"})
+        QCoreApplication.processEvents()
+        self.assertEqual(added, [("github.com", "egor", "Нов-ый1!")])
+        for bad in ({"login": ["x"]}, {"password": 5}, {"password": "x" * 300}):
+            self.assertEqual(self.ask(type="show", url="https://github.com", **bad)["status"], "error")
 
     def test_rate_limit(self):
         statuses = [self.ask(type="fill", url="https://mail.ru", index=0, login="egor@mail.ru")["status"]

@@ -7,7 +7,7 @@
 ; программы НЕ удаляется.
 
 #ifndef AppVersion
-  #define AppVersion "1.5"
+  #define AppVersion "1.5.1"
 #endif
 
 [Setup]

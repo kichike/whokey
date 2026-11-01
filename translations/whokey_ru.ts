@@ -248,6 +248,30 @@ After saving, the old password cannot be recovered.</source>
         <translation>Мастер-пароль:</translation>
     </message>
     <message>
+        <source>About WhoKey</source>
+        <translation>О программе WhoKey</translation>
+    </message>
+    <message>
+        <source>Version {version}</source>
+        <translation>Версия {version}</translation>
+    </message>
+    <message>
+        <source>Password manager: everything is stored encrypted on your computer, nothing is sent to the internet.</source>
+        <translation>Менеджер паролей: всё хранится зашифрованным на вашем компьютере, ничего не отправляется в интернет.</translation>
+    </message>
+    <message>
+        <source>Author:</source>
+        <translation>Автор:</translation>
+    </message>
+    <message>
+        <source>Source code and updates:</source>
+        <translation>Исходный код и обновления:</translation>
+    </message>
+    <message>
+        <source>Free and open source (MIT license).</source>
+        <translation>Бесплатная программа с открытым кодом (лицензия MIT).</translation>
+    </message>
+    <message>
         <source>Passwords sent to the browser (newest first):</source>
         <translation>Пароли, отправленные в браузер (сначала новые):</translation>
     </message>
@@ -490,6 +514,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation>Экспорт в CSV…</translation>
     </message>
     <message>
+        <source>Save encrypted copy…</source>
+        <translation>Сохранить зашифрованную копию…</translation>
+    </message>
+    <message>
         <source>Settings…</source>
         <translation>Настройки…</translation>
     </message>
@@ -500,6 +528,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
     <message>
         <source>Entry</source>
         <translation>Запись</translation>
+    </message>
+    <message>
+        <source>Help</source>
+        <translation>Справка</translation>
     </message>
     <message>
         <source>Search by name, login or note</source>
@@ -544,6 +576,26 @@ Restore from it? If you create a new vault, the old backup will be kept under an
     <message>
         <source>The CSV file is not encrypted — delete it now (and empty the Trash).</source>
         <translation>CSV-файл не зашифрован — удалите его сейчас (и очистите Корзину).</translation>
+    </message>
+    <message>
+        <source>Save encrypted copy</source>
+        <translation>Зашифрованная копия</translation>
+    </message>
+    <message>
+        <source>Password vault (*.dat)</source>
+        <translation>Хранилище паролей (*.dat)</translation>
+    </message>
+    <message>
+        <source>This is the vault file itself — choose another place for the copy.</source>
+        <translation>Это сам файл хранилища — выберите для копии другое место.</translation>
+    </message>
+    <message>
+        <source>The copy is saved: {name}
+
+It is encrypted with the same master password. To open it, choose it with the &quot;Other file…&quot; button in the WhoKey window.</source>
+        <translation>Копия сохранена: {name}
+
+Она зашифрована тем же мастер-паролем. Чтобы открыть её, выберите файл кнопкой «Другой файл…» в окне WhoKey.</translation>
     </message>
     <message>
         <source>There are no entries to export yet.</source>
@@ -606,6 +658,10 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
     <message>
         <source>Show / hide characters</source>
         <translation>Показать / скрыть символы</translation>
+    </message>
+    <message>
+        <source>Caps Lock is on</source>
+        <translation>Включён Caps Lock</translation>
     </message>
     <message>
         <source>very strong</source>

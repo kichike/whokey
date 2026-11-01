@@ -55,6 +55,47 @@ class MainWindow(unittest.TestCase):
         self.assertEqual(len(self.vault.entries), 3)  # «Отмена» — ничего не удалено
 
 
+class CopyAboutVersion(unittest.TestCase):
+    def setUp(self):
+        self.folder = Path(tempfile.mkdtemp())
+        prefs.use_file(self.folder / "p.ini")
+        self.vault = Vault.create(self.folder / "v.dat", "Зелёный-Кит-Летит-2026!")
+        self.vault.add("github.com", "egor", "pw")
+        self.window = MW.MainWindow(self.vault, Clipboard())
+        self.shown = []
+        self._real = MW.QFileDialog.getSaveFileName, MW.show_info, MW.show_error
+        MW.show_info = lambda parent, title, text: self.shown.append(text)
+        MW.show_error = lambda parent, text: self.shown.append("ERROR " + text)
+
+    def tearDown(self):
+        MW.QFileDialog.getSaveFileName, MW.show_info, MW.show_error = self._real
+
+    def test_encrypted_copy_opens_with_same_password(self):
+        target = self.folder / "copy.dat"
+        MW.QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: (str(target), ""))
+        self.window.save_copy()
+        self.assertEqual(Vault.open(target, "Зелёный-Кит-Летит-2026!").entries[0]["password"], "pw")
+        self.assertNotIn(b"github.com", target.read_bytes())  # внутри — только шифр
+
+    def test_copy_onto_itself_is_refused(self):
+        MW.QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: (str(self.vault.path), ""))
+        self.window.save_copy()
+        self.assertTrue(self.shown[0].startswith("ERROR"))
+        self.assertEqual(len(Vault.open(self.vault.path, "Зелёный-Кит-Летит-2026!").entries), 1)
+
+    def test_about_and_version(self):
+        import re
+        import version
+        from PySide6.QtWidgets import QLabel
+        dialog = D.AboutDialog(self.window)
+        text = " ".join(label.text() for label in dialog.findChildren(QLabel))
+        for part in (version.VERSION, "github.com/kichike/whokey", ">kichike<"):
+            self.assertIn(part, text)
+        # версия одна на всё: установщик Windows собирается с той же
+        iss = (Path(__file__).resolve().parent.parent / "installer.iss").read_text(encoding="utf-8")
+        self.assertEqual(re.search(r'#define AppVersion "(.*)"', iss).group(1), version.VERSION)
+
+
 class GenerateInSavedEntry(unittest.TestCase):
     def setUp(self):
         self.asked = []

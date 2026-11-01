@@ -12,6 +12,7 @@ from gui import i18n, prefs, theme, touchid
 from gui.widgets import ClipboardCountdown, GeneratorPanel, PasswordField, StrengthBar, ask_yes, show_error, weakness_text
 from gui.i18n import tr
 from vault import SaveError
+from version import AUTHOR, AUTHOR_URL, GITHUB_URL, VERSION
 
 MASTER_MIN_LENGTH = 12
 
@@ -183,9 +184,9 @@ class ChangeMasterDialog(QDialog):
         self.resize(480, 1)  # начальная ширина, см. EntryDialog
         self.vault = vault
 
-        self.current = PasswordField()
-        self.new = PasswordField()
-        self.repeat = PasswordField()
+        self.current = PasswordField(master=True)
+        self.new = PasswordField(master=True)
+        self.repeat = PasswordField(master=True)
         self.strength = StrengthBar(tr("Type a master password"))
         self.new.textChanged.connect(self.strength.show_for)
         rules = theme.role(QLabel(tr("Choose a master password: at least 12 characters. It cannot be recovered — if you forget it, your passwords are lost.")), "muted")
@@ -253,7 +254,7 @@ class ExportDialog(QDialog):
         # с переносом строк Qt иначе считает высоту окна по неверной ширине и обрезает текст
         warning.setMinimumWidth(440)
         warning.setMinimumHeight(warning.heightForWidth(440))
-        self.master = PasswordField(tr("Master password"))
+        self.master = PasswordField(tr("Master password"), master=True)
         self.error = theme.role(QLabel(), "error")
         column = QVBoxLayout(self)
         column.addWidget(warning)
@@ -353,6 +354,37 @@ class SettingsDialog(QDialog):
         if had_touch_id and not touchid.is_enabled(self.vault.path):
             touchid.save_key(self.vault.path, self.vault.key)
             touchid.set_offered(self.vault.path)
+
+
+class AboutDialog(QDialog):
+    """О программе: версия, автор и ссылка на GitHub."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle(tr("About WhoKey"))
+        title = theme.neon_title(theme.role(QLabel(tr("WhoKey")), "title"))
+        version = theme.role(QLabel(tr("Version {version}").format(version=VERSION)), "muted")
+        what = QLabel(tr("Password manager: everything is stored encrypted on your computer, nothing is sent to the internet."))
+        what.setWordWrap(True)
+        # ссылки открываются в браузере; адреса — свои, из version.py
+        author, source = tr("Author:"), tr("Source code and updates:")  # tr() вне f-строки — иначе lupdate её не увидит
+        link = f'style="color: {theme.NEON}; text-decoration: none;"'  # лавандовые, как всё в WhoKey
+        links = QLabel(f'{author} <a {link} href="{AUTHOR_URL}">{AUTHOR}</a><br>'
+                       f'{source} <a {link} href="{GITHUB_URL}">{GITHUB_URL.split("://")[1]}</a>')
+        links.setTextFormat(Qt.RichText)
+        links.setOpenExternalLinks(True)
+        links.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        license_ = theme.role(QLabel(tr("Free and open source (MIT license).")), "muted")
+        close = QDialogButtonBox(QDialogButtonBox.Close)
+        close.button(QDialogButtonBox.Close).setText(tr("Close"))
+        close.rejected.connect(self.reject)
+        column = QVBoxLayout(self)
+        column.setSpacing(10)
+        for widget in (title, version, what, links, license_):
+            column.addWidget(widget)
+        column.addWidget(close)
+        what.setMinimumWidth(380)
+        what.setMinimumHeight(what.heightForWidth(380))
 
 
 README_URL = "https://github.com/kichike/whokey#browser-extension"

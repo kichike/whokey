@@ -236,6 +236,30 @@ After saving, the old password cannot be recovered.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>About WhoKey</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Version {version}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Password manager: everything is stored encrypted on your computer, nothing is sent to the internet.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Author:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Source code and updates:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Free and open source (MIT license).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Passwords sent to the browser (newest first):</source>
         <translation type="unfinished"></translation>
     </message>
@@ -475,6 +499,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Save encrypted copy…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Settings…</source>
         <translation type="unfinished"></translation>
     </message>
@@ -484,6 +512,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
     </message>
     <message>
         <source>Entry</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Help</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -553,6 +585,24 @@ This cannot be undone.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Save encrypted copy</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Password vault (*.dat)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>This is the vault file itself — choose another place for the copy.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The copy is saved: {name}
+
+It is encrypted with the same master password. To open it, choose it with the &quot;Other file…&quot; button in the WhoKey window.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>There are no entries to export yet.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -587,6 +637,10 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
     </message>
     <message>
         <source>Show / hide characters</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Caps Lock is on</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

@@ -34,6 +34,8 @@ from PySide6.QtWidgets import QDialog
 
 import bridge_protocol as P
 import sites
+from generator import generate_password
+from gui import prefs
 from gui.widgets import ask_code
 from gui.i18n import tr
 from vault import SaveError
@@ -43,7 +45,8 @@ MAX_CONNECTIONS = 8                # больше одновременно не 
 REQUEST_TIMEOUT_MS = 5000          # соединение без запроса дольше этого закрывается
 PAIR_COOLDOWN = 10                 # секунд после отказа — новые запросы разрешения не показываем;
 PAIR_COOLDOWN_MAX = 600            # после каждого следующего отказа пауза вдвое длиннее, до 10 минут
-RATE_LIMIT = {"logins": 30, "fill": 10, "show": 5}  # запросов в минуту
+RATE_LIMIT = {"logins": 30, "fill": 10, "show": 5, "generate": 10}  # запросов в минуту
+MAX_FIELD = 256  # логин и пароль из расширения для новой записи — не длиннее
 CLOSE_AFTER_MS = 2000              # после ответа: сколько ждём, пока собеседник закроет соединение
 
 
@@ -235,14 +238,25 @@ class BridgeServer(QObject):
             return {"status": "ok", "items": items}
         if kind == "fill":
             return self._fill(request, url)
+        if kind == "generate":
+            # «Сгенерировать пароль» в форме регистрации: тем же генератором и с теми же
+            # настройками, что в окне WhoKey. Ничего не сохраняется — это делает «show»
+            length, kinds = prefs.generator_options() or (20, {})
+            if not any(kinds.values()):
+                kinds = {}  # все наборы символов выключены — берём обычные (все)
+            return {"status": "ok", "password": generate_password(max(length, 12), **kinds)}
         if kind == "show":
-            # «Добавить в WhoKey» из окошка расширения: для сайта ещё нет записи — открываем
-            # окно новой записи с уже вписанным адресом (после ответа: окно не держит мост)
-            QTimer.singleShot(0, lambda: self._show_new_entry(url))
+            # «Добавить в WhoKey» из расширения: окно новой записи с уже вписанным адресом,
+            # а после «Сгенерировать пароль» — ещё с логином и паролем из формы
+            # (после ответа: окно не держит мост)
+            login, password = request.get("login", ""), request.get("password", "")
+            if not all(isinstance(x, str) and len(x) <= MAX_FIELD for x in (login, password)):
+                return {"status": "error"}
+            QTimer.singleShot(0, lambda: self._show_new_entry(url, login, password))
             return {"status": "ok"}
         return {"status": "error"}
 
-    def _show_new_entry(self, url):
+    def _show_new_entry(self, url, login="", password=""):
         window = self.window
         if window is None or not hasattr(window, "add"):
             return
@@ -252,7 +266,7 @@ class BridgeServer(QObject):
         if not window.findChildren(QDialog):  # уже открыто какое-то окно — второе поверх не открываем
             address = sites.normalize(url) or ""
             # без «www.»: запись для github.com подойдёт и www.github.com, а наоборот — нет
-            window.add(url=address[4:] if address.startswith("www.") else address)
+            window.add(url=address[4:] if address.startswith("www.") else address, login=login, password=password)
 
     def _pair(self, request):
         """Первое подключение расширения: человек вводит в WhoKey код со значка расширения.

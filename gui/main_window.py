@@ -1,10 +1,11 @@
 """Главное окно: поиск, таблица записей и меню действий по правому клику."""
 
+import shutil
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QDateTime, QLocale, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QColor, QDesktopServices, QFontDatabase, QGuiApplication, QKeySequence, QShortcut
+from PySide6.QtCore import QDate, QDateTime, QLocale, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QAction, QColor, QDesktopServices, QFontDatabase, QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel,
                                QLineEdit, QMainWindow, QMenu, QPushButton, QStackedWidget,
                                QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
@@ -12,7 +13,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QFileDialog, QFrame, QHBoxLayo
 import csv_io
 import sites
 from gui import i18n, prefs, theme
-from gui.dialogs import ChangeMasterDialog, EntryDialog, ExportDialog, ExtensionDialog, GeneratorDialog, SettingsDialog
+from gui.dialogs import AboutDialog, ChangeMasterDialog, EntryDialog, ExportDialog, ExtensionDialog, GeneratorDialog, SettingsDialog
 from gui.widgets import ClipboardCountdown, RoundedRowDelegate, ask_yes, show_error, show_info
 from gui.i18n import tr
 from vault import SaveError
@@ -131,6 +132,7 @@ class MainWindow(QMainWindow):
         for text, keys, handler in [(tr("New entry"), QKeySequence.New, self.add),
                                     (tr("Import from CSV…"), None, self.import_csv),
                                     (tr("Export to CSV…"), None, self.export_csv),
+                                    (tr("Save encrypted copy…"), None, self.save_copy),
                                     (tr("Settings…"), QKeySequence("Ctrl+,"), self.open_settings),
                                     (tr("Lock WhoKey"), QKeySequence("Ctrl+L"), self.lock_requested.emit)]:
             self._menu_action(file_menu, text, keys, handler)
@@ -141,6 +143,9 @@ class MainWindow(QMainWindow):
             if handler == self.delete and sys.platform == "win32":
                 keys = QKeySequence.Delete  # на Windows в меню показываем привычную Delete
             self._menu_action(entry_menu, text, keys, handler)
+        help_menu = bar.addMenu(tr("Help"))
+        about = self._menu_action(help_menu, tr("About WhoKey"), None, self.about)
+        about.setMenuRole(QAction.AboutRole)  # на Mac — в меню программы, как у всех
 
     def _menu_action(self, menu, text, keys, handler):
         action = menu.addAction(text)
@@ -339,9 +344,10 @@ class MainWindow(QMainWindow):
 
     # --- действия ---
 
-    def add(self, url=""):
-        """Новая запись; url — адрес сайта, если запись добавляют из расширения браузера."""
-        entry = {"site": url, "login": "", "password": "", "note": "", "url": url} if url else None
+    def add(self, url="", login="", password=""):
+        """Новая запись; url, login, password — если запись добавляют из расширения браузера
+        (после «Сгенерировать пароль» на странице регистрации)."""
+        entry = {"site": url, "login": login, "password": password, "note": "", "url": url} if url else None
         dialog = EntryDialog(self, entry, copy_password=self.copy_password)
         if dialog.exec() and self._save(lambda: self.vault.add(**dialog.values())):
             self.search.clear()
@@ -445,6 +451,29 @@ class MainWindow(QMainWindow):
             self.refresh()
             show_info(self, tr("Import from CSV"), self.tr("Added %n passwords.", "", count) + "\n\n" +
                       tr("The CSV file is not encrypted — delete it now (and empty the Trash)."))
+
+    def save_copy(self):
+        """Копия хранилища как есть — зашифрованная тем же мастер-паролем. В отличие от CSV,
+        её можно хранить где угодно (флешка, облако): без мастер-пароля она бесполезна."""
+        default = Path.home() / "Documents" / f"WhoKey {QDate.currentDate().toString('yyyy-MM-dd')}.dat"
+        name, _ = QFileDialog.getSaveFileName(self, tr("Save encrypted copy"), str(default),
+                                              tr("Password vault (*.dat)"))
+        if not name:
+            return
+        target = Path(name)
+        if target.resolve() == self.vault.path.resolve():
+            show_error(self, tr("This is the vault file itself — choose another place for the copy."))
+            return
+        try:
+            shutil.copyfile(self.vault.path, target)
+        except OSError as error:
+            show_error(self, tr("Could not write the file: {error}").format(error=error.strerror or error))
+            return
+        show_info(self, tr("Save encrypted copy"),
+                  tr("The copy is saved: {name}\n\nIt is encrypted with the same master password. To open it, choose it with the \"Other file…\" button in the WhoKey window.").format(name=target.name))
+
+    def about(self):
+        AboutDialog(self).exec()
 
     def export_csv(self):
         """Все пароли в CSV-файл — после мастер-пароля и предупреждения, что файл не зашифрован."""
