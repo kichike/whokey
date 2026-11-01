@@ -534,6 +534,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation>Справка</translation>
     </message>
     <message>
+        <source>WhoKey on GitHub</source>
+        <translation>WhoKey на GitHub</translation>
+    </message>
+    <message>
         <source>Search by name, login or note</source>
         <translation>Поиск по названию, логину или заметке</translation>
     </message>

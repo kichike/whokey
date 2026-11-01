@@ -17,6 +17,7 @@ from gui.dialogs import AboutDialog, ChangeMasterDialog, EntryDialog, ExportDial
 from gui.widgets import ClipboardCountdown, RoundedRowDelegate, ask_yes, show_error, show_info
 from gui.i18n import tr
 from vault import SaveError
+from version import GITHUB_URL
 
 HIDDEN = "••••••••"   # одинаковые точки — не выдаём даже длину пароля
 COLUMNS = ["site", "login", "password", "note", "updated"]
@@ -146,6 +147,11 @@ class MainWindow(QMainWindow):
         help_menu = bar.addMenu(tr("Help"))
         about = self._menu_action(help_menu, tr("About WhoKey"), None, self.about)
         about.setMenuRole(QAction.AboutRole)  # на Mac — в меню программы, как у всех
+        # на Mac «О программе» уезжает в меню WhoKey, а пустую «Справку» система прячет —
+        # поэтому в ней своя строка: страница проекта (README, новые версии, сообщить о проблеме)
+        github = self._menu_action(help_menu, tr("WhoKey on GitHub"), None,
+                                   lambda: QDesktopServices.openUrl(QUrl(GITHUB_URL)))
+        github.setMenuRole(QAction.NoRole)
 
     def _menu_action(self, menu, text, keys, handler):
         action = menu.addAction(text)
