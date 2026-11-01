@@ -62,12 +62,14 @@ Fills the login and password on a website with one click or **⌘⇧L** (**Ctrl+
 2. Download **WhoKey-extension.zip** from [Releases](../../releases) and unzip it (or use the `extension` folder of this repository).
 3. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the unzipped folder.
 4. In WhoKey, set **Website address** (`github.com`) in the entries you want to fill.
-5. On a login page, click the WhoKey icon. The first time, WhoKey asks for permission — allow it only if the code matches the one in the extension popup.
+5. On a login page, click the WhoKey key icon inside the password field and choose an account (or click the WhoKey icon in the toolbar). The first time, type into WhoKey the 4-digit code shown by the extension.
 
 How it protects your passwords:
 - A password is given only to its own website and its subdomains: an entry for `mail.ru` fills on `e.mail.ru`, but never on `mail.ru.evil.com` or `mai1.ru`. Only on https pages.
 - It fills only when you click (never by itself), only in fields you can actually see, and only after WhoKey is unlocked. If WhoKey is closed, the extension opens it and waits for your master password.
 - The extension talks to WhoKey without the network, through a local socket (a named pipe on Windows) only your user can open. WhoKey answers only its own bridge program, and the bridge talks only to WhoKey.
+- The account menu under the field is a page of the extension itself: the website can't read the list of logins, and clicks on the menu count only while it is really visible (a site can't hide it under its own button).
+- To show the icon in login fields, the extension needs access to all websites (Chrome says it can "read and change your data on all websites") — like Bitwarden or 1Password. It only looks for login fields there; nothing leaves the page except the site address it sends to WhoKey when you open the menu.
 - You can disconnect the extension any time: **Extension** button in WhoKey.
 
 Honest limits:
@@ -140,12 +142,14 @@ WhoKey хранит логины и пароли в одном зашифров�
 2. Скачайте **WhoKey-extension.zip** в разделе [Releases](../../releases) и распакуйте (или возьмите папку `extension` из этого репозитория).
 3. Откройте `chrome://extensions`, включите **Режим разработчика**, нажмите **Загрузить распакованное** и выберите распакованную папку.
 4. В WhoKey укажите **Адрес сайта** (`github.com`) в записях, которые хотите заполнять.
-5. На странице входа нажмите иконку WhoKey. В первый раз WhoKey спросит разрешение — разрешайте, только если код совпадает с кодом в окошке расширения.
+5. На странице входа нажмите значок-ключ WhoKey в поле пароля и выберите аккаунт (или нажмите иконку WhoKey на панели браузера). В первый раз введите в WhoKey 4-значный код, который покажет расширение.
 
 Как защищены пароли:
 - Пароль выдаётся только своему сайту и его поддоменам: запись `mail.ru` заполняется на `e.mail.ru`, но никогда — на `mail.ru.evil.com` или `mai1.ru`. Только на страницах с https.
 - Заполняет только по нажатию (никогда само), только в поля, которые реально видно, и только когда WhoKey разблокирован. Если WhoKey закрыт, расширение откроет его и подождёт мастер-пароль.
 - Расширение общается с WhoKey без сети, через локальный сокет (на Windows — именованный канал), доступный только вашему пользователю. WhoKey отвечает только своему мосту, а мост говорит только с WhoKey.
+- Меню с аккаунтами под полем — страница самого расширения: сайт не может прочитать список логинов, а нажатия в меню засчитываются, только пока оно действительно видно (сайт не спрячет его под своей кнопкой).
+- Чтобы показывать значок в полях входа, расширению нужен доступ ко всем сайтам (Chrome пишет «читать и изменять данные на всех сайтах») — как у Bitwarden и 1Password. Там оно только ищет поля входа; со страницы ничего не уходит, кроме адреса сайта, который отправляется в WhoKey, когда вы открываете меню.
 - Отключить расширение можно в любой момент: кнопка **Расширение** в WhoKey.
 
 Честные ограничения:
