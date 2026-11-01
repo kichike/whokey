@@ -144,6 +144,37 @@ def normalize(text):
     return host
 
 
+def address(text):
+    """Как хранить «Адрес сайта» записи. Обычно — только сайт («mail.ru»). Но если в ссылке
+    есть путь («https://31.76.230.232:28682/92bdcee75028d0c7/» — панель, которая без него
+    не открывается), ссылка хранится целиком: «Открыть сайт» откроет именно её.
+    Какие страницы подходят записи, всё равно решает только сайт и порт (normalize).
+    "" — адрес не задан, None — не похоже на адрес сайта."""
+    site = normalize(text)
+    if not site:
+        return site
+    text = text.strip()
+    parts = urlsplit(text if "://" in text else "https://" + text)
+    if parts.scheme not in ("http", "https"):
+        return site  # ftp:// и прочее браузер с паролем не откроет — храним только сайт
+    path = parts.path + ("?" + parts.query if parts.query else "")
+    if path in ("", "/"):
+        return site
+    # без логина-пароля в ссылке (user:pass@) и без #якоря — только сайт, порт и путь
+    return f"{parts.scheme}://{site}{path}"
+
+
+def link(text):
+    """Ссылка для браузера по «Адресу сайта» записи или None."""
+    site = normalize(text)
+    if not site:
+        return None
+    if "://" in text:  # сохранена целиком (address)
+        return text.strip()
+    scheme = "http" if site.startswith(("localhost", "127.", "[::1]")) else "https"
+    return f"{scheme}://{site}"
+
+
 def page_host(url):
     """Домен страницы, если на ней можно заполнять пароль; иначе None."""
     try:

@@ -68,8 +68,7 @@ def site_link(entry):
     for text in (entry.get("url", ""), entry.get("site", "")):
         host = sites.normalize(text)
         if host and ("." in host.split(":")[0] or host.startswith("localhost")):
-            scheme = "http" if host.startswith(("localhost", "127.", "[::1]")) else "https"
-            return f"{scheme}://{host}"
+            return sites.link(text if text == entry.get("url") else host)
     return None
 
 

@@ -71,6 +71,7 @@ def read(path):
         password = row[columns["password"]] if columns["password"] < len(row) else ""
         if not password:
             continue
+        # только сайт: браузеры выгружают длинные ссылки на страницу входа, открывать их незачем
         url = sites.normalize(value.get("url", "")) or ""
         # нет названия — берём адрес сайта (у Firefox названия нет вовсе)
         name = value.get("site") or url or value.get("url", "")

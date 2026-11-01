@@ -94,6 +94,22 @@ class Matching(unittest.TestCase):
             with self.subTest(bad=bad):
                 self.assertIsNone(sites.normalize(bad))
 
+    def test_address_keeps_path_for_opening(self):
+        # панель 3x-ui открывается только по ссылке с секретным путём
+        panel = "https://31.76.230.232:28682/92bdcee75028d0c7/"
+        self.assertEqual(sites.address(panel), panel)
+        self.assertEqual(sites.link(sites.address(panel)), panel)
+        self.assertTrue(sites.matches(panel, "https://31.76.230.232:28682/panel/login"))  # заполнение — по сайту и порту
+        self.assertFalse(sites.matches(panel, "https://31.76.230.232:443/"))
+        # без пути — как раньше, только сайт; логин-пароль и #якорь из ссылки не сохраняются
+        self.assertEqual(sites.address("https://Mail.ru/"), "mail.ru")
+        self.assertEqual(sites.address("https://user:pw@mail.ru/login?x=1#top"), "https://mail.ru/login?x=1")
+        self.assertEqual(sites.address("ftp://mail.ru/file"), "mail.ru")
+        self.assertEqual(sites.link("mail.ru"), "https://mail.ru")
+        self.assertEqual(sites.link("localhost:3000"), "http://localhost:3000")
+        self.assertIsNone(sites.address("co.uk/path"))
+        self.assertEqual(sites.address(""), "")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -100,7 +100,7 @@ class EntryDialog(QDialog):
             return self._problem(self.site, tr("Name is required."))
         if not self.password.text():
             return self._problem(self.password.edit, tr("Password cannot be empty."))
-        if sites.normalize(self.url.text()) is None:
+        if sites.address(self.url.text()) is None:
             return self._problem(self.url, tr("This does not look like a website address. Example: mail.ru"))
         super().accept()
 
@@ -112,7 +112,7 @@ class EntryDialog(QDialog):
         super().reject()
 
     def values(self, normalize=True):
-        url = sites.normalize(self.url.text()) if normalize else self.url.text().strip()
+        url = sites.address(self.url.text()) if normalize else self.url.text().strip()
         return {"site": self.site.text().strip(), "login": self.login.text().strip(),
                 "password": self.password.text(), "note": self.note.toPlainText().strip(),
                 "url": url}
