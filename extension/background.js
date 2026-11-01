@@ -235,7 +235,10 @@ function fromMenu(message, sender, sendResponse) {
   const tabId = sender.tab.id;
   const url = sender.tab.url;
   if (message.kind === "menu_open") {
-    open(tabId, url).then((reply) => sendResponse({ ...reply, host: new URL(url).hostname }));
+    const page = new URL(url);
+    // адрес страницы целиком — только для значка сайта: браузер помнит значки по страницам.
+    // Меню — страница самого расширения, сайт его не прочитает
+    open(tabId, url).then((reply) => sendResponse({ ...reply, host: page.hostname, page: page.origin + page.pathname }));
     return true;
   }
   if (message.kind === "menu_fill") {

@@ -50,7 +50,56 @@ function status(text, kind = "") {
   resize();
 }
 
-let pageHost = ""; // сайт, на котором открыто меню (сообщает фоновая часть)
+let pageHost = "";   // сайт, на котором открыто меню (сообщает фоновая часть)
+let pageUrl = "";    // адрес страницы без параметров — по нему браузер помнит значок
+
+// Значок сайта — из хранилища значков самого браузера (разрешение "favicon"): без запросов
+// в интернет, никакой сервер не узнаёт, на какие сайты вы заходите. Если браузер значка
+// не знает, он отдаёт стандартный «глобус» — тогда лучше оставить первую букву названия.
+const favicon = (page) => new Promise((resolve) => {
+  const img = new Image(32, 32);
+  img.alt = "";
+  img.onload = () => resolve(img);
+  img.onerror = () => resolve(null);
+  img.src = chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(page)}&size=32`);
+});
+
+function pixels(img) {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 32;
+  const context = canvas.getContext("2d");
+  context.drawImage(img, 0, 0, 32, 32);
+  return context.getImageData(0, 0, 32, 32).data.join(",");
+}
+
+let iconPromise = null; // один значок на всё меню: все аккаунты в нём — с одного сайта
+
+function loadSiteIcon() {
+  iconPromise = iconPromise || (async () => {
+    if (!pageUrl) return null;
+    // глобус — то, что браузер отдаёт для сайта, где никто не бывал (.invalid не существует)
+    const globe = await favicon("https://whokey.invalid/");
+    const isGlobe = (img) => !img || (globe && pixels(img) === pixels(globe));
+    // сначала значок этой страницы, потом — главной страницы сайта
+    for (const page of [pageUrl, new URL(pageUrl).origin + "/"]) {
+      const icon = await favicon(page);
+      if (!isGlobe(icon)) return icon.src;
+    }
+    return null;
+  })();
+  return iconPromise;
+}
+
+async function siteIcon(avatar) {
+  const src = await loadSiteIcon();
+  if (!src) return;
+  const img = new Image(32, 32);
+  img.alt = "";
+  img.src = src;
+  avatar.textContent = "";
+  avatar.classList.add("icon");
+  avatar.append(img);
+}
 
 function showResult(reply) {
   const [key, kind] = TEXTS[reply.status] || ["error", "bad"];
@@ -81,6 +130,7 @@ function showItems(items, host) {
     const avatar = document.createElement("span");
     avatar.className = "avatar";
     avatar.textContent = (item.site || "?").trim().charAt(0).toUpperCase();
+    siteIcon(avatar);
     const text = document.createElement("span");
     text.className = "text";
     const site = document.createElement("span");
@@ -135,6 +185,7 @@ async function main() {
   status(msg("connecting"));
   const reply = await send({ kind: "menu_open" });
   pageHost = reply.host || "";
+  pageUrl = reply.page || "";
   if (reply.status === "ok") showItems(reply.items, pageHost);
   else showResult(reply);
 }
