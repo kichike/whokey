@@ -1,22 +1,21 @@
-/* Меню под полем пароля — те же цвета, что у окошка расширения (popup.css) и WhoKey */
-:root {
-  --bg: #16121c;
-  --text: #ecebf1;
-  --muted: #a29fae;
-  --neon: #ddaaf9;
-  --acc: #caa7f0;
-  --bad: #ff8a95;
-}
+/* Меню под полем пароля. Цвета и шрифт — общие (tokens.css). Фон — одним плавным переходом
+   от зарева сверху к тёмному индиго внизу, на всю высоту меню: без резких полос */
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
 body {
-  font: 13px/1.35 "MesloLGS Nerd Font", "MesloLGS NF", Menlo, Consolas, monospace;
+  font: var(--font);
   color: var(--text);
+  background: radial-gradient(160% 100% at 50% -20%, rgba(58, 26, 154, 0.75) 0%, rgba(42, 15, 90, 0.45) 35%, rgba(18, 10, 48, 0) 75%), var(--bg);
 }
 /* меню — во весь фрейм; длинный список прокручивается внутри */
 main { padding: 6px; height: 100%; overflow-y: auto; }
+main::-webkit-scrollbar { width: 6px; }
+main::-webkit-scrollbar-thumb { background: var(--rim); border-radius: 3px; }
+.brand { padding: 4px 8px 6px; }
+.brand img { height: 18px; }
+.brand b { font-size: 13px; }
 [hidden] { display: none !important; }
-#status { margin: 6px 8px; color: var(--muted); white-space: pre-line; }
+#status { margin: 4px 8px 6px; color: var(--muted); white-space: pre-line; }
 #status:empty { display: none; }
 #status.bad { color: var(--bad); }
 #status.good { color: var(--neon); }
@@ -27,12 +26,7 @@ button {
   width: 100%; padding: 8px; border: 0; border-radius: 9px;
   background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer;
 }
-button:hover, button:focus-visible { outline: none; background: rgba(202, 167, 240, 0.16); }
-.avatar {
-  flex: none; width: 30px; height: 30px; border-radius: 8px;
-  display: grid; place-items: center; font-weight: 800; color: #1a1024;
-  background: linear-gradient(160deg, #ecd2ff, #a77fd6);
-}
+button:hover, button:focus-visible { outline: none; background: rgba(168, 144, 240, 0.16); }
 .avatar.icon { padding: 4px; }
 .avatar.dark { background: #fff; }      /* тёмное лого — на белой плашке, как в Bitwarden */
 .avatar.light { background: #2c2536; }  /* светлое (белый кот GitHub) — на тёмной */
@@ -42,5 +36,8 @@ button:hover, button:focus-visible { outline: none; background: rgba(202, 167, 2
 .site { font-weight: 700; }
 .login { color: var(--muted); font-size: 12px; }
 .wide { justify-content: center; font-weight: 700; color: var(--neon); }
-#generate { margin-bottom: 4px; }
-.link { justify-content: center; padding: 6px; color: var(--muted); font-size: 11px; }
+/* «Сгенерировать» — под списком, в пунктирной рамке: отдельное действие, а не ещё один аккаунт */
+#generate { margin-top: 6px; border: 1px dashed rgba(240, 92, 240, 0.45); }
+#generate:hover, #generate:focus-visible { background: rgba(240, 92, 240, 0.12); }
+.link { justify-content: center; padding: 6px; color: var(--faint); font-size: 11px; }
+.link:hover { color: var(--muted); }

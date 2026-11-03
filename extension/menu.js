@@ -39,10 +39,23 @@ function trustedClick(event) {
 }
 
 // высоту меню знает только оно само — сообщаем странице, какой сделать фрейм
+// высота — по содержимому (вместе с отступами меню); пересчёт при любом изменении:
+// встроенный шрифт догружается позже, и строки становятся чуть выше — без этого
+// внизу появлялась полоса прокрутки
+let lastHeight = 0;
 function resize() {
-  // высота содержимого, а не документа: документ не бывает ниже самого фрейма
-  send({ kind: "menu_size", height: Math.ceil($("menu").scrollHeight) });
+  const menu = $("menu");
+  const style = getComputedStyle(menu);
+  const content = [...menu.children].filter((el) => !el.hidden && getComputedStyle(el).display !== "none");
+  const bottom = content.length ? Math.max(...content.map((el) => el.offsetTop + el.offsetHeight + parseFloat(getComputedStyle(el).marginBottom))) : 0;
+  const height = Math.ceil(bottom + parseFloat(style.paddingBottom)) + 2; // +2 — запас на дробные размеры (иначе полоса прокрутки)
+  if (height !== lastHeight) {
+    lastHeight = height;
+    send({ kind: "menu_size", height });
+  }
 }
+new MutationObserver(() => resize()).observe($("menu"), { childList: true, subtree: true, attributes: true, characterData: true });
+document.fonts.ready.then(() => resize());
 
 const TEXTS = {
   filled: ["filled", "good"], filled_login: ["filled_login", "good"], no_field: ["no_field", "bad"],
@@ -213,6 +226,10 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 async function main() {
+  // сначала встроенный шрифт: иначе меню размечается запасным и потом «подрастает» —
+  // а сдвинутое меню по правилу защиты полсекунды не принимает нажатий
+  await Promise.all(["400", "700"].map((weight) => document.fonts.load(`${weight} 13px "WhoKey Meslo"`)))
+    .catch(() => {});
   status(msg("connecting"));
   const reply = await send({ kind: "menu_open" });
   pageHost = reply.host || "";

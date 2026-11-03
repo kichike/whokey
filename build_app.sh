@@ -20,7 +20,7 @@ rm -rf "$BUILD"  # старой сборки не остаётся — нече�
 "$VENV/bin/python" "$P/translations/build.py"
 
 # картинки окон и переводы — все файлы папок (как в build_windows.py): новый файл не забудется
-DATA=(--add-data "$P/gui/assets/icon.png:gui/assets")
+DATA=(--add-data "$P/gui/assets/icon.png:gui/assets" --add-data "$P/gui/assets/key.png:gui/assets")
 for f in "$P"/gui/assets/*.svg; do DATA+=(--add-data "${f}:gui/assets"); done
 for f in "$P"/translations/*.qm; do DATA+=(--add-data "${f}:translations"); done
 

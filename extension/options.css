@@ -1,10 +1,9 @@
-/* Настройки расширения — те же цвета, что у окошка и меню */
-:root { --bg: #16121c; --text: #ecebf1; --muted: #a29fae; --neon: #ddaaf9; --acc: #caa7f0; }
+/* Настройки расширения — общие цвета и шрифт (tokens.css) */
 body {
-  margin: 0; padding: 18px 22px; min-width: 380px; background: var(--bg); color: var(--text);
-  font: 13px/1.45 "MesloLGS Nerd Font", "MesloLGS NF", Menlo, Consolas, monospace;
+  margin: 0; padding: 18px 22px; min-width: 380px; background: var(--backdrop); color: var(--text);
+  font: var(--font);
 }
-h1 { margin: 0 0 14px; font-size: 18px; color: var(--neon); }
+h1 { margin: 0 0 14px; font-size: 18px; background: var(--title); -webkit-background-clip: text; background-clip: text; color: transparent; }
 h2 { margin: 18px 0 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
 .row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
 input[type=checkbox] { accent-color: var(--acc); width: 16px; height: 16px; }

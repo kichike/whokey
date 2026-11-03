@@ -73,16 +73,25 @@ function showItems(tab, url, host, items) {
   status(msg("choose"));
   items.forEach((item, n) => {
     const button = document.createElement("button");
-    const num = document.createElement("span");
-    num.className = "num";
-    num.textContent = n < 9 ? String(n + 1) : "";
+    const avatar = document.createElement("span");
+    avatar.className = "avatar";                 // буква-кружок, как в меню под полем и в окне WhoKey
+    avatar.textContent = (item.site || "?").trim().charAt(0).toUpperCase();
+    const text = document.createElement("span");
+    text.className = "text";
     const login = document.createElement("span");
     login.className = "login";
     login.textContent = item.login || "—";       // textContent, не innerHTML: данные из хранилища не исполняются
     const site = document.createElement("span");
     site.className = "site";
     site.textContent = item.site;
-    button.append(num, login, site);
+    text.append(login, site);
+    button.append(avatar, text);
+    if (n < 9) {
+      const num = document.createElement("span");
+      num.className = "keycap";                  // цифра — нажмите её, чтобы выбрать сразу
+      num.textContent = String(n + 1);
+      button.append(num);
+    }
     button.addEventListener("click", async () => {
       list.querySelectorAll("button").forEach((b) => (b.disabled = true));
       status(msg("filling"));
@@ -111,8 +120,9 @@ function showItems(tab, url, host, items) {
 async function main() {
   document.documentElement.lang = chrome.i18n.getUILanguage();
   shortcut = await loadShortcut();
-  $("hint").textContent = msg("hint", shortcut);
-  $("options").textContent = msg("options_link");
+  $("keys").textContent = shortcut;
+  $("hint_text").textContent = msg("hint_short");
+  $("options").textContent = msg("settings_link");
   $("options").addEventListener("click", (event) => { event.preventDefault(); chrome.runtime.openOptionsPage(); });
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const url = tab && tab.url ? tab.url : "";

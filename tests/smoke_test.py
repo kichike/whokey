@@ -110,6 +110,7 @@ from gui import theme  # noqa: E402
 theme.apply(app)
 from PySide6.QtGui import QIcon  # noqa: E402
 
+check(not theme.logo_pixmap(36).isNull(), "логотип-ключ для окон загружается (gui/assets/key.png)")
 window_icon = QIcon(str(theme.ICON_FILE))
 check(not window_icon.isNull() and window_icon.availableSizes(),
       f"иконка окна загружается ({theme.ICON_FILE.name}, размеров: {len(window_icon.availableSizes())})")

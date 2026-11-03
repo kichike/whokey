@@ -1,58 +1,43 @@
-/* Окошко расширения в стиле WhoKey: почти чёрный фон с фиолетовым заревом,
-   лавандовый неон и стеклянные кнопки — те же цвета, что в gui/theme.py */
-:root {
-  --bg: #0a0a0c;
-  --text: #ecebf1;
-  --muted: #a29fae;
-  --neon: #ddaaf9;
-  --acc: #caa7f0;
-  --rim: #3a3242;
-  --bad: #ff8a95;
-}
+/* Окошко расширения: логотип и сайт плашкой сверху, аккаунты — строками с буквой-кружком
+   (как в меню под полем), внизу клавиша и настройки. Цвета и шрифт — в tokens.css */
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  width: 320px;
-  padding: 16px;
-  /* тот же моноширинный шрифт, что в окне WhoKey (если он установлен), иначе системный */
-  font: 13px/1.4 "MesloLGS Nerd Font", "MesloLGS NF", Menlo, Consolas, monospace;
+  width: 330px;
+  padding: 14px 14px 12px;
+  font: var(--font);
   color: var(--text);
-  background: radial-gradient(120% 90% at 50% -15%, #3f2160 0%, #1a1024 45%, var(--bg) 100%);
+  background: var(--backdrop);
 }
-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
-h1 {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--neon);
-  text-shadow: 0 0 10px rgba(221, 170, 249, 0.7);
+header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+#host {
+  max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--acc); font-weight: 700; font-size: 12px;
+  padding: 2px 10px; border-radius: 10px; border: 1px solid rgba(168, 144, 240, 0.45); background: rgba(168, 144, 240, 0.12);
 }
-#host { color: var(--acc); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#status { margin: 0 0 10px; color: var(--muted); white-space: pre-line; }
+#host:empty { display: none; }
+#status { margin: 0 4px 8px; color: var(--muted); white-space: pre-line; }
 #status.bad { color: var(--bad); }
 #status.good { color: var(--neon); }
-ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 button {
-  width: 100%;
-  text-align: left;
-  padding: 9px 12px;
-  border: 1px solid var(--rim);
-  border-radius: 12px;
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.09) 45%, rgba(255, 255, 255, 0.05) 100%);
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 8px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer;
 }
-button:hover, button:focus-visible {
-  outline: none;
-  border-color: var(--acc);
-  box-shadow: 0 0 12px rgba(202, 167, 240, 0.45);
+button:hover, button:focus-visible { outline: none; background: rgba(168, 144, 240, 0.16); }
+.text { min-width: 0; flex: 1; }
+.login, .site { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.login { font-weight: 700; }
+.site { color: var(--muted); font-size: 12px; }
+#add { justify-content: center; font-weight: 700; color: var(--neon); border: 1px dashed rgba(240, 92, 240, 0.45); }
+footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 10px; padding: 9px 4px 0; border-top: 1px solid var(--rim);
+  color: var(--faint); font-size: 11px;
 }
-button .login { display: block; font-weight: 600; }
-button .site { display: block; color: var(--muted); font-size: 12px; }
-button .num { float: right; color: var(--muted); }
-footer { margin-top: 12px; color: var(--muted); font-size: 11px; }
-footer a { color: var(--acc); text-decoration: none; display: block; margin-top: 4px; }
+footer a { color: var(--acc); text-decoration: none; font-weight: 700; }
+footer a:hover { color: var(--neon); }
 [hidden] { display: none !important; }
 #code {
   margin: 4px 0 12px;
@@ -61,6 +46,5 @@ footer a { color: var(--acc); text-decoration: none; display: block; margin-top:
   font-weight: 800;
   letter-spacing: 10px;
   color: var(--neon);
-  text-shadow: 0 0 12px rgba(221, 170, 249, 0.6);
+  text-shadow: 0 0 12px rgba(240, 92, 240, 0.6);
 }
-#add { text-align: center; font-weight: 600; }

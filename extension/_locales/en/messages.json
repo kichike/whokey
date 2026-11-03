@@ -62,15 +62,6 @@
   "error": {
     "message": "Something went wrong. Try again."
   },
-  "hint": {
-    "message": "$KEY$ opens this popup from the keyboard",
-    "placeholders": {
-      "key": {
-        "content": "$1",
-        "example": "Ctrl+Shift+L"
-      }
-    }
-  },
   "pairing": {
     "message": "Enter this code in WhoKey (it is also shown on the WhoKey icon in the toolbar):"
   },
@@ -93,7 +84,7 @@
     }
   },
   "generate_password": {
-    "message": "🔑 Generate a strong password"
+    "message": "✦ Generate a strong password"
   },
   "generated": {
     "message": "Password filled in. WhoKey opened a new entry with it — check it and press Save."
@@ -127,5 +118,11 @@
   },
   "window_busy": {
     "message": "Another WhoKey window is open. Finish it, then press again."
+  },
+  "hint_short": {
+    "message": "open this popup"
+  },
+  "settings_link": {
+    "message": "Settings"
   }
 }

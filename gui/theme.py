@@ -14,7 +14,7 @@ import traceback
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QRect, QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QLinearGradient, QPainter, QPalette, QPen, QPixmap
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QIcon, QLinearGradient, QPainter, QPalette, QPen, QPixmap
 from PySide6.QtWidgets import QAbstractSpinBox, QApplication, QGraphicsDropShadowEffect, QLineEdit, QWidget
 from shiboken6 import isValid  # жив ли ещё объект Qt за питоновской обёрткой
 
@@ -34,23 +34,26 @@ EYE_OFF_FILE = str(Path(__file__).parent / "assets" / "eye_off.svg")
 # иконка окна: на Windows — .ico без полей macOS (с полями на панели задач она мельче соседних)
 ICON_FILE = Path(__file__).parent / "assets" / ("WhoKey.ico" if sys.platform == "win32" else "icon.png")
 
-# --- цвета (имена — как переменные на сайте) ---
-BG = "#0a0a0c"         # фон окна
-SURF = "#0f0f12"       # панели
-WELL = "#0b0b0d"       # «углубления»: поля ввода, шапка таблицы
-LINE = "#1f1e24"       # тонкие линии
-LINE2 = "#2c2b32"      # рамки панелей
-TEXT = "#ecebf1"
-MUTED = "#a29fae"
-FAINT = "#6f6c7a"
-ACC = "#caa7f0"        # лавандовый акцент
-ACC_DEEP = "#936fc4"
-ACC_LIGHT = "#e4cffd"
-ACC_FILL = "#312442"   # заливка акцентных кнопок и выделения
-NEON = "#ddaaf9"       # «неон» — цвет логотипа на сайте, для свечения
-RAISED = "#1c1b21"     # обычные кнопки
-TIP = "#1d1c22"        # меню и подсказки
-TIP_RIM = "#4a4952"
+# --- цвета: палитра логотипа (пиксельный неоновый ключ на тёмно-синей плитке) ---
+# Ключ переливается от голубовато-лавандового (верх) к фуксии (низ) — это ACC и MAGENTA;
+# фон — тёмный индиго, как плитка иконки. Те же цвета — в расширении (extension/*.css)
+BG = "#07061a"         # фон окна — тёмный индиго
+SURF = "#0c0a22"       # панели
+WELL = "#08071a"       # «углубления»: поля ввода, шапка таблицы
+LINE = "#1d1a3c"       # тонкие линии
+LINE2 = "#2b2752"      # рамки панелей
+TEXT = "#eeeaff"
+MUTED = "#a4a0c8"
+FAINT = "#6c6896"
+ACC = "#a890f0"        # голубовато-лавандовый — верх ключа
+ACC_DEEP = "#6f55d8"
+ACC_LIGHT = "#d9ccff"
+ACC_FILL = "#261d5c"   # заливка акцентных кнопок и выделения
+MAGENTA = "#f048f0"    # фуксия — низ ключа
+NEON = "#f05cf0"       # «неон»: заголовок, свечение
+RAISED = "#17153a"     # обычные кнопки
+TIP = "#16143a"        # меню и подсказки
+TIP_RIM = "#3e3a6e"
 OK = "#3fb950"
 WARN = "#e0b64a"
 BAD = "#f24d5c"
@@ -65,7 +68,7 @@ def rgba(color, alpha):
     return f"rgba({r}, {g}, {b}, {alpha})"
 
 
-def solid(color, alpha, over="#1f1329"):
+def solid(color, alpha, over="#16123a"):
     """Непрозрачный цвет, который выглядит как color с прозрачностью alpha поверх фона over.
 
     Для рамок: скруглённую рамку Qt рисует по кусочкам (стороны и дуги углов
@@ -99,13 +102,14 @@ def glass(top, middle, bottom):
 GLASS = glass(rgba(WHITE, 52), rgba(WHITE, 24), rgba(WHITE, 12))
 GLASS_HOVER = glass(rgba(WHITE, 72), rgba(WHITE, 36), rgba(WHITE, 20))
 GLASS_PANEL = glass(rgba(WHITE, 24), rgba(WHITE, 10), rgba(WHITE, 4))
-GLASS_ACC = glass(rgba(ACC_LIGHT, 150), rgba(ACC, 105), rgba(ACC_DEEP, 70))
-GLASS_ACC_HOVER = glass(rgba(ACC_LIGHT, 190), rgba(ACC, 145), rgba(ACC_DEEP, 105))
+# главные кнопки переливаются как ключ: лавандовый сверху, фуксия снизу
+GLASS_ACC = glass(rgba(ACC_LIGHT, 150), rgba(ACC, 120), rgba(MAGENTA, 120))
+GLASS_ACC_HOVER = glass(rgba(ACC_LIGHT, 190), rgba(ACC, 160), rgba(MAGENTA, 160))
 GLASS_BAD = glass(rgba(BAD, 90), rgba(BAD, 50), rgba(BAD, 28))
 RIM = solid(WHITE, 40)       # кромка стекла
 RIM_HOVER = solid(WHITE, 75)
 RIM_ACC = solid(ACC_LIGHT, 150)
-RIM_CARD = solid(ACC, 120)
+RIM_CARD = solid(MAGENTA, 130)  # рамка больших панелей — в цвет фуксии
 HOLLOW = rgba("#000000", 95) # «углубление» поля ввода
 
 STYLE = f"""
@@ -115,9 +119,18 @@ QWidget {{ color: {TEXT}; font-family: "{FONT_FAMILY}"; font-size: {FONT_SIZE}px
 /* фиолетовое зарево сверху окна — как неоновая подсветка; его видно сквозь стекло */
 QMainWindow, QDialog, QWidget[role="backdrop"] {{
     background: qradialgradient(cx:0.5, cy:-0.15, radius:1.1, fx:0.5, fy:-0.15,
-                                stop:0 #3f2160, stop:0.45 #1a1024, stop:1 {BG}); }}
+                                stop:0 #3a1a9a, stop:0.30 #2a0f5a, stop:0.6 #120a30, stop:1 {BG}); }}
 QLabel {{ background: transparent; }}
-QLabel[role="title"] {{ font-size: {FONT_SIZE * 2 + 2}px; font-weight: 800; color: {NEON}; }}
+/* заголовок «WhoKey» — переливом, как ключ на логотипе */
+QLabel[role="title"] {{ font-size: {FONT_SIZE * 2 + 2}px; font-weight: 800;
+    color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #c9b8ff, stop:1 {NEON}); }}
+QLabel[role="heading"] {{ font-size: {FONT_SIZE + 3}px; font-weight: 800; color: {ACC_LIGHT}; }}
+QLabel[role="faint"] {{ color: {FAINT}; font-size: {FONT_SIZE - 1}px; }}
+/* плашка: имя файла хранилища, «Подключено» */
+QLabel[role="chip"] {{ color: {ACC}; background: {rgba(ACC, 40)}; border: 1px solid {solid(ACC, 110)};
+    border-radius: 9px; padding: 2px 9px; font-size: {FONT_SIZE - 1}px; font-weight: 600; }}
+QLabel[role="chip_off"] {{ color: {MUTED}; background: {rgba(WHITE, 14)}; border: 1px solid {solid(WHITE, 50)};
+    border-radius: 9px; padding: 2px 9px; font-size: {FONT_SIZE - 1}px; font-weight: 600; }}
 QLabel[role="muted"] {{ color: {MUTED}; }}
 QLabel[role="error"] {{ color: {BAD_INK}; }}
 QLabel[role="accent"] {{ color: {ACC}; font-weight: 600; }}
@@ -199,6 +212,10 @@ QHeaderView::section {{
 
 /* меню скруглено (см. rounded_menu) и непрозрачно: размытия под ним нет,
    и сквозь прозрачное меню читался бы текст таблицы */
+/* строка меню (на Windows — внутри окна): прозрачная, пункты — скруглённой плашкой */
+QMenuBar {{ background: transparent; }}
+QMenuBar::item {{ background: transparent; padding: 4px 10px; border-radius: 6px; }}
+QMenuBar::item:selected {{ background: {solid(ACC, 80, TIP)}; }}
 QMenu {{ background: {TIP}; border: 1px solid {solid(ACC, 130, TIP)}; border-radius: 12px; padding: 6px; }}
 QMenu::item {{ padding: 7px 22px 7px 14px; border-radius: 8px; }}
 QMenu::item:selected {{ background: {solid(ACC, 80, TIP)}; color: {WHITE}; }}
@@ -234,9 +251,16 @@ def apply(app):
                         (QPalette.Text, TEXT), (QPalette.WindowText, TEXT), (QPalette.ButtonText, TEXT),
                         (QPalette.Button, RAISED), (QPalette.PlaceholderText, FAINT),
                         (QPalette.Highlight, ACC_FILL), (QPalette.HighlightedText, TEXT),
-                        (QPalette.ToolTipBase, TIP), (QPalette.ToolTipText, TEXT), (QPalette.Mid, LINE2)]:
+                        (QPalette.ToolTipBase, TIP), (QPalette.ToolTipText, TEXT), (QPalette.Mid, LINE2),
+                        # ссылки — неоновые, а не стандартные синие
+                        (QPalette.Link, NEON), (QPalette.LinkVisited, NEON)]:
         palette.setColor(role, QColor(color))
     app.setPalette(palette)
+    # тёмная рамка окна и на Windows в светлой теме (иначе белая полоса над тёмным окном)
+    try:
+        app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
+    except AttributeError:  # Qt старше 6.8
+        pass
     app.setStyleSheet(STYLE + (
         # на Mac кнопки окон в системном порядке: «Отмена» слева, главное действие справа
         "QDialogButtonBox { button-layout: 1; }" if sys.platform == "darwin" else ""))
@@ -449,3 +473,67 @@ def mark_invalid(widget, invalid=True):
     widget.setProperty("invalid", invalid)
     widget.style().unpolish(widget)
     widget.style().polish(widget)
+
+
+# --- значки из шрифта и логотип ---
+# В MesloLGS Nerd Font уже есть значки Font Awesome — рисуем их как картинки:
+# одинаково на Mac и Windows (в отличие от эмодзи) и без лишних файлов
+GLYPHS = {"lock": "\uf023", "search": "\uf002", "cog": "\uf013", "puzzle": "\uf12e", "magic": "\uf0d0",
+          "plus": "\uf067", "import": "\uf093", "shield": "\uf132", "clock": "\uf017"}
+_SCALE = 3  # рисуем крупнее и уменьшаем — чётко и на Retina
+
+
+def glyph_pixmap(name, color=ACC, px=14, box=None):
+    box = box or px + 4
+    pixmap = QPixmap(box * _SCALE, box * _SCALE)
+    pixmap.setDevicePixelRatio(_SCALE)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    font = QFont(FONT_FAMILY)
+    font.setPixelSize(px)
+    painter.setFont(font)
+    painter.setPen(QColor(color))
+    painter.drawText(QRectF(0, 0, box, box), Qt.AlignCenter, GLYPHS[name])
+    painter.end()
+    return pixmap
+
+
+def glyph_icon(name, color=ACC, px=14):
+    return QIcon(glyph_pixmap(name, color, px))
+
+
+KEY_FILE = Path(__file__).parent / "assets" / "key.png"  # ключ с логотипа без плитки (make_key.py)
+
+
+def logo_pixmap(height):
+    """Пиксельный неоновый ключ с логотипа высотой height точек."""
+    source = QPixmap(str(KEY_FILE))
+    if source.isNull():
+        return QPixmap()
+    pixmap = source.scaledToHeight(height * _SCALE, Qt.SmoothTransformation)
+    pixmap.setDevicePixelRatio(_SCALE)
+    return pixmap
+
+
+def monogram(text, size=24):
+    """Кружок-буква записи (скруглённый квадрат), как в меню расширения: «G» для github.com."""
+    pixmap = QPixmap(size * _SCALE, size * _SCALE)
+    pixmap.setDevicePixelRatio(_SCALE)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    gradient = QLinearGradient(0, 0, size * 0.35, size)  # цвета ключа: светлый верх, фуксия к низу
+    gradient.setColorAt(0, QColor("#e6dcff"))
+    gradient.setColorAt(1, QColor("#c38cf2"))
+    painter.setBrush(gradient)
+    painter.setPen(Qt.NoPen)
+    painter.drawRoundedRect(QRectF(0, 0, size, size), size * 0.29, size * 0.29)
+    font = QFont(FONT_FAMILY)
+    font.setPixelSize(int(size * 0.55))
+    font.setBold(True)
+    painter.setFont(font)
+    painter.setPen(QColor("#1a1036"))
+    painter.drawText(QRectF(0, 0, size, size), Qt.AlignCenter, (text.strip() or "?")[0].upper())
+    painter.end()
+    return pixmap

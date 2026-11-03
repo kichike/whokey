@@ -147,6 +147,10 @@ Use it anyway?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Updated: {date}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Name</source>
         <translation type="unfinished"></translation>
     </message>
@@ -280,11 +284,15 @@ After saving, the old password cannot be recovered.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>The browser extension is connected.</source>
+        <source>Connected</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>The browser extension is not connected.</source>
+        <source>Not connected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fills logins and passwords on websites.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -435,10 +443,6 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Right-click an entry for actions. Double-click to edit.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Generator</source>
         <translation type="unfinished"></translation>
     </message>
@@ -452,10 +456,6 @@ Restore from it? If you create a new vault, the old backup will be kept under an
     </message>
     <message>
         <source>Updated</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>No entries yet — click &quot;+ Add&quot;.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -484,6 +484,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
     </message>
     <message>
         <source>Delete</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Right-click — actions  ·  double-click — edit  ·  {keys} — new entry</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -524,10 +528,6 @@ Restore from it? If you create a new vault, the old backup will be kept under an
     </message>
     <message>
         <source>Search by name, login or note</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Nothing found.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -616,6 +616,35 @@ It is encrypted with the same master password. To open it, choose it with the &q
     </message>
     <message>
         <source>Could not write the file: {error}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Your passwords will live here</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Everything is stored encrypted on this computer.
+Add your first entry or move your passwords from a browser.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add first entry</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Passwords can be filled right on websites — connect the extension</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Search looks in the name, login, note and website address.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear search</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Nothing found for «{query}»</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -729,6 +758,14 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
     </message>
     <message>
         <source>shorter than 12 characters</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>today, {time}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>yesterday</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

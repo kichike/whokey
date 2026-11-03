@@ -5,15 +5,16 @@ import shutil
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QDate, QDateTime, QLocale, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QColor, QDesktopServices, QFontDatabase, QGuiApplication, QKeySequence, QShortcut
+from PySide6.QtCore import QDate, QSize, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QAction, QColor, QIcon, QDesktopServices, QFontDatabase, QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel,
                                QLineEdit, QMainWindow, QMenu, QPushButton, QStackedWidget,
                                QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
 import csv_io
 import sites
-from gui import i18n, prefs, theme
+from gui import prefs, theme
+from gui.dates import full_date, shown_date
 from gui.dialogs import AboutDialog, ChangeMasterDialog, EntryDialog, ExportDialog, ExtensionDialog, GeneratorDialog, SettingsDialog
 from gui.widgets import ClipboardCountdown, RoundedRowDelegate, ask_yes, show_error, show_info
 from gui.i18n import tr
@@ -39,14 +40,6 @@ class SortItem(QTableWidgetItem):
 
     def __lt__(self, other):
         return self.key < getattr(other, "key", other.text())
-
-
-def shown_date(stamp):
-    """«2026-10-27 22:54» из хранилища — в привычном виде для выбранного языка."""
-    moment = QDateTime.fromString(stamp, "yyyy-MM-dd HH:mm")
-    if not moment.isValid():
-        return stamp
-    return QLocale("ru_RU" if i18n.LANG == "ru" else "en_US").toString(moment, QLocale.ShortFormat)
 
 
 def TABLE_KEYS(window):
@@ -96,7 +89,6 @@ class MainWindow(QMainWindow):
         column.addLayout(self._header())
         column.addLayout(self._toolbar())
         column.addWidget(self._table_card(), 1)
-        column.addWidget(theme.role(QLabel(tr("Right-click an entry for actions. Double-click to edit.")), "muted"))
         central = QWidget()
         central.setLayout(column)
         self.setCentralWidget(central)
@@ -105,6 +97,12 @@ class MainWindow(QMainWindow):
         self.countdown = ClipboardCountdown(bar_width=220)
         self.countdown.setContentsMargins(22, 0, 0, 4)  # вровень с содержимым окна
         self.statusBar().addWidget(self.countdown)
+        # подсказка — в строке состояния (пока нет таймера буфера), а не отдельной строкой над ней
+        new_entry = QKeySequence(QKeySequence.New).toString(QKeySequence.NativeText)
+        self.hint = theme.role(QLabel(tr("Right-click — actions  ·  double-click — edit  ·  {keys} — new entry").format(keys=new_entry)), "faint")
+        self.hint.setContentsMargins(22, 0, 0, 4)
+        self.statusBar().addWidget(self.hint)
+        self.countdown.finished.connect(self.hint.show)
         self.entries_count = theme.role(QLabel(), "muted")
         self.statusBar().addPermanentWidget(self.entries_count)
 
@@ -174,15 +172,22 @@ class MainWindow(QMainWindow):
     def _header(self):
         """Заголовок слева, общие действия справа."""
         row = QHBoxLayout()
+        row.setSpacing(10)
+        logo = QLabel()
+        logo.setPixmap(theme.logo_pixmap(36))  # пиксельный ключ с иконки WhoKey
+        row.addWidget(logo)
         title = theme.neon_title(theme.role(QLabel(tr("WhoKey")), "title"))
         row.addWidget(title)
-        row.addWidget(theme.role(QLabel(tr("password manager")), "muted"), 0, Qt.AlignBottom)
-        row.addWidget(theme.role(QLabel(self.vault.path.name), "accent"), 0, Qt.AlignBottom)
+        # открытый файл — плашкой со щитом (значки — символы шрифта Nerd Font)
+        vault_file = theme.role(QLabel(theme.GLYPHS["shield"] + "  " + self.vault.path.name), "chip")
+        vault_file.setToolTip(str(self.vault.path))
+        row.addWidget(vault_file, 0, Qt.AlignVCenter)
         row.addStretch()
-        for text, tip, handler in [(tr("Generator"), "", self.open_generator),
-                                   (tr("Extension"), "", self.extension),
-                                   (tr("Settings"), shortcut_text("Ctrl+,"), self.open_settings),
-                                   ("🔒", tr("Lock WhoKey") + " " + shortcut_text("Ctrl+L"), self.lock_requested.emit)]:
+        glyph = theme.GLYPHS
+        for text, tip, handler in [(glyph["magic"] + "  " + tr("Generator"), "", self.open_generator),
+                                   (glyph["puzzle"] + "  " + tr("Extension"), "", self.extension),
+                                   (glyph["cog"] + "  " + tr("Settings"), shortcut_text("Ctrl+,"), self.open_settings),
+                                   (glyph["lock"], tr("Lock WhoKey") + " " + shortcut_text("Ctrl+L"), self.lock_requested.emit)]:
             button = QPushButton(text)
             button.setToolTip(tip)
             button.clicked.connect(lambda checked=False, h=handler: h())
@@ -194,6 +199,7 @@ class MainWindow(QMainWindow):
         self.search = QLineEdit()
         self.search.setPlaceholderText(tr("Search by name, login or note"))
         self.search.setClearButtonEnabled(True)
+        self.search.addAction(theme.glyph_icon("search", theme.FAINT, 13), QLineEdit.LeadingPosition)
         self.search.textChanged.connect(lambda: self.refresh())
         row.addWidget(self.search, 1)
         add = theme.kind(QPushButton("+ " + tr("Add")), "primary")
@@ -215,9 +221,14 @@ class MainWindow(QMainWindow):
         self.table.setShowGrid(False)
         self.table.setItemDelegate(RoundedRowDelegate(self.table))  # выделение — скруглённой плашкой
         self.table.verticalHeader().setVisible(False)
-        self.table.verticalHeader().setDefaultSectionSize(38)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        self.table.verticalHeader().setDefaultSectionSize(42)
+        self.table.setIconSize(QSize(24, 24))  # буква-кружок у названия
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Stretch)
+        # восемь одинаковых точек не нуждаются в широкой колонке — место названию и логину
+        header.setSectionResizeMode(2, QHeaderView.Fixed)
+        header.resizeSection(2, 120)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setHighlightSections(False)
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         # по умолчанию — по сайту от А до Я (Qt сам начал бы с обратного порядка)
@@ -228,10 +239,8 @@ class MainWindow(QMainWindow):
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._context_menu)
 
-        self.empty = theme.role(QLabel(tr("No entries yet — click \"+ Add\".")), "muted")
-        self.empty.setAlignment(Qt.AlignCenter)
-        self.nothing_found = theme.role(QLabel(tr("Nothing found.")), "muted")
-        self.nothing_found.setAlignment(Qt.AlignCenter)
+        self.empty = self._empty_state()
+        self.nothing_found = self._nothing_found_state()
 
         card = theme.role(QFrame(), "card")
         self.stack = QStackedWidget()
@@ -243,6 +252,51 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.nothing_found)
         theme.neon_card(card)
         return card
+
+    def _centered(self, widgets):
+        """Блок по центру карточки: виджеты один под другим."""
+        page = QWidget()
+        column = QVBoxLayout(page)
+        column.addStretch()
+        for widget in widgets:
+            if isinstance(widget, QHBoxLayout):
+                column.addLayout(widget)
+            else:
+                if isinstance(widget, QLabel):
+                    widget.setAlignment(Qt.AlignCenter)
+                column.addWidget(widget, 0, Qt.AlignHCenter)
+        column.addStretch()
+        column.setSpacing(10)
+        return page
+
+    def _empty_state(self):
+        """Пустое хранилище — первое, что видит новый человек: что здесь будет и с чего начать."""
+        logo = QLabel()
+        logo.setPixmap(theme.logo_pixmap(96))
+        heading = theme.role(QLabel(tr("Your passwords will live here")), "heading")
+        about = theme.role(QLabel(tr("Everything is stored encrypted on this computer.\nAdd your first entry or move your passwords from a browser.")), "muted")
+        first = theme.kind(QPushButton(theme.GLYPHS["plus"] + "  " + tr("Add first entry")), "primary")
+        first.clicked.connect(lambda: self.add())
+        import_button = QPushButton(theme.GLYPHS["import"] + "  " + tr("Import from CSV…"))
+        import_button.clicked.connect(lambda: self.import_csv())
+        buttons = QHBoxLayout()
+        buttons.addStretch()
+        buttons.addWidget(first)
+        buttons.addWidget(import_button)
+        buttons.addStretch()
+        extension = theme.role(QLabel(f'{theme.GLYPHS["puzzle"]}  <a href="#" style="color: {theme.ACC}; text-decoration: none;">'
+                                      + tr("Passwords can be filled right on websites — connect the extension") + "</a>"), "accent")
+        extension.linkActivated.connect(lambda _: self.extension())
+        return self._centered([logo, heading, about, buttons, extension])
+
+    def _nothing_found_state(self):
+        icon = QLabel()
+        icon.setPixmap(theme.glyph_pixmap("search", theme.FAINT, 44, 56))
+        self.nothing_text = theme.role(QLabel(), "heading")
+        hint = theme.role(QLabel(tr("Search looks in the name, login, note and website address.")), "muted")
+        clear = QPushButton(tr("Clear search"))
+        clear.clicked.connect(lambda: (self.search.clear(), self.search.setFocus()))
+        return self._centered([icon, self.nothing_text, hint, clear])
 
     def _context_menu(self, pos):
         row = self.table.rowAt(pos.y())
@@ -273,6 +327,14 @@ class MainWindow(QMainWindow):
         if not rows:
             return None
         return self.table.item(rows[0].row(), 0).data(Qt.UserRole)
+
+    _monograms = {}  # буква -> значок: рисуем каждую букву один раз
+
+    def _monogram(self, name):
+        letter = (name.strip() or "?")[0].upper()
+        if letter not in self._monograms:
+            MainWindow._monograms[letter] = QIcon(theme.monogram(letter, 24))
+        return self._monograms[letter]
 
     _chosen = None  # последняя выбранная запись — чтобы выделение пережило поиск без результатов
 
@@ -308,8 +370,10 @@ class MainWindow(QMainWindow):
                     item = SortItem(shown_date(text), text)
                 else:
                     item = SortItem(text, text.casefold())
+                if field == "site":
+                    item.setIcon(self._monogram(text))
                 if field != "password":
-                    item.setToolTip(text if field != "updated" else item.text())  # обрезанное — целиком
+                    item.setToolTip(text if field != "updated" else full_date(text))  # обрезанное — целиком
                 if field == "password" and index == self.revealed:
                     item.setFont(mono)  # в моноширинном шрифте не спутать l и 1, O и 0
                     item.setForeground(QColor(theme.ACC_LIGHT))
@@ -328,6 +392,7 @@ class MainWindow(QMainWindow):
         if not self.vault.entries:
             self.stack.setCurrentWidget(self.empty)
         elif not self.table.rowCount():
+            self.nothing_text.setText(tr("Nothing found for «{query}»").format(query=query))
             self.stack.setCurrentWidget(self.nothing_found)
         else:
             self.stack.setCurrentWidget(self.table)
@@ -422,6 +487,7 @@ class MainWindow(QMainWindow):
             show_error(self, tr("Could not copy the password to the clipboard."))
             return False
         self.statusBar().clearMessage()  # сообщение поверх скрыло бы таймер
+        self.hint.hide()  # на месте подсказки — таймер буфера
         self.countdown.start(prefs.clear_after())
         return True
 

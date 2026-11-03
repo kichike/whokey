@@ -194,8 +194,14 @@ class RoundedRowDelegate(QStyledItemDelegate):
 
     def paint(self, painter, option, index):
         if option.state & QStyle.State_Selected:
-            fill = QColor(theme.ACC)
-            fill.setAlpha(115)
+            # переливом через всю строку, как ключ на логотипе: лавандовый → фуксия
+            width = option.widget.viewport().width() if option.widget else option.rect.right()
+            fill = QLinearGradient(0, 0, width, 0)
+            start, end = QColor(theme.ACC), QColor(theme.MAGENTA)
+            start.setAlpha(120)
+            end.setAlpha(110)
+            fill.setColorAt(0, start)
+            fill.setColorAt(1, end)
             self._plate(painter, option, fill)
             # остальное (текст) — как обычно, но без стандартной прямоугольной заливки
             option = QStyleOptionViewItem(option)

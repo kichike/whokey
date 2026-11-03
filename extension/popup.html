@@ -3,18 +3,21 @@
 <head>
   <meta charset="utf-8">
   <title>WhoKey</title>
+  <link rel="preload" href="fonts/meslo-regular.woff" as="font" type="font/woff" crossorigin>
+  <link rel="preload" href="fonts/meslo-bold.woff" as="font" type="font/woff" crossorigin>
+  <link rel="stylesheet" href="tokens.css">
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <header>
-    <h1>WhoKey</h1>
+    <span class="brand"><img src="icons/key.png" alt=""><b>WhoKey</b></span>
     <span id="host"></span>
   </header>
   <p id="status"></p>
   <p id="code" hidden></p>
   <ul id="items"></ul>
   <button id="add" hidden></button>
-  <footer><span id="hint"></span> <a id="options" href="#"></a></footer>
+  <footer><span id="hint"><span class="keycap" id="keys"></span> <span id="hint_text"></span></span> <a id="options" href="#"></a></footer>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -2,13 +2,15 @@
 настройки, расширение браузера (журнал выдач паролей)."""
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QWidget,
                                QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPlainTextEdit, QPushButton,
                                QTableWidget, QTableWidgetItem, QVBoxLayout)
 
 import sites
 from generator import weakness_reasons
 from gui import i18n, prefs, theme, touchid
+from gui.dates import full_date, shown_date
 from gui.widgets import ClipboardCountdown, GeneratorPanel, PasswordField, StrengthBar, ask_yes, show_error, weakness_text
 from gui.i18n import tr
 from vault import SaveError
@@ -62,6 +64,21 @@ class EntryDialog(QDialog):
         self.generator.generated.connect(self._on_generated)
         self._on_password_changed(entry["password"])
 
+        # шапка: буква-кружок и название (меняются, пока название печатают), когда изменена
+        self.avatar = QLabel()
+        self.heading = theme.role(QLabel(), "heading")
+        changed = tr("Updated: {date}").format(date=shown_date(entry["updated"])) if entry.get("updated") else tr("New entry")
+        head = QHBoxLayout()
+        head.setSpacing(12)
+        head.addWidget(self.avatar)
+        names = QVBoxLayout()
+        names.setSpacing(2)
+        names.addWidget(self.heading)
+        names.addWidget(theme.role(QLabel(changed), "faint"))
+        head.addLayout(names, 1)
+        self.site.textChanged.connect(self._update_heading)
+        self._update_heading()
+
         form = QFormLayout()
         form.addRow(tr("Name"), self.site)
         form.addRow(tr("Website address"), self.url)
@@ -74,6 +91,9 @@ class EntryDialog(QDialog):
         self.error = QLabel()
         theme.role(self.error, "error")
         column = QVBoxLayout(self)
+        column.setContentsMargins(22, 20, 22, 20)
+        column.addLayout(head)
+        column.addSpacing(6)
         column.addLayout(form)
         column.addWidget(self.error)
         column.addWidget(_buttons(self, tr("Save")))
@@ -83,6 +103,11 @@ class EntryDialog(QDialog):
         self._initial = self.values(normalize=False)
         if "created" not in entry:
             self._initial["password"] = ""
+
+    def _update_heading(self):
+        name = self.site.text().strip()
+        self.heading.setText(name or tr("New entry"))
+        self.avatar.setPixmap(theme.monogram(name or "?", 40))
 
     def _on_generated(self, password, bits):
         # у сохранённой записи старый пароль после «Сохранить» пропал бы насовсем — спрашиваем
@@ -369,6 +394,10 @@ class AboutDialog(QDialog):
         self.setWindowTitle(tr("About WhoKey"))
         title = theme.neon_title(theme.role(QLabel(tr("WhoKey")), "title"))
         version = theme.role(QLabel(tr("Version {version}").format(version=VERSION)), "muted")
+        icon = QLabel()
+        picture = QPixmap(str(theme.ICON_FILE)).scaled(72 * 3, 72 * 3, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        picture.setDevicePixelRatio(3)
+        icon.setPixmap(picture)
         what = QLabel(tr("Password manager: everything is stored encrypted on your computer, nothing is sent to the internet."))
         what.setWordWrap(True)
         # ссылки открываются в браузере; адреса — свои, из version.py
@@ -385,7 +414,17 @@ class AboutDialog(QDialog):
         close.rejected.connect(self.reject)
         column = QVBoxLayout(self)
         column.setSpacing(10)
-        for widget in (title, version, what, links, license_):
+        head = QHBoxLayout()
+        head.setSpacing(16)
+        head.addWidget(icon)
+        names = QVBoxLayout()
+        names.addStretch()
+        names.addWidget(title)
+        names.addWidget(version)
+        names.addStretch()
+        head.addLayout(names, 1)
+        column.addLayout(head)
+        for widget in (what, links, license_):
             column.addWidget(widget)
         column.addWidget(close)
         what.setMinimumWidth(380)
@@ -406,6 +445,13 @@ class ExtensionDialog(QDialog):
         self.vault, self.save = vault, save
 
         column = QVBoxLayout(self)
+        column.setContentsMargins(22, 20, 22, 20)
+        head = QHBoxLayout()
+        head.addWidget(theme.role(QLabel(theme.GLYPHS["puzzle"] + "  " + tr("Browser extension")), "heading"))
+        head.addStretch()
+        self.state = QLabel()
+        head.addWidget(self.state)
+        column.addLayout(head)
         self.status = QLabel()
         self.status.setWordWrap(True)
         self.status.setTextFormat(Qt.RichText)
@@ -423,8 +469,16 @@ class ExtensionDialog(QDialog):
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         column.addWidget(self.table, 1)
-        self.empty = theme.role(QLabel(tr("Nothing has been sent yet.")), "muted")
-        column.addWidget(self.empty)
+        # пустой журнал — по центру, со значком часов, а не строчкой посреди пустоты
+        self.empty = QWidget()
+        empty_column = QVBoxLayout(self.empty)
+        empty_column.addStretch()
+        clock = QLabel()
+        clock.setPixmap(theme.glyph_pixmap("clock", theme.FAINT, 18))
+        empty_column.addWidget(clock, 0, Qt.AlignHCenter)
+        empty_column.addWidget(theme.role(QLabel(tr("Nothing has been sent yet.")), "muted"), 0, Qt.AlignHCenter)
+        empty_column.addStretch()
+        column.addWidget(self.empty, 1)
 
         row = QHBoxLayout()
         self.clear_button = QPushButton(tr("Clear log"))
@@ -442,17 +496,22 @@ class ExtensionDialog(QDialog):
 
     def _refresh(self):
         connected = bool(self.vault.bridge_keys)
-        if connected:
-            self.status.setText(tr("The browser extension is connected."))
-        else:
-            self.status.setText(tr("The browser extension is not connected.") + " "
-                                + tr('How to install it: <a href="{url}">README on GitHub</a>.').format(url=README_URL))
+        self.state.setText("●  " + (tr("Connected") if connected else tr("Not connected")))
+        theme.role(self.state, "chip" if connected else "chip_off")
+        self.state.style().unpolish(self.state)
+        self.state.style().polish(self.state)
+        self.status.setText(tr("Fills logins and passwords on websites.") if connected else
+                            tr('How to install it: <a href="{url}">README on GitHub</a>.').format(url=README_URL))
         self.disconnect_button.setEnabled(connected)
         log = list(reversed(self.vault.access_log))
         self.table.setRowCount(len(log))
         for row, item in enumerate(log):
             for col, key in enumerate(("time", "site", "login")):
-                self.table.setItem(row, col, QTableWidgetItem(item[key]))
+                text = shown_date(item[key]) if key == "time" else item[key]
+                cell = QTableWidgetItem(text)
+                if key == "time":
+                    cell.setToolTip(full_date(item[key]))
+                self.table.setItem(row, col, cell)
         self.table.setVisible(bool(log))
         self.empty.setVisible(not log)
         self.clear_button.setEnabled(bool(log))

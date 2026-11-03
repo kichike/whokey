@@ -1,0 +1,38 @@
+/* Общие цвета и шрифт всех страниц расширения — те же, что в окнах WhoKey (gui/theme.py):
+   палитра логотипа — тёмный индиго, голубовато-лавандовый и фуксия, как неоновый ключ */
+@font-face { font-family: "WhoKey Meslo"; src: url("fonts/meslo-regular.woff") format("woff"); font-weight: 400; }
+@font-face { font-family: "WhoKey Meslo"; src: url("fonts/meslo-bold.woff") format("woff"); font-weight: 700 800; }
+:root {
+  --bg: #07061a;
+  --surface: #0c0a22;
+  --text: #eeeaff;
+  --muted: #a4a0c8;
+  --faint: #6c6896;
+  --acc: #a890f0;          /* верх ключа */
+  --acc-light: #d9ccff;
+  --magenta: #f048f0;      /* низ ключа */
+  --neon: #f05cf0;
+  --rim: #2b2752;
+  --bad: #ff8a95;
+  --font: 13px/1.4 "WhoKey Meslo", "MesloLGS Nerd Font", Menlo, Consolas, monospace;
+  /* фон: зарево сверху плавно растворяется в тёмном индиго — без резких полос */
+  --backdrop: radial-gradient(140% 120% at 50% -30%, #3a1a9a 0%, #2a0f5a 30%, #120a30 60%, var(--bg) 100%);
+  --title: linear-gradient(90deg, #c9b8ff, var(--neon));
+  --avatar: linear-gradient(160deg, #e6dcff, #c38cf2);
+}
+html { background: var(--bg); }
+.brand { display: flex; align-items: center; gap: 8px; }
+.brand img { height: 26px; image-rendering: pixelated; filter: drop-shadow(0 0 6px rgba(240, 92, 240, 0.55)); }
+.brand b {
+  font-size: 17px; font-weight: 800;
+  background: var(--title); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.avatar {
+  flex: none; width: 30px; height: 30px; border-radius: 8px;
+  display: grid; place-items: center; font-weight: 800; color: #1a1036;
+  background: var(--avatar);
+}
+.keycap {
+  display: inline-block; min-width: 20px; padding: 0 5px; border-radius: 6px; text-align: center;
+  border: 1px solid var(--rim); background: rgba(255, 255, 255, 0.05); color: var(--muted); font-size: 11px;
+}

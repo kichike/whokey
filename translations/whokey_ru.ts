@@ -158,6 +158,10 @@ Use it anyway?</source>
         <translation>Пароли не совпадают, попробуйте ещё раз.</translation>
     </message>
     <message>
+        <source>Updated: {date}</source>
+        <translation>Изменено: {date}</translation>
+    </message>
+    <message>
         <source>Name</source>
         <translation>Название</translation>
     </message>
@@ -292,12 +296,16 @@ After saving, the old password cannot be recovered.</source>
         <translation>Отключить расширение</translation>
     </message>
     <message>
-        <source>The browser extension is connected.</source>
-        <translation>Расширение для браузера подключено.</translation>
+        <source>Connected</source>
+        <translation>Подключено</translation>
     </message>
     <message>
-        <source>The browser extension is not connected.</source>
-        <translation>Расширение для браузера не подключено.</translation>
+        <source>Not connected</source>
+        <translation>Не подключено</translation>
+    </message>
+    <message>
+        <source>Fills logins and passwords on websites.</source>
+        <translation>Заполняет логины и пароли на сайтах.</translation>
     </message>
     <message>
         <source>How to install it: &lt;a href=&quot;{url}&quot;&gt;README on GitHub&lt;/a&gt;.</source>
@@ -450,10 +458,6 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation>Не получилось открыть хранилище по Touch ID. Введите мастер-пароль.</translation>
     </message>
     <message>
-        <source>Right-click an entry for actions. Double-click to edit.</source>
-        <translation>Правый клик по записи — действия. Двойной клик — изменить.</translation>
-    </message>
-    <message>
         <source>Generator</source>
         <translation>Генератор</translation>
     </message>
@@ -468,10 +472,6 @@ Restore from it? If you create a new vault, the old backup will be kept under an
     <message>
         <source>Updated</source>
         <translation>Изменено</translation>
-    </message>
-    <message>
-        <source>No entries yet — click &quot;+ Add&quot;.</source>
-        <translation>Записей пока нет — нажмите «+ Добавить».</translation>
     </message>
     <message>
         <source>Hide password</source>
@@ -500,6 +500,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
     <message>
         <source>Delete</source>
         <translation>Удалить</translation>
+    </message>
+    <message>
+        <source>Right-click — actions  ·  double-click — edit  ·  {keys} — new entry</source>
+        <translation>Правый клик — действия  ·  двойной клик — изменить  ·  {keys} — новая запись</translation>
     </message>
     <message>
         <source>File</source>
@@ -540,10 +544,6 @@ Restore from it? If you create a new vault, the old backup will be kept under an
     <message>
         <source>Search by name, login or note</source>
         <translation>Поиск по названию, логину или заметке</translation>
-    </message>
-    <message>
-        <source>Nothing found.</source>
-        <translation>Ничего не найдено.</translation>
     </message>
     <message>
         <source>Delete entry</source>
@@ -620,6 +620,36 @@ It is encrypted with the same master password. To open it, choose it with the &q
     <message>
         <source>⚠ The change is saved, but the backup was not updated: {error}.</source>
         <translation>⚠ Изменение сохранено, но резервная копия не обновилась: {error}.</translation>
+    </message>
+    <message>
+        <source>Your passwords will live here</source>
+        <translation>Здесь будут ваши пароли</translation>
+    </message>
+    <message>
+        <source>Everything is stored encrypted on this computer.
+Add your first entry or move your passwords from a browser.</source>
+        <translation>Всё хранится зашифрованным на этом компьютере.
+Добавьте первую запись или перенесите пароли из браузера.</translation>
+    </message>
+    <message>
+        <source>Add first entry</source>
+        <translation>Добавить первую запись</translation>
+    </message>
+    <message>
+        <source>Passwords can be filled right on websites — connect the extension</source>
+        <translation>Пароли можно вставлять прямо на сайтах — подключите расширение</translation>
+    </message>
+    <message>
+        <source>Search looks in the name, login, note and website address.</source>
+        <translation>Поиск идёт по названию, логину, заметке и адресу сайта.</translation>
+    </message>
+    <message>
+        <source>Clear search</source>
+        <translation>Очистить поиск</translation>
+    </message>
+    <message>
+        <source>Nothing found for «{query}»</source>
+        <translation>Ничего не найдено по «{query}»</translation>
     </message>
     <message>
         <source>Delete &quot;{site}&quot; ({login})?
@@ -750,6 +780,14 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
     <message>
         <source>shorter than 12 characters</source>
         <translation>короче 12 символов</translation>
+    </message>
+    <message>
+        <source>today, {time}</source>
+        <translation>сегодня, {time}</translation>
+    </message>
+    <message>
+        <source>yesterday</source>
+        <translation>вчера</translation>
     </message>
 </context>
 <context>

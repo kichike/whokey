@@ -60,8 +60,19 @@ class LoginWindow(QWidget):
         column = QVBoxLayout(card)
         column.setContentsMargins(28, 24, 28, 24)
         column.setSpacing(12)
-        column.addWidget(theme.neon_title(theme.role(QLabel(tr("WhoKey")), "title")))
-        column.addWidget(theme.role(QLabel(tr("password manager")), "muted"))
+        logo = QLabel()
+        logo.setPixmap(theme.logo_pixmap(60))  # пиксельный ключ с иконки WhoKey
+        names = QVBoxLayout()
+        names.setSpacing(2)
+        names.addStretch()
+        names.addWidget(theme.neon_title(theme.role(QLabel(tr("WhoKey")), "title")))
+        names.addWidget(theme.role(QLabel(tr("password manager")), "muted"))
+        names.addStretch()
+        brand = QHBoxLayout()
+        brand.setSpacing(16)
+        brand.addWidget(logo)
+        brand.addLayout(names, 1)
+        column.addLayout(brand)
         column.addLayout(self._file_row())
 
         tidy_old_files(path)  # копия и замок от прежней версии — на новые места

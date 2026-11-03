@@ -3,15 +3,19 @@
 <head>
   <meta charset="utf-8">
   <title>WhoKey</title>
+  <link rel="preload" href="fonts/meslo-regular.woff" as="font" type="font/woff" crossorigin>
+  <link rel="preload" href="fonts/meslo-bold.woff" as="font" type="font/woff" crossorigin>
+  <link rel="stylesheet" href="tokens.css">
   <link rel="stylesheet" href="menu.css">
 </head>
 <body>
   <main id="menu">
+    <div class="brand"><img src="icons/key.png" alt=""><b>WhoKey</b></div>
     <p id="status"></p>
     <p id="code" hidden></p>
-    <button id="generate" class="wide" hidden></button>
     <ul id="items"></ul>
     <button id="add" class="wide" hidden></button>
+    <button id="generate" class="wide" hidden></button>
     <button id="hide_site" class="link" hidden></button>
   </main>
   <script src="menu.js"></script>

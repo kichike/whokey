@@ -98,6 +98,41 @@ class CopyAboutVersion(unittest.TestCase):
         self.assertEqual(re.search(r'#define AppVersion "(.*)"', iss).group(1), version.VERSION)
 
 
+class Redesign(unittest.TestCase):
+    """Короткие даты, пустое хранилище, «ничего не найдено»."""
+
+    def test_short_dates(self):
+        from PySide6.QtCore import QDateTime
+        from gui import i18n
+        from gui.dates import full_date, shown_date
+        now = QDateTime.currentDateTime()
+        stamp = lambda days: now.addDays(-days).toString("yyyy-MM-dd HH:mm")  # noqa: E731
+        i18n.set_language("en")
+        self.assertTrue(shown_date(stamp(0)).startswith("today, "))
+        self.assertEqual(shown_date(stamp(1)), "yesterday")
+        self.assertIn(str(now.addYears(-1).date().year()), shown_date(now.addYears(-1).toString("yyyy-MM-dd HH:mm")))
+        self.assertEqual(shown_date("не дата"), "не дата")
+        self.assertIn(":", full_date(stamp(40)))  # в подсказке — полностью, со временем
+
+    def test_empty_and_nothing_found(self):
+        from PySide6.QtWidgets import QPushButton
+        folder = Path(tempfile.mkdtemp())
+        prefs.use_file(folder / "p.ini")
+        vault = Vault.create(folder / "v.dat", "Зелёный-Кит-Летит-2026!")
+        window = MW.MainWindow(vault, Clipboard())
+        self.assertIs(window.stack.currentWidget(), window.empty)
+        buttons = [b.text() for b in window.empty.findChildren(QPushButton)]
+        self.assertTrue(any("Add first entry" in t for t in buttons) and any("CSV" in t for t in buttons))
+        vault.add("github.com", "egor", "pw")
+        window.search.setText("zzz")
+        self.assertIs(window.stack.currentWidget(), window.nothing_found)
+        self.assertIn("zzz", window.nothing_text.text())
+        [b for b in window.nothing_found.findChildren(QPushButton)][0].click()  # «Очистить поиск»
+        self.assertEqual(window.search.text(), "")
+        self.assertIs(window.stack.currentWidget(), window.table)
+        self.assertFalse(window.table.item(0, 0).icon().isNull())  # буква-кружок у названия
+
+
 class GenerateInSavedEntry(unittest.TestCase):
     def setUp(self):
         self.asked = []
