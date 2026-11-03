@@ -36,3 +36,12 @@ html { background: var(--bg); }
   display: inline-block; min-width: 20px; padding: 0 5px; border-radius: 6px; text-align: center;
   border: 1px solid var(--rim); background: rgba(255, 255, 255, 0.05); color: var(--muted); font-size: 11px;
 }
+
+/* нажатие видно: кнопка чуть сжимается и подсвечивается неоном */
+button { transition: transform 0.08s ease, background-color 0.08s ease, box-shadow 0.12s ease; }
+button:active:not(:disabled) {
+  transform: scale(0.97);
+  background: rgba(240, 92, 240, 0.22);
+  box-shadow: 0 0 0 1px rgba(240, 92, 240, 0.55), 0 0 14px rgba(240, 92, 240, 0.45);
+}
+@media (prefers-reduced-motion: reduce) { button { transition: none; } button:active:not(:disabled) { transform: none; } }

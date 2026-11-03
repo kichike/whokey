@@ -13,9 +13,9 @@ import sys
 import traceback
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject, QPoint, QRect, QRectF, Qt
+from PySide6.QtCore import QEvent, QObject, QPoint, QRect, QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QIcon, QLinearGradient, QPainter, QPalette, QPen, QPixmap
-from PySide6.QtWidgets import QAbstractSpinBox, QApplication, QGraphicsDropShadowEffect, QLineEdit, QWidget
+from PySide6.QtWidgets import QAbstractSpinBox, QApplication, QGraphicsDropShadowEffect, QLineEdit, QPushButton, QToolButton, QWidget
 from shiboken6 import isValid  # жив ли ещё объект Qt за питоновской обёрткой
 
 # лицензия Apache 2.0 — fonts/LICENSE.txt; обычное начертание и жирное (для кнопок и заголовков)
@@ -153,7 +153,6 @@ QPushButton {{
     background: {GLASS}; border: 1px solid {RIM};
     border-radius: {BUTTON_RADIUS}px; padding: 7px 16px; font-weight: 600; }}
 QPushButton:hover {{ background: {GLASS_HOVER}; border-color: {RIM_HOVER}; }}
-QPushButton:pressed {{ background: {rgba(WHITE, 8)}; }}
 QPushButton:disabled {{ color: {FAINT}; background: {rgba(WHITE, 8)}; border-color: {solid(WHITE, 20)}; }}
 QPushButton[kind="primary"] {{
     background: {GLASS_ACC}; border-color: {RIM_ACC}; color: {WHITE}; }}
@@ -162,6 +161,15 @@ QPushButton[kind="danger"] {{ background: {GLASS_BAD}; border-color: {solid(BAD_
 /* на чём стоит фокус с клавиатуры (Tab) — видно по лавандовой рамке */
 QPushButton:focus, QToolButton:focus, QComboBox:focus {{ border: 2px solid {ACC}; }}
 QLineEdit QToolButton:focus {{ border: none; }}
+/* нажатие: кнопка «проминается» — стекло становится впадиной, загорается рамка,
+   текст опускается на точку. Правила — после фокуса, чтобы при нажатии побеждали они */
+QPushButton:pressed, QToolButton:pressed {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {rgba("#000000", 120)}, stop:1 {rgba(ACC, 45)});
+    border-color: {ACC}; padding-top: 8px; padding-bottom: 6px; }}
+QPushButton[kind="primary"]:pressed {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {rgba(MAGENTA, 170)}, stop:1 {rgba(ACC_DEEP, 150)});
+    border-color: {NEON}; }}
+QPushButton[kind="danger"]:pressed {{ background: {rgba(BAD, 110)}; border-color: {BAD_INK}; }}
 
 QToolButton {{
     background: {GLASS}; border: 1px solid {RIM};
@@ -388,6 +396,17 @@ class _FocusGlow(QObject):
         if kind == QEvent.Show and obj.property("neon") and getattr(obj, "_halo", None) is None:
             # у карточки при создании ещё нет родителя — свечение заводим при показе
             obj._halo = Halo(obj, ACC_DEEP, 16, CARD_RADIUS, 110)
+        # нажали кнопку — вокруг неё загорается неон, отпустили — гаснет: нажатие видно сразу
+        if isinstance(obj, (QPushButton, QToolButton)) and obj.isEnabled() and not isinstance(obj.parentWidget(), QLineEdit):
+            pressed = kind == QEvent.MouseButtonPress or (kind == QEvent.KeyPress and event.key() == Qt.Key_Space)
+            released = kind in (QEvent.MouseButtonRelease, QEvent.Leave, QEvent.Hide) \
+                or (kind == QEvent.KeyRelease and event.key() == Qt.Key_Space)
+            flash = getattr(obj, "_press_halo", None)
+            if pressed and flash is None:
+                obj._press_halo = Halo(obj, NEON, 9, BUTTON_RADIUS, 170, on_top=True)
+            elif released and flash is not None:
+                obj._press_halo = None
+                QTimer.singleShot(90, lambda: flash.remove() if isValid(flash) else None)  # гаснет не мгновенно
         if kind in (QEvent.FocusIn, QEvent.FocusOut) \
                 and isinstance(obj, (QLineEdit, QAbstractSpinBox)) \
                 and not isinstance(obj.parentWidget(), QAbstractSpinBox):  # строка внутри поля-числа
