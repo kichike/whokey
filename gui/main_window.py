@@ -286,6 +286,7 @@ class MainWindow(QMainWindow):
         buttons.addStretch()
         extension = theme.role(QLabel(f'{theme.GLYPHS["puzzle"]}  <a href="#" style="color: {theme.ACC}; text-decoration: none;">'
                                       + tr("Passwords can be filled right on websites — connect the extension") + "</a>"), "accent")
+        extension.setTextFormat(Qt.RichText)  # ссылка — HTML (role() делает надписи простым текстом)
         extension.linkActivated.connect(lambda _: self.extension())
         return self._centered([logo, heading, about, buttons, extension])
 

@@ -15,7 +15,8 @@ from pathlib import Path
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QRect, QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QIcon, QLinearGradient, QPainter, QPalette, QPen, QPixmap
-from PySide6.QtWidgets import QAbstractSpinBox, QApplication, QGraphicsDropShadowEffect, QLineEdit, QPushButton, QToolButton, QWidget
+from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QGraphicsDropShadowEffect, QLabel, QLineEdit, QPushButton,
+                               QToolButton, QWidget)
 from shiboken6 import isValid  # жив ли ещё объект Qt за питоновской обёрткой
 
 # лицензия Apache 2.0 — fonts/LICENSE.txt; обычное начертание и жирное (для кнопок и заголовков)
@@ -397,9 +398,10 @@ class _FocusGlow(QObject):
             # у карточки при создании ещё нет родителя — свечение заводим при показе
             obj._halo = Halo(obj, ACC_DEEP, 16, CARD_RADIUS, 110)
         # нажали кнопку — вокруг неё загорается неон, отпустили — гаснет: нажатие видно сразу
-        if isinstance(obj, (QPushButton, QToolButton)) and obj.isEnabled() and not isinstance(obj.parentWidget(), QLineEdit):
-            pressed = kind == QEvent.MouseButtonPress or (kind == QEvent.KeyPress and event.key() == Qt.Key_Space)
-            released = kind in (QEvent.MouseButtonRelease, QEvent.Leave, QEvent.Hide) \
+        if isinstance(obj, (QPushButton, QToolButton)) and not isinstance(obj.parentWidget(), QLineEdit):
+            pressed = obj.isEnabled() and (kind == QEvent.MouseButtonPress
+                                           or (kind == QEvent.KeyPress and event.key() == Qt.Key_Space))
+            released = kind in (QEvent.MouseButtonRelease, QEvent.Leave, QEvent.Hide, QEvent.EnabledChange) \
                 or (kind == QEvent.KeyRelease and event.key() == Qt.Key_Space)
             flash = getattr(obj, "_press_halo", None)
             if pressed and flash is None:
@@ -474,8 +476,15 @@ def rounded_popup(combo):
 
 
 def role(widget, name):
-    """Помечает элемент для оформления: role(label, "muted") — серый текст и т.п."""
+    """Помечает элемент для оформления: role(label, "muted") — серый текст и т.п.
+
+    Надпись заодно становится простым текстом. Иначе Qt сам решает, не HTML ли это,
+    и название записи вроде «<img width=60000 …>» (например, из CSV) рисовалось бы
+    картинкой — окно раздувалось до гигантских размеров и WhoKey падал (ревью 1.6).
+    HTML (ссылки) включают явно: label.setTextFormat(Qt.RichText)."""
     widget.setProperty("role", name)
+    if isinstance(widget, QLabel):
+        widget.setTextFormat(Qt.PlainText)
     return widget
 
 

@@ -133,6 +133,28 @@ class Redesign(unittest.TestCase):
         self.assertFalse(window.table.item(0, 0).icon().isNull())  # буква-кружок у названия
 
 
+class PlainTextLabels(unittest.TestCase):
+    """Ревью 1.6: название записи и текст поиска — не HTML (иначе <img width=60000> ронял WhoKey)."""
+
+    HOSTILE = "<img src=x width=30000 height=30000><b>bold</b>"
+
+    def test_entry_name_and_search_are_plain_text(self):
+        from PySide6.QtCore import Qt
+        folder = Path(tempfile.mkdtemp())
+        prefs.use_file(folder / "p.ini")
+        vault = Vault.create(folder / "v.dat", "Зелёный-Кит-Летит-2026!")
+        vault.add(self.HOSTILE, "egor", "pw")  # как после импорта CSV с таким названием
+        window = MW.MainWindow(vault, Clipboard())
+        window.resize(960, 600)
+        window.search.setText(self.HOSTILE + "zz")
+        self.assertEqual(window.nothing_text.textFormat(), Qt.PlainText)
+        self.assertLess(window.nothing_text.sizeHint().height(), 200)
+        dialog = D.EntryDialog(window, vault.entries[0])
+        self.assertEqual(dialog.heading.textFormat(), Qt.PlainText)
+        self.assertLess(dialog.sizeHint().width(), 3000)  # окно не раздувается картинкой
+        self.assertIn("<img", dialog.heading.text())  # название показано как есть, буквами
+
+
 class GenerateInSavedEntry(unittest.TestCase):
     def setUp(self):
         self.asked = []

@@ -389,6 +389,7 @@ def _message(parent, title, text, symbol, color):
     """Окошко с сообщением и нашим значком вместо стандартного (тот почти не виден)."""
     box = QMessageBox(parent)
     box.setWindowTitle(title)
+    box.setTextFormat(Qt.PlainText)  # в тексте бывает название записи — не HTML
     box.setText(text)
     box.setIconPixmap(theme.badge(symbol, color))
     return box
