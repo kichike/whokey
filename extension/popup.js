@@ -29,6 +29,7 @@ const TEXTS = {
   timeout: ["timeout", "bad"],
   fake_app: ["fake_app", "bad"],
   ambiguous: ["ambiguous", "bad"],
+  window_busy: ["window_busy", "bad"],
   cancelled: ["connecting", ""],
 };
 

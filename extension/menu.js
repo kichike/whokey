@@ -50,7 +50,8 @@ const TEXTS = {
   not_installed: ["not_installed", "bad"], bridge_closed: ["bridge_closed", "bad"], bad_page: ["bad_page", "bad"],
   not_found: ["not_found", "bad"], error: ["error", "bad"], busy: ["busy", "bad"], timeout: ["timeout", "bad"],
   fake_app: ["fake_app", "bad"], ambiguous: ["choose", ""], cancelled: ["connecting", ""],
-  generated: ["generated", "good"],
+  generated: ["generated", "good"], generated_not_filled: ["generated_not_filled", "bad"],
+  window_busy: ["window_busy", "bad"],
 };
 
 function status(text, kind = "") {

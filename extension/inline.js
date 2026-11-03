@@ -9,6 +9,10 @@
 (() => {
   if (window.top !== window) return; // только сама страница, не встроенные в неё фреймы
 
+  // отметка поля для вставки (см. background.js): по ключу-символу, а не по имени —
+  // элемент страницы с id="__whokeyTarget" подменил бы обычное свойство window
+  const TARGET = Symbol.for("whokey.target");
+  globalThis[TARGET] = null;
   const ICON = "data:image/png;base64,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";
   const SIZE = 20;      // значок, точек
   const GAP = 8;        // от правого края поля
@@ -164,7 +168,7 @@
     closeMenu();
     // отметка для вставки пароля (fillInPage в background.js): заполнять эту форму, а не первую.
     // Живёт в изолированном мире расширения — сайт её не видит
-    globalThis.__whokeyTarget = field;
+    globalThis[TARGET] = field;
     const frame = document.createElement("iframe");
     frame.src = chrome.runtime.getURL("menu.html");
     frame.style.height = "120px"; // точную высоту меню сообщит само (menu_size)
@@ -176,6 +180,7 @@
   function closeMenu() {
     if (menu) menu.frame.remove();
     menu = null;
+    globalThis[TARGET] = null; // меню закрыли — отметка поля больше не нужна
   }
 
   // сообщения приходят только от самого расширения (страница их послать не может)

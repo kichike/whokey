@@ -45,7 +45,7 @@ MAX_CONNECTIONS = 8                # больше одновременно не 
 REQUEST_TIMEOUT_MS = 5000          # соединение без запроса дольше этого закрывается
 PAIR_COOLDOWN = 10                 # секунд после отказа — новые запросы разрешения не показываем;
 PAIR_COOLDOWN_MAX = 600            # после каждого следующего отказа пауза вдвое длиннее, до 10 минут
-RATE_LIMIT = {"logins": 30, "fill": 10, "show": 5, "generate": 10}  # запросов в минуту
+RATE_LIMIT = {"logins": 30, "fill": 10, "show": 5, "generate": 5}  # запросов в минуту
 MAX_FIELD = 256  # логин и пароль из расширения для новой записи — не длиннее
 CLOSE_AFTER_MS = 2000              # после ответа: сколько ждём, пока собеседник закроет соединение
 
@@ -240,21 +240,34 @@ class BridgeServer(QObject):
             return self._fill(request, url)
         if kind == "generate":
             # «Сгенерировать пароль» в форме регистрации: тем же генератором и с теми же
-            # настройками, что в окне WhoKey. Ничего не сохраняется — это делает «show»
+            # настройками, что в окне WhoKey. Пароль выдаётся, ТОЛЬКО если WhoKey может сразу
+            # открыть с ним новую запись: сначала он появляется в WhoKey, потом на сайте —
+            # иначе пароль мог бы оказаться на сайте и нигде больше (ревью безопасности 1.5.1)
+            login = request.get("login", "")
+            if not isinstance(login, str) or len(login) > MAX_FIELD:
+                return {"status": "error"}
+            if not self._can_show():
+                return {"status": "window_busy"}
             length, kinds = prefs.generator_options() or (20, {})
             if not any(kinds.values()):
                 kinds = {}  # все наборы символов выключены — берём обычные (все)
-            return {"status": "ok", "password": generate_password(max(length, 12), **kinds)}
-        if kind == "show":
-            # «Добавить в WhoKey» из расширения: окно новой записи с уже вписанным адресом,
-            # а после «Сгенерировать пароль» — ещё с логином и паролем из формы
-            # (после ответа: окно не держит мост)
-            login, password = request.get("login", ""), request.get("password", "")
-            if not all(isinstance(x, str) and len(x) <= MAX_FIELD for x in (login, password)):
-                return {"status": "error"}
+            password = generate_password(max(length, 12), **kinds)
             QTimer.singleShot(0, lambda: self._show_new_entry(url, login, password))
+            return {"status": "ok", "password": password}
+        if kind == "show":
+            # «Добавить в WhoKey» из расширения: окно новой записи с уже вписанным адресом
+            # (после ответа: окно не держит мост)
+            if not self._can_show():
+                return {"status": "window_busy"}
+            QTimer.singleShot(0, lambda: self._show_new_entry(url))
             return {"status": "ok"}
         return {"status": "error"}
+
+    def _can_show(self):
+        """Можно ли сейчас открыть окно новой записи: WhoKey открыт и в нём нет другого окна
+        (второе поверх не открываем — человек запутается, что сохраняет)."""
+        window = self.window
+        return window is not None and hasattr(window, "add") and not window.findChildren(QDialog)
 
     def _show_new_entry(self, url, login="", password=""):
         window = self.window
@@ -263,7 +276,7 @@ class BridgeServer(QObject):
         window.showNormal()
         window.raise_()
         window.activateWindow()
-        if not window.findChildren(QDialog):  # уже открыто какое-то окно — второе поверх не открываем
+        if self._can_show():
             address = sites.normalize(url) or ""
             # без «www.»: запись для github.com подойдёт и www.github.com, а наоборот — нет
             window.add(url=address[4:] if address.startswith("www.") else address, login=login, password=password)

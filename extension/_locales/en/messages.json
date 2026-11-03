@@ -121,5 +121,11 @@
   },
   "options_link": {
     "message": "Extension settings"
+  },
+  "generated_not_filled": {
+    "message": "The page changed, so the password was not filled in. It is in the open WhoKey window — copy it from there."
+  },
+  "window_busy": {
+    "message": "Another WhoKey window is open. Finish it, then press again."
   }
 }

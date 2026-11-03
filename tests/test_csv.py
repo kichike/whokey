@@ -126,6 +126,12 @@ class Dialogs(unittest.TestCase):
     def test_prefilled_from_extension_is_new(self):
         dialog = D.EntryDialog(None, {"site": "github.com", "login": "", "password": "", "note": "", "url": "github.com"})
         self.assertEqual(dialog.windowTitle(), "New entry")
+        dialog.reject()  # только адрес — закрывается без вопроса
+        self.assertEqual(self.asked, [])
+        # пароль из «Сгенерировать» на сайте уже вписан там — молча закрыть нельзя (ревью 1.5.1)
+        dialog = D.EntryDialog(None, {"site": "github.com", "login": "egor", "password": "Gen-1!", "note": "", "url": "github.com"})
+        dialog.reject()
+        self.assertEqual(len(self.asked), 1)
 
     def test_export_needs_master_password(self):
         dialog = D.ExportDialog(None, self.vault)

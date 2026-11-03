@@ -76,6 +76,8 @@ class CopyAboutVersion(unittest.TestCase):
         self.window.save_copy()
         self.assertEqual(Vault.open(target, "Зелёный-Кит-Летит-2026!").entries[0]["password"], "pw")
         self.assertNotIn(b"github.com", target.read_bytes())  # внутри — только шифр
+        if sys.platform != "win32":
+            self.assertEqual(target.stat().st_mode & 0o777, 0o600)  # как само хранилище
 
     def test_copy_onto_itself_is_refused(self):
         MW.QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: (str(self.vault.path), ""))

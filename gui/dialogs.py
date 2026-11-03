@@ -77,7 +77,12 @@ class EntryDialog(QDialog):
         column.addLayout(form)
         column.addWidget(self.error)
         column.addWidget(_buttons(self, tr("Save")))
-        self._initial = self.values(normalize=False)  # чтобы при закрытии понять, было ли что-то изменено
+        # чтобы при закрытии понять, было ли что-то изменено. У новой записи пароль считается
+        # несохранённым: запись из расширения приходит уже с паролем (он уже вписан на сайте),
+        # и закрыть её молча значило бы этот пароль потерять
+        self._initial = self.values(normalize=False)
+        if "created" not in entry:
+            self._initial["password"] = ""
 
     def _on_generated(self, password, bits):
         # у сохранённой записи старый пароль после «Сохранить» пропал бы насовсем — спрашиваем

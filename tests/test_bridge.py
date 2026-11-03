@@ -127,20 +127,30 @@ class Requests(unittest.TestCase):
         self.assertEqual(self.ask(type="show", url="http://github.com")["status"], "bad_page")
         self.assertEqual(self.server.handle({"type": "show", "url": "https://github.com"})["status"], "pair_required")
 
-    def test_generate_and_show_with_login_and_password(self):
-        reply = self.ask(type="generate", url="https://github.com/signup")
-        self.assertEqual(reply["status"], "ok")
-        self.assertGreaterEqual(len(reply["password"]), 12)
-        self.assertNotEqual(reply["password"], self.ask(type="generate", url="https://github.com")["password"])
-        self.assertEqual(self.server.handle({"type": "generate", "url": "https://github.com"})["status"], "pair_required")
-        self.assertEqual(self.ask(type="generate", url="http://github.com")["status"], "bad_page")
+    def test_generate_opens_the_entry_before_giving_the_password(self):
+        """Ревью 1.5.1: пароль сначала в WhoKey (окно новой записи), потом на сайте."""
         added = []
         self.server.window.add = lambda url="", login="", password="": added.append((url, login, password))
-        self.assertEqual(self.ask(type="show", url="https://github.com", login="egor", password="Нов-ый1!"), {"status": "ok"})
+        reply = self.ask(type="generate", url="https://github.com/signup", login="egor")
+        self.assertEqual(reply["status"], "ok")
+        self.assertGreaterEqual(len(reply["password"]), 12)
         QCoreApplication.processEvents()
-        self.assertEqual(added, [("github.com", "egor", "Нов-ый1!")])
-        for bad in ({"login": ["x"]}, {"password": 5}, {"password": "x" * 300}):
-            self.assertEqual(self.ask(type="show", url="https://github.com", **bad)["status"], "error")
+        self.assertEqual(added, [("github.com", "egor", reply["password"])])
+        self.assertEqual(self.server.handle({"type": "generate", "url": "https://github.com"})["status"], "pair_required")
+        self.assertEqual(self.ask(type="generate", url="http://github.com")["status"], "bad_page")
+        for bad in (["x"], 5, "x" * 300):
+            self.assertEqual(self.ask(type="generate", url="https://github.com", login=bad)["status"], "error")
+
+    def test_no_password_when_the_entry_window_cannot_open(self):
+        from PySide6.QtWidgets import QDialog
+        self.server.window.add = lambda **_: None
+        dialog = QDialog(self.server.window)  # в WhoKey уже открыто другое окно
+        for kind in ("generate", "show"):
+            reply = self.ask(type=kind, url="https://github.com")
+            self.assertEqual(reply, {"status": "window_busy"})
+        dialog.deleteLater()
+        self.server.window = None  # WhoKey заблокирован
+        self.assertEqual(self.ask(type="generate", url="https://github.com"), {"status": "window_busy"})
 
     def test_rate_limit(self):
         statuses = [self.ask(type="fill", url="https://mail.ru", index=0, login="egor@mail.ru")["status"]

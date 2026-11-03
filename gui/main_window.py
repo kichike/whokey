@@ -1,5 +1,6 @@
 """Главное окно: поиск, таблица записей и меню действий по правому клику."""
 
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -472,6 +473,7 @@ class MainWindow(QMainWindow):
             return
         try:
             shutil.copyfile(self.vault.path, target)
+            os.chmod(target, 0o600)  # как само хранилище: только владельцу
         except OSError as error:
             show_error(self, tr("Could not write the file: {error}").format(error=error.strerror or error))
             return

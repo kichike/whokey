@@ -141,9 +141,9 @@ async function fillInPage(expectedOrigin, login, password, auto) {
   };
   // Поле, у которого человек нажал на значок WhoKey (inline.js). Эта функция работает в том
   // же изолированном от сайта мире расширения, что и inline.js, поэтому видит его отметку,
-  // а сайт — нет. Отметка одноразовая
-  const target = globalThis.__whokeyTarget;
-  globalThis.__whokeyTarget = null;
+  // а сайт — нет. Ключ — символ: элементом страницы с таким id его не подменить
+  const marked = globalThis[Symbol.for("whokey.target")];
+  const target = marked instanceof HTMLInputElement ? marked : null;
   // поле могло оказаться ниже экрана — прокрутим к нему, прежде чем проверять видимость
   const focus = target && target.isConnected ? target : document.querySelector("input[type=password]");
   if (focus) focus.scrollIntoView({ block: "center" });
@@ -289,24 +289,35 @@ async function hideOnSite(tabId, url) {
   await menuCommand(tabId, "inline_off");
 }
 
-// Эта функция выполняется ВНУТРИ страницы: вписывает сгенерированный пароль в поля
-// нового пароля той формы, у которой нажали на значок (и в «Повторите пароль»).
-// Возвращает логин из той же формы — чтобы WhoKey открыл запись уже с ним
+// Эта функция выполняется ВНУТРИ страницы: находит поля нового пароля той формы, у которой
+// нажали на значок (и «Повторите пароль»), и логин из той же формы. С password — вписывает
+// пароль; без него только проверяет, есть ли куда вписывать (до того, как просить WhoKey)
 function fillNewPassword(expectedOrigin, password) {
-  const target = globalThis.__whokeyTarget;
-  globalThis.__whokeyTarget = null;
   if (location.origin !== expectedOrigin) return { ok: false, reason: "moved" };
-  if (!target || !target.isConnected || target.type !== "password") return { ok: false, reason: "no_field" };
+  const marked = globalThis[Symbol.for("whokey.target")];
+  const target = marked instanceof HTMLInputElement && marked.isConnected ? marked : null;
+  if (!target || target.type !== "password") return { ok: false, reason: "no_field" };
   const shown = (el) => !el.disabled && !el.readOnly
     && (!el.checkVisibility || el.checkVisibility({ opacityProperty: true, visibilityProperty: true }))
     && el.getBoundingClientRect().width >= 8;
   const scope = [...(target.form || document).querySelectorAll("input")].filter(shown);
   const passwords = scope.filter((el) => el.type === "password");
-  const marked = passwords.filter((el) => (el.autocomplete || "").toLowerCase() === "new-password");
+  if (!passwords.includes(target)) return { ok: false, reason: "no_field" }; // поле спрятали
+  const hint = (el) => `${el.autocomplete || ""} ${el.name || ""} ${el.id || ""}`.toLowerCase();
+  // «текущий / старый пароль» не трогаем никогда
+  const current = (el) => /current-password|current|old/.test(hint(el));
+  const candidates = passwords.filter((el) => !current(el));
+  const newMarked = candidates.filter((el) => /new-password/.test(hint(el)));
   // помеченные сайтом «новый пароль»; иначе пароль + повтор; иначе это поле и следующие
-  // (в «старый, новый, повтор» старый не трогаем)
-  const fields = marked.length ? marked
-    : passwords.length === 2 ? passwords : passwords.slice(passwords.indexOf(target));
+  const fields = newMarked.length ? newMarked
+    : candidates.length === 2 ? candidates
+      : candidates.slice(Math.max(candidates.indexOf(target), 0));
+  if (!fields.length || current(target)) return { ok: false, reason: "no_field" };
+  const before = scope.slice(0, scope.indexOf(fields[0]));
+  const loginField = before.filter((el) => el.autocomplete === "username").pop()
+    || before.filter((el) => ["text", "email", "tel", ""].includes(el.type)).pop();
+  const login = loginField ? loginField.value.trim().slice(0, 256) : "";
+  if (password === null) return { ok: true, login };
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
   for (const el of fields) {
     el.focus();
@@ -314,32 +325,37 @@ function fillNewPassword(expectedOrigin, password) {
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
   }
-  const before = scope.slice(0, scope.indexOf(fields[0]));
-  const login = before.filter((el) => el.autocomplete === "username").pop()
-    || before.filter((el) => ["text", "email", "tel", ""].includes(el.type)).pop();
-  return { ok: true, login: login ? login.value.trim().slice(0, 256) : "" };
+  return { ok: true, login };
 }
 
+async function inPage(tabId, url, password) {
+  try {
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId }, func: fillNewPassword, args: [new URL(url).origin, password],
+    });
+    return result || { ok: false, reason: "no_field" };
+  } catch (e) {
+    return { ok: false, reason: "moved" };
+  }
+}
+
+// Порядок важен (ревью безопасности 1.5.1): пароль сначала появляется в WhoKey (окно новой
+// записи), и только потом на сайте. Если WhoKey не может открыть окно — пароль не создаётся,
+// и на сайт ничего не уходит: пароль не окажется там, где его нигде не записали
 async function generate(tabId, url) {
-  const reply = await api({ type: "generate", url });
+  const form = await inPage(tabId, url, null); // есть ли вообще куда вписывать
+  if (!form.ok) return { status: form.reason };
+  const reply = await api({ type: "generate", url, login: form.login });
   if (reply.status !== "ok") return reply;
   await menuCommand(tabId, "menu_hide");
-  let result;
-  try {
-    [{ result }] = await chrome.scripting.executeScript({
-      target: { tabId }, func: fillNewPassword, args: [new URL(url).origin, reply.password],
-    });
-  } catch (e) {
-    result = { ok: false, reason: "moved" };
-  }
-  if (!result || !result.ok) {
+  const result = await inPage(tabId, url, reply.password);
+  if (!result.ok) {
+    // в WhoKey пароль уже есть (окно новой записи открыто) — его можно скопировать оттуда
     await menuCommand(tabId, "menu_unhide");
-    return { status: (result && result.reason) || "no_field" };
+    return { status: "generated_not_filled" };
   }
-  // пароль уже в форме — сразу сохраняем его в WhoKey (окно новой записи), чтобы не потерять
   await closeMenu(tabId);
-  const saved = await api({ type: "show", url, login: result.login, password: reply.password });
-  return { status: saved.status === "ok" ? "generated" : saved.status };
+  return { status: "generated" };
 }
 
 // Команда меню на вкладке: menu_close — закрыть, menu_hide / menu_unhide — спрятать и
