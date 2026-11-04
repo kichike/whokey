@@ -262,7 +262,8 @@ class Devices(unittest.TestCase):
         self.path.write_bytes(self.template.read_bytes())
         other = self.folder / "vault 2.dat"
         Vault.create(other, "Совсем-Другой-Пароль-2026!")
-        for unrelated in ("vaults.dat", "WhoKey.dat", ".vault.dat.bak", "vault.txt"):
+        self.assertTrue(V.backup_path(self.path).exists())  # своя резервная копия рядом — не «копия от облака»
+        for unrelated in ("vaults.dat", "WhoKey.dat", "vault.txt"):
             (self.folder / unrelated).write_text("x")
         self.assertEqual(self.device().conflict_copies(), [other, copy] if str(other) < str(copy) else [copy, other])
         vault = self.device()
