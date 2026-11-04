@@ -119,5 +119,26 @@ class Glass(unittest.TestCase):
         self.assertLess((time.perf_counter() - started) / 30, 0.1)  # меньше 0,1 с на всё окно
 
 
+class IconButton(unittest.TestCase):
+    def test_glyph_is_centered(self):
+        """Замок на кнопке блокировки: шрифт держит значок не посреди ячейки, он съезжал вправо."""
+        button = QPushButton(theme.GLYPHS["lock"])
+        button.resize(46, 34)
+        button.show()
+        APP.processEvents()
+        with_glyph = button.grab().toImage()
+        button.setText("")
+        button.resize(46, 34)
+        APP.processEvents()
+        empty = button.grab().toImage()
+        ink = [(x, y) for y in range(with_glyph.height()) for x in range(with_glyph.width())
+               if abs(with_glyph.pixelColor(x, y).lightness() - empty.pixelColor(x, y).lightness()) > 60]
+        self.assertTrue(ink)
+        xs, ys = [p[0] for p in ink], [p[1] for p in ink]
+        self.assertLessEqual(abs(min(xs) + max(xs) + 1 - with_glyph.width()) / 2, 0.5)
+        self.assertLessEqual(abs(min(ys) + max(ys) + 1 - with_glyph.height()) / 2, 0.5)
+        button.close()
+
+
 if __name__ == "__main__":
     unittest.main()

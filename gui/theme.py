@@ -61,6 +61,21 @@ OK = "#3fb950"
 WARN = "#e0b64a"
 BAD = "#f24d5c"
 BAD_INK = "#ff8a95"
+GLOW_1, GLOW_2, GLOW_3 = "#3a1a9a", "#2a0f5a", "#120a30"  # зарево сверху окна
+TITLE_START = "#c9b8ff"  # начало перелива в заголовке
+LETTER_TOP, LETTER_BOTTOM, LETTER_INK = "#e6dcff", "#c38cf2", "#1a1036"  # кружки-буквы записей
+
+# Пасхалка: три нажатия на ключ в главном окне (см. MainWindow._logo_clicked).
+# Коричневый фон, жёлтый неон и оранжевый оттенок вместо фуксии. Только на время сеанса.
+_EGG_COLORS = {
+    "BG": "#140a03", "SURF": "#1e1006", "WELL": "#120903", "LINE": "#33200f", "LINE2": "#4a2f16",
+    "TEXT": "#fff6d6", "MUTED": "#c9b27a", "FAINT": "#8f7a4c",
+    "ACC": "#ffe600", "ACC_DEEP": "#a86a00", "ACC_LIGHT": "#fff59a", "ACC_FILL": "#4a3800",
+    "MAGENTA": "#ff9a00", "NEON": "#ffea00", "RAISED": "#2a1809", "TIP": "#24140a", "TIP_RIM": "#5a3c1c",
+    "GLOW_1": "#6b3a12", "GLOW_2": "#4a2509", "GLOW_3": "#241206", "TITLE_START": "#fff59a",
+    "LETTER_TOP": "#fff3a0", "LETTER_BOTTOM": "#ffb52e", "LETTER_INK": "#2a1605",
+}
+_USUAL_COLORS = {name: globals()[name] for name in _EGG_COLORS}
 
 
 
@@ -102,31 +117,38 @@ def glass(top, middle, bottom):
             f"stop:0 {top}, stop:0.45 {middle}, stop:1 {bottom})")
 
 
-GLASS = glass(rgba(WHITE, 52), rgba(WHITE, 24), rgba(WHITE, 12))
-GLASS_HOVER = glass(rgba(WHITE, 72), rgba(WHITE, 36), rgba(WHITE, 20))
-GLASS_PANEL = glass(rgba(WHITE, 24), rgba(WHITE, 10), rgba(WHITE, 4))
-# главные кнопки переливаются как ключ: лавандовый сверху, фуксия снизу
-GLASS_ACC = glass(rgba(ACC_LIGHT, 150), rgba(ACC, 120), rgba(MAGENTA, 120))
-GLASS_ACC_HOVER = glass(rgba(ACC_LIGHT, 190), rgba(ACC, 160), rgba(MAGENTA, 160))
-GLASS_BAD = glass(rgba(BAD, 90), rgba(BAD, 50), rgba(BAD, 28))
-RIM = solid(WHITE, 40)       # кромка стекла
-RIM_HOVER = solid(WHITE, 75)
-RIM_ACC = solid(ACC_LIGHT, 150)
-RIM_CARD = solid(MAGENTA, 130)  # рамка больших панелей — в цвет фуксии
-HOLLOW = rgba("#000000", 95) # «углубление» поля ввода
+def _derive_colors():
+    global GLASS, GLASS_HOVER, GLASS_PANEL, GLASS_ACC, GLASS_ACC_HOVER, GLASS_BAD, RIM, RIM_HOVER, RIM_ACC, RIM_CARD, HOLLOW
+    GLASS = glass(rgba(WHITE, 52), rgba(WHITE, 24), rgba(WHITE, 12))
+    GLASS_HOVER = glass(rgba(WHITE, 72), rgba(WHITE, 36), rgba(WHITE, 20))
+    GLASS_PANEL = glass(rgba(WHITE, 24), rgba(WHITE, 10), rgba(WHITE, 4))
+    # главные кнопки переливаются как ключ: лавандовый сверху, фуксия снизу
+    GLASS_ACC = glass(rgba(ACC_LIGHT, 150), rgba(ACC, 120), rgba(MAGENTA, 120))
+    GLASS_ACC_HOVER = glass(rgba(ACC_LIGHT, 190), rgba(ACC, 160), rgba(MAGENTA, 160))
+    GLASS_BAD = glass(rgba(BAD, 90), rgba(BAD, 50), rgba(BAD, 28))
+    RIM = solid(WHITE, 40)       # кромка стекла
+    RIM_HOVER = solid(WHITE, 75)
+    RIM_ACC = solid(ACC_LIGHT, 150)
+    RIM_CARD = solid(MAGENTA, 130)  # рамка больших панелей — в цвет фуксии
+    HOLLOW = rgba("#000000", 95) # «углубление» поля ввода
 
-STYLE = f"""
+
+_derive_colors()
+
+
+def _style():
+    return f"""
 /* шрифт — здесь, а не только через app.setFont: на macOS Qt ставит кнопкам, подписям
    и таблице системный шрифт отдельно, и общий шрифт приложения до них не доходил */
 QWidget {{ color: {TEXT}; font-family: "{FONT_FAMILY}"; font-size: {FONT_SIZE}px; }}
 /* фиолетовое зарево сверху окна — как неоновая подсветка; его видно сквозь стекло */
 QMainWindow, QDialog, QWidget[role="backdrop"] {{
     background: qradialgradient(cx:0.5, cy:-0.15, radius:1.1, fx:0.5, fy:-0.15,
-                                stop:0 #3a1a9a, stop:0.30 #2a0f5a, stop:0.6 #120a30, stop:1 {BG}); }}
+                                stop:0 {GLOW_1}, stop:0.30 {GLOW_2}, stop:0.6 {GLOW_3}, stop:1 {BG}); }}
 QLabel {{ background: transparent; }}
 /* заголовок «WhoKey» — переливом, как ключ на логотипе */
 QLabel[role="title"] {{ font-size: {FONT_SIZE * 2 + 2}px; font-weight: 800;
-    color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #c9b8ff, stop:1 {NEON}); }}
+    color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {TITLE_START}, stop:1 {NEON}); }}
 QLabel[role="heading"] {{ font-size: {FONT_SIZE + 3}px; font-weight: 800; color: {ACC_LIGHT}; }}
 QLabel[role="faint"] {{ color: {FAINT}; font-size: {FONT_SIZE - 1}px; }}
 /* плашка: имя файла хранилища, «Подключено» */
@@ -247,6 +269,9 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none
 """
 
 
+STYLE = _style()
+
+
 def apply(app):
     """Включает оформление для всего приложения."""
     QFontDatabase.addApplicationFont(str(FONT_BOLD_FILE))
@@ -257,6 +282,18 @@ def apply(app):
     # Fusion — простой стиль Qt, который послушно перекрашивается;
     # родной стиль macOS игнорирует часть настроек оформления
     app.setStyle("Fusion")
+    _apply_colors(app)
+    # тёмная рамка окна и на Windows в светлой теме (иначе белая полоса над тёмным окном)
+    try:
+        app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
+    except AttributeError:  # Qt старше 6.8
+        pass
+    global _focus_glow
+    _focus_glow = _FocusGlow()  # держим ссылку, иначе Python удалит фильтр
+    app.installEventFilter(_focus_glow)
+
+
+def _apply_colors(app):
     palette = QPalette()
     for role, color in [(QPalette.Window, BG), (QPalette.Base, WELL), (QPalette.AlternateBase, SURF),
                         (QPalette.Text, TEXT), (QPalette.WindowText, TEXT), (QPalette.ButtonText, TEXT),
@@ -267,17 +304,53 @@ def apply(app):
                         (QPalette.Link, NEON), (QPalette.LinkVisited, NEON)]:
         palette.setColor(role, QColor(color))
     app.setPalette(palette)
-    # тёмная рамка окна и на Windows в светлой теме (иначе белая полоса над тёмным окном)
-    try:
-        app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
-    except AttributeError:  # Qt старше 6.8
-        pass
     app.setStyleSheet(STYLE + (
         # на Mac кнопки окон в системном порядке: «Отмена» слева, главное действие справа
         "QDialogButtonBox { button-layout: 1; }" if sys.platform == "darwin" else ""))
-    global _focus_glow
-    _focus_glow = _FocusGlow()  # держим ссылку, иначе Python удалит фильтр
-    app.installEventFilter(_focus_glow)
+
+
+egg = False  # включена ли пасхалка
+
+
+def set_egg(on):
+    """Включает или выключает палитру пасхалки во всём приложении. Открытые окна перекрашиваются сами;
+    то, что нарисовано заранее (значки, логотип), главное окно обновляет в MainWindow._recolor."""
+    global egg, STYLE
+    if on == egg:
+        return
+    egg = on
+    globals().update(_EGG_COLORS if on else _USUAL_COLORS)
+    _derive_colors()
+    STYLE = _style()
+    _SCENES.clear()
+    app = QApplication.instance()
+    if app is None:
+        return
+    _apply_colors(app)
+    for widget in app.allWidgets():  # неоновые свечения заданы цветом заранее
+        effect = widget.graphicsEffect()
+        if isinstance(effect, QGraphicsDropShadowEffect):
+            light = QColor(ACC if widget.property("kind") == "primary" else NEON)  # см. kind() и neon_title()
+            light.setAlpha(effect.color().alpha())
+            effect.setColor(light)
+        elif isinstance(widget, Halo):
+            widget.recolor()
+
+
+def _poop_pixmap(height):
+    """Эмодзи вместо ключа. Цветной шрифт эмодзи есть в каждой системе, картинка в программу не встроена."""
+    side = height * _SCALE
+    pixmap = QPixmap(side, side)
+    pixmap.setDevicePixelRatio(_SCALE)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    font = QFont()
+    font.setFamilies(["Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"])
+    font.setPixelSize(int(height * 0.85))
+    painter.setFont(font)
+    painter.drawText(QRectF(0, 0, height, height), Qt.AlignCenter, "\U0001F4A9")
+    painter.end()
+    return pixmap
 
 
 def glow(widget, color=ACC, radius=24, alpha=170):
@@ -343,6 +416,12 @@ class Halo(QWidget):
         if isValid(self):
             self.hide()  # сразу, не дожидаясь удаления
             self.deleteLater()
+
+    def recolor(self):
+        """Палитра сменилась: у карточек один цвет свечения, у полей ввода другой (см. _FocusGlow)."""
+        if isValid(self.target):
+            self.color = QColor(ACC_DEEP if self.target.property("neon") else ACC)
+            self.update()
 
     def remove(self):
         if isValid(self.target):
@@ -550,6 +629,8 @@ KEY_FILE = Path(__file__).parent / "assets" / "key.png"  # ключ с лого�
 
 def logo_pixmap(height):
     """Пиксельный неоновый ключ с логотипа высотой height точек."""
+    if egg:
+        return _poop_pixmap(height)
     source = QPixmap(str(KEY_FILE))
     if source.isNull():
         return QPixmap()
@@ -566,8 +647,8 @@ def monogram(text, size=24):
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.Antialiasing)
     gradient = QLinearGradient(0, 0, size * 0.35, size)  # цвета ключа: светлый верх, фуксия к низу
-    gradient.setColorAt(0, QColor("#e6dcff"))
-    gradient.setColorAt(1, QColor("#c38cf2"))
+    gradient.setColorAt(0, QColor(LETTER_TOP))
+    gradient.setColorAt(1, QColor(LETTER_BOTTOM))
     painter.setBrush(gradient)
     painter.setPen(Qt.NoPen)
     painter.drawRoundedRect(QRectF(0, 0, size, size), size * 0.29, size * 0.29)
@@ -575,7 +656,7 @@ def monogram(text, size=24):
     font.setPixelSize(int(size * 0.55))
     font.setBold(True)
     painter.setFont(font)
-    painter.setPen(QColor("#1a1036"))
+    painter.setPen(QColor(LETTER_INK))
     painter.drawText(QRectF(0, 0, size, size), Qt.AlignCenter, (text.strip() or "?")[0].upper())
     painter.end()
     return pixmap
@@ -593,8 +674,9 @@ _BLUR_SCALE = 0.08    # чем меньше копия, тем сильнее р
 _SCENE_MAX = 2048     # длинная сторона картинки фона: в ней только плавные переливы, растяжение незаметно
 _LENS = 0.90          # какая доля картинки под стеклом видна: остальное — «увеличение»
 # пятна света: x, y, радиус (доли окна), цвет, яркость
-_LIGHTS = ((0.14, 0.04, 0.42, ACC_DEEP, 150), (0.84, 0.02, 0.36, MAGENTA, 120),
-           (0.92, 0.82, 0.38, ACC_DEEP, 70), (0.06, 0.92, 0.34, MAGENTA, 50))
+def _lights():
+    return ((0.14, 0.04, 0.42, ACC_DEEP, 150), (0.84, 0.02, 0.36, MAGENTA, 120),
+            (0.92, 0.82, 0.38, ACC_DEEP, 70), (0.06, 0.92, 0.34, MAGENTA, 50))
 
 
 def _scene(width, height):
@@ -609,12 +691,12 @@ def _scene(width, height):
         painter.setRenderHint(QPainter.Antialiasing)
         glow_top = QRadialGradient(0.5, -0.15, 1.1)  # то же зарево сверху, что в STYLE
         glow_top.setCoordinateMode(QGradient.ObjectBoundingMode)
-        for stop, color in ((0, "#3a1a9a"), (0.30, "#2a0f5a"), (0.6, "#120a30"), (1, BG)):
+        for stop, color in ((0, GLOW_1), (0.30, GLOW_2), (0.6, GLOW_3), (1, BG)):
             glow_top.setColorAt(stop, QColor(color))
         painter.fillRect(sharp.rect(), glow_top)
         painter.setPen(Qt.NoPen)
         reach = max(width, height)
-        for x, y, radius, color, alpha in _LIGHTS:
+        for x, y, radius, color, alpha in _lights():
             center = QPointF(x * width, y * height)
             light = QRadialGradient(center, radius * reach)
             bright = QColor(color)
@@ -670,7 +752,7 @@ def _draw_glass(painter, widget, rect, radius, tint, dark, sheen, rim_top, rim_b
     source = QRectF(corner.x() + rect.center().x() - width / 2, corner.y() + rect.center().y() - height / 2, width, height)
     scale_x, scale_y = small.width() / max(window.width(), 1), small.height() / max(window.height(), 1)
     painter.drawPixmap(rect, small, QRectF(source.x() * scale_x, source.y() * scale_y, width * scale_x, height * scale_y))
-    painter.fillPath(path, QColor(7, 6, 26, dark))
+    painter.fillPath(path, _with_alpha(BG, dark))
     # 2. оттенок стекла
     painter.fillPath(path, tint)
     # 3. блик сверху — поверхность кажется выпуклой
@@ -717,7 +799,7 @@ def _paint_button(button):
         look = button.property("kind")
         tint, ink = _with_alpha(WHITE, 42 if hover else 26), QColor(TEXT)
         if look == "primary":  # главная кнопка переливается как ключ: лавандовый сверху, фуксия снизу
-            tint, ink = QLinearGradient(rect.topLeft(), rect.bottomLeft()), QColor(WHITE)
+            tint, ink = QLinearGradient(rect.topLeft(), rect.bottomLeft()), QColor(LETTER_INK if egg else WHITE)
             strength = 230 if pressed else 205 if hover else 175
             tint.setColorAt(0, _with_alpha(ACC, strength))
             tint.setColorAt(1, _with_alpha(MAGENTA, strength))
@@ -744,9 +826,17 @@ def _paint_button(button):
             icon.paint(painter, place, Qt.AlignCenter, QIcon.Normal if enabled else QIcon.Disabled,
                        QIcon.On if button.isChecked() else QIcon.Off)
         else:
-            painter.setFont(button.font())
-            painter.setPen(ink)
-            painter.drawText(rect, Qt.AlignCenter | Qt.TextHideMnemonic, button.text())
+            text = button.text()
+            if len(text) == 1:
+                # один значок: по центру ставим сам рисунок, а не его ячейку в шрифте —
+                # внутри ячейки он лежит не посередине, и на Windows это заметно (замок съезжал вправо)
+                shape = QPainterPath()
+                shape.addText(0, 0, button.font(), text)
+                painter.fillPath(shape.translated(rect.center() - shape.boundingRect().center()), ink)
+            else:
+                painter.setFont(button.font())
+                painter.setPen(ink)
+                painter.drawText(rect, Qt.AlignCenter | Qt.TextHideMnemonic, text)
     finally:
         painter.end()
 

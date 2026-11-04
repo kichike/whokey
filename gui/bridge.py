@@ -27,6 +27,7 @@ import json
 import os
 import socket
 import time
+import weakref
 
 from PySide6.QtCore import QObject, QTimer
 from PySide6.QtNetwork import QLocalServer
@@ -60,6 +61,7 @@ class BridgeServer(QObject):
         # будь он «ребёнком» окна, Qt удалил бы его вместе со старым окном
         super().__init__()
         self.vault, self.window, self.settings = vault, window, settings
+        self.stopped = False  # сервер остановлен: WhoKey заблокирован
         self.server = None
         self.buffers = {}  # соединение -> полученные байты
         self.busy = set()  # соединения, чей запрос сейчас обрабатывается (например, ждёт «разрешить?»)
@@ -94,6 +96,7 @@ class BridgeServer(QObject):
 
     def stop(self):
         self.watchdog.stop()
+        self.stopped = True
         if self.server is not None:
             self.server.close()
             self.server = None
@@ -124,9 +127,21 @@ class BridgeServer(QObject):
                 self._answer_and_close(conn, b'{"status": "untrusted"}\n')
                 continue
             self.buffers[conn] = b""
-            conn.readyRead.connect(lambda c=conn: self._read(c))
-            conn.disconnected.connect(lambda c=conn: self._drop(c))
-            QTimer.singleShot(REQUEST_TIMEOUT_MS, lambda c=conn: self._timeout(c))
+            conn.readyRead.connect(self._weak("_read", conn))
+            conn.disconnected.connect(self._weak("_drop", conn))
+            QTimer.singleShot(REQUEST_TIMEOUT_MS, self._weak("_timeout", conn))
+
+    def _weak(self, method, conn, **options):
+        """Вызов метода сервера для сигналов сокета, не держащий сервер живым. Иначе при удалении сокета
+        могла исчезнуть последняя ссылка на сервер, а сервер удалял тот же сокет второй раз —
+        WhoKey падал при блокировке во время окна с кодом подключения (ревью 1.6.3)."""
+        server = weakref.ref(self)
+
+        def call():
+            alive = server()
+            if alive is not None:
+                getattr(alive, method)(conn, **options)
+        return call
 
     def _trusted(self, conn):
         """На другом конце — наш мост (та же программа, что и WhoKey)?"""
@@ -145,7 +160,7 @@ class BridgeServer(QObject):
     def _timeout(self, conn):
         """Соединение молчит дольше REQUEST_TIMEOUT_MS — закрыть. Но не то, чей запрос
         в работе: человек может долго думать над «разрешить?», это нормально."""
-        if conn in self.buffers and conn not in self.busy:
+        if conn in self.buffers and conn not in self.busy and conn not in self.closing:  # ответ ещё доходит
             conn.abort()
 
     def _drop(self, conn):
@@ -197,10 +212,10 @@ class BridgeServer(QObject):
             conn.deleteLater()
             return
         self.closing.add(conn)
-        conn.disconnected.connect(lambda c=conn: self._closed(c))
+        conn.disconnected.connect(self._weak("_closed", conn))
         conn.write(data)
         conn.flush()
-        QTimer.singleShot(CLOSE_AFTER_MS, lambda c=conn: self._closed(c, force=True))
+        QTimer.singleShot(CLOSE_AFTER_MS, self._weak("_closed", conn, force=True))
 
     def _closed(self, conn, force=False):
         if conn not in self.closing:  # уже закрыт — объект не трогаем
@@ -273,13 +288,22 @@ class BridgeServer(QObject):
         window = self.window
         if window is None or not hasattr(window, "add"):
             return
+        address = sites.normalize(url) or ""
+        # без «www.»: запись для github.com подойдёт и www.github.com, а наоборот — нет
+        address = address[4:] if address.startswith("www.") else address
+        if self.stopped:
+            # WhoKey заблокировали в этот самый миг: окно не открываем, но пароль уже на сайте — сохраняем
+            if password:
+                try:
+                    self.vault.add(address, login, password, url=address)
+                except SaveError:
+                    pass
+            return
         window.showNormal()
         window.raise_()
         window.activateWindow()
         if self._can_show():
-            address = sites.normalize(url) or ""
-            # без «www.»: запись для github.com подойдёт и www.github.com, а наоборот — нет
-            window.add(url=address[4:] if address.startswith("www.") else address, login=login, password=password)
+            window.add(url=address, login=login, password=password)
 
     def _pair(self, request):
         """Первое подключение расширения: человек вводит в WhoKey код со значка расширения.

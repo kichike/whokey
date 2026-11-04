@@ -94,7 +94,15 @@ class Controller:
             old.close()
             old.deleteLater()
 
+    def _egg_off(self):
+        """Пасхалка не должна мешать блокировке, что бы с ней ни случилось."""
+        try:
+            theme.set_egg(False)
+        except Exception:
+            traceback.print_exc()
+
     def show_login(self, path):
+        self._egg_off()
         window = LoginWindow(path, self.state)
         window.restart.connect(self.show_login)
         window.opened.connect(self.show_main)
@@ -131,6 +139,7 @@ class Controller:
         return seen if vault.generation < seen else None
 
     def _new_main(self, vault):
+        self._egg_off()
         window = MainWindow(vault, self.clipboard)
         window.language_changed.connect(lambda code: self.change_language(vault, code))
         window.lock_requested.connect(lambda: self.lock("manual"))
@@ -161,9 +170,13 @@ class Controller:
         self.autolock.stop()
         self.stop_bridge()
         # открытые окошки (запись, генератор…) закрываем — они держат данные хранилища
+        self.window.locking = True  # окно записи не откроется снова после ошибки сохранения
+        self.window.lock_state = self.state
         for widget in QApplication.topLevelWidgets():
             if isinstance(widget, QDialog) and widget.isVisible():
-                widget.reject()
+                # не reject(): окно записи с правками спросило бы «Закрыть без сохранения?»,
+                # и блокировка ждала бы ответа, пока на экране открыты записи (ревью 1.6.3)
+                widget.done(QDialog.Rejected)
             elif isinstance(widget, QMenu) and widget.isVisible():
                 widget.close()  # меню правого клика: иначе «Копировать пароль» сработал бы после блокировки
         self.clipboard.clear_now()

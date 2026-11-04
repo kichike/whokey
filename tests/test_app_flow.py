@@ -64,6 +64,85 @@ class ControllerFlow(unittest.TestCase):
         self.assertIsNone(c.bridge)
         self.assertIsInstance(c.window, LoginWindow)
 
+    def test_lock_does_not_wait_for_unsaved_changes_question(self):
+        """Ревью 1.6.3: окно записи с правками спрашивало «Закрыть без сохранения?», и блокировка ждала ответа."""
+        from gui import dialogs as D
+        c = self.controller
+        c.show_main(self.vault)
+        dialog = D.EntryDialog(c.window)
+        dialog.note.setPlainText("правка")
+        dialog.show()
+        asked = []
+        real, D.ask_yes = D.ask_yes, lambda *args, **kwargs: asked.append(args) or False
+        try:
+            c.lock("system")
+            self.assertFalse(dialog.isVisible())  # сразу, а не после ответа на вопрос
+            settle()
+        finally:
+            D.ask_yes = real
+        self.assertEqual(asked, [])
+        self.assertIsInstance(c.window, LoginWindow)
+
+    def test_generated_password_survives_a_lock(self):
+        """Ревью 1.6.3: пароль уже вписан на сайте, блокировка не должна его терять."""
+        from PySide6.QtCore import QTimer
+        c = self.controller
+        c.show_main(self.vault)
+        window, before = c.window, len(self.vault.entries)
+        QTimer.singleShot(0, lambda: c.lock("system"))
+        window.add(url="github.com", login="egor", password="Gen-1!")  # нажали «Сгенерировать» на сайте
+        settle()
+        again = Vault.open(self.vault.path, "Зелёный-Кит-Летит-2026!")
+        self.assertEqual(len(again.entries), before + 1)
+        self.assertEqual((again.entries[-1]["site"], again.entries[-1]["password"]), ("github.com", "Gen-1!"))
+        self.assertIsInstance(c.window, LoginWindow)
+        self.assertIn("github.com", c.window.notice.text())
+
+    def test_failed_save_does_not_reopen_the_entry_window_after_lock(self):
+        import gui.main_window as MW
+        c = self.controller
+        c.show_main(self.vault)
+        window = c.window
+        window.locking = True
+        shown = []
+
+        class Dialog:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def exec(self):
+                shown.append(1)
+                return 1
+
+            def values(self):
+                return {"site": "x", "login": "", "password": "p", "note": "", "url": ""}
+        real = MW.EntryDialog, window._save
+        MW.EntryDialog, window._save = Dialog, (lambda change: False)
+        try:
+            window.add()
+        finally:
+            MW.EntryDialog = real[0]
+        self.assertEqual(len(shown), 1)
+        self.assertEqual(self.vault.entries[-1]["site"], "GitHub")  # без пароля из расширения записывать нечего
+
+    def test_lock_and_language_change_turn_the_easter_egg_off(self):
+        from gui import theme
+        c = self.controller
+        c.show_main(self.vault)
+        usual = theme.BG
+        c.window._toggle_egg()
+        self.assertTrue(theme.egg)
+        c.change_language(self.vault, "en")
+        settle()
+        self.assertFalse(theme.egg)
+        c.window._toggle_egg()
+        self.assertTrue(theme.egg)
+        c.lock("manual")  # окно входа — всегда в обычных цветах
+        settle()
+        self.assertIsInstance(c.window, LoginWindow)
+        self.assertFalse(theme.egg)
+        self.assertEqual(theme.BG, usual)
+
     def test_old_copy_of_the_file_is_noticed(self):
         """Ревью безопасности: подменённая старая копия возвращала отозванный доступ расширения."""
         import shutil

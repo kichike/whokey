@@ -660,6 +660,14 @@ Add your first entry or move your passwords from a browser.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>The password generated on {site} was saved to WhoKey.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>⚠ The password generated on {site} was not saved: {error}. It is only on the website now.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>The CSV file is not encrypted — delete it as soon as you no longer need it (and empty the Trash).</source>
         <translation type="unfinished"></translation>
     </message>

@@ -9,13 +9,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import Qt  # noqa: E402
+from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 APP = QApplication.instance() or QApplication([])
 
 import gui.dialogs as D  # noqa: E402
 import gui.main_window as MW  # noqa: E402
-from gui import prefs  # noqa: E402
+from gui import prefs, sound, theme  # noqa: E402
 from vault import Vault, VaultTooLarge  # noqa: E402
 
 
@@ -79,6 +81,109 @@ class MainWindow(unittest.TestCase):
             MW.ask_yes = real
         self.assertEqual(asked[0]["danger"], "Delete")
         self.assertEqual(len(self.vault.entries), 3)  # «Отмена» — ничего не удалено
+
+
+class EasterEgg(unittest.TestCase):
+    def setUp(self):
+        folder = Path(tempfile.mkdtemp())
+        prefs.use_file(folder / "p.ini")
+        self.vault = Vault.create(folder / "v.dat", "Зелёный-Кит-Летит-2026!")
+        self.vault.add("github.com", "egor", "pw")
+        self.window = MW.MainWindow(self.vault, Clipboard())
+        self.window.show()
+        self.usual = (theme.BG, theme.ACC, theme.STYLE)
+        self.sounds = []  # настоящий звук в тестах не играем
+        self.addCleanup(setattr, MW, "play_fart", MW.play_fart)
+        MW.play_fart = lambda: self.sounds.append(1)
+        self.addCleanup(theme.set_egg, False)
+
+    def finish_wave(self):
+        wave = self.window._wave
+        self.assertIsNotNone(wave)
+        wave.animation.setCurrentTime(wave.DURATION)  # сразу в конец
+        self.assertIsNone(self.window._wave)
+
+    def test_three_clicks_on_and_one_click_off(self):
+        self.window._logo_clicked()
+        self.window._logo_clicked()
+        self.assertFalse(theme.egg)
+        self.assertEqual(self.sounds, [])
+        self.window._logo_clicked()
+        self.assertTrue(theme.egg)
+        self.assertEqual(len(self.sounds), 1)  # звук — на третье нажатие
+        self.assertEqual((theme.BG, theme.ACC), ("#140a03", "#ffe600"))
+        self.assertIn("255, 230, 0", theme.GLASS_ACC)  # производные цвета тоже новые
+        self.assertIn("#140a03", APP.styleSheet())
+        self.window._logo_clicked()  # пока идёт волна, нажатия не считаются
+        self.assertTrue(theme.egg)
+        self.finish_wave()
+        self.window._logo_clicked()
+        self.assertFalse(theme.egg)
+        self.assertEqual(len(self.sounds), 1)  # обратно — без звука
+        self.finish_wave()
+        self.assertEqual((theme.BG, theme.ACC, theme.STYLE), self.usual)
+
+    def test_sound_file_is_valid_and_player_is_safe(self):
+        import wave
+        with wave.open(str(sound.FART_FILE)) as audio:
+            self.assertGreater(audio.getnframes() / audio.getframerate(), 0.3)
+        real = sound.FART_FILE
+        sound.FART_FILE = Path(tempfile.mkdtemp()) / "нет такого.wav"
+        self.addCleanup(setattr, sound, "FART_FILE", real)
+        sound.play_fart()  # файла нет — тишина, а не ошибка
+
+    def test_hidden_password_does_not_stay_on_the_snapshot(self):
+        self.window.refresh(select=0)
+        self.window.toggle_reveal()
+        self.window._toggle_egg()
+        self.assertIsNotNone(self.window._wave)
+        self.window._auto_hide()
+        self.assertIsNone(self.window._wave)
+        self.window._toggle_egg()
+        self.window.search.setText("ничего такого нет")  # и любое другое обновление таблицы
+        self.assertIsNone(self.window._wave)
+
+    def test_letters_and_glow_come_back_with_usual_colors(self):
+        add = [b for b in self.window.findChildren(MW.QPushButton) if b.property("kind") == "primary"][0]
+        usual_glow = add.graphicsEffect().color().name()
+        letter = self.window._monogram("github").pixmap(24).toImage()
+        self.window._toggle_egg()
+        self.assertNotEqual(self.window._monogram("github").pixmap(24).toImage(), letter)
+        self.finish_wave()
+        self.window._toggle_egg()
+        self.finish_wave()
+        self.assertEqual(add.graphicsEffect().color().name(), usual_glow)
+        self.assertEqual(self.window._monogram("github").pixmap(24).toImage(), letter)
+
+    def test_slow_clicks_do_not_count(self):
+        for _ in range(3):
+            self.window._logo_clicked()
+            self.window._last_logo_click -= MW.EGG_CLICK_GAP + 1
+        self.assertFalse(theme.egg)
+
+    def test_logo_changes_and_real_mouse_clicks_work(self):
+        key = self.window.logo.pixmap().toImage()
+        for _ in range(3):
+            QTest.mouseClick(self.window.logo, Qt.LeftButton)
+        self.assertTrue(theme.egg)
+        self.assertNotEqual(self.window.logo.pixmap().toImage(), key)
+        self.finish_wave()
+        QTest.mouseDClick(self.window.logo, Qt.LeftButton)  # и двойное нажатие не ломает
+        self.finish_wave()
+
+    def test_wave_paints_at_every_stage(self):
+        self.window._toggle_egg()
+        wave = self.window._wave
+        for value in (0.0, 0.5, 1.0):
+            wave._advance(value)
+            self.assertFalse(wave.grab().isNull())
+        self.finish_wave()
+
+    def test_egg_does_not_touch_the_vault_or_settings(self):
+        before = self.vault.path.read_bytes()
+        self.window._toggle_egg()
+        self.finish_wave()
+        self.assertEqual(self.vault.path.read_bytes(), before)
 
 
 class CopyAboutVersion(unittest.TestCase):

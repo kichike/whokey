@@ -9,6 +9,7 @@
 import hashlib
 import io
 import json
+import gc
 import os
 import socket
 import struct
@@ -19,6 +20,7 @@ import threading
 import time
 import types
 import unittest
+import weakref
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -262,6 +264,28 @@ class Socket(unittest.TestCase):
         self.pump(2.5)
         self.assertEqual(self.request(b'{"type": "ping"}\n'), {"status": "ok"})
         server.stop()
+
+    def test_generated_password_is_kept_if_locked_at_that_moment(self):
+        server, *_ = make_server()
+
+        class Window:
+            def add(self, **kwargs):
+                raise AssertionError("после блокировки окно записи не открываем")
+        server.window = Window()
+        server.stop()
+        server._show_new_entry("https://www.github.com/", "egor", "Gen-1!")
+        self.assertEqual((server.vault.entries[-1]["site"], server.vault.entries[-1]["password"]), ("github.com", "Gen-1!"))
+
+    def test_connections_do_not_keep_a_stopped_server_alive(self):
+        # ревью 1.6.3: сокет был последней ссылкой на сервер, тот удалял сокет повторно, и WhoKey падал
+        server, *_ = make_server()
+        server.start()
+        self.assertEqual(self.request(b"[" * 30000 + b"\n"), {"status": "error"})
+        server.stop()
+        alive = weakref.ref(server)
+        del server
+        gc.collect()
+        self.assertIsNone(alive())
 
     def test_slow_human_over_pair_dialog(self):
         # ревью-исправление «тайм-аут 5 с» роняло WhoKey, если человек думал дольше

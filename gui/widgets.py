@@ -6,8 +6,8 @@ import math
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QElapsedTimer, QRectF, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QIcon, QKeySequence, QLinearGradient, QPainter, QPalette
+from PySide6.QtCore import QEasingCurve, QElapsedTimer, QRectF, QSize, Qt, QTimer, QVariantAnimation, Signal
+from PySide6.QtGui import QColor, QFont, QIcon, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPalette, QPen
 from PySide6.QtWidgets import (QCheckBox, QDialogButtonBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QMenu, QMessageBox,
                                QProgressBar, QPushButton, QSpinBox, QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QToolButton, QVBoxLayout, QWidget)
@@ -225,6 +225,75 @@ class RoundedRowDelegate(QStyledItemDelegate):
         if self._selected:
             # серые колонки (заметка, дата) на светлой плашке читались бы плохо
             option.palette.setColor(QPalette.Text, QColor(theme.WHITE))
+
+
+class ClickableLabel(QLabel):
+    """Картинка, на которую можно нажать. Двойное нажатие считается двумя."""
+    clicked = Signal()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit()
+
+    def mouseDoubleClickEvent(self, event):
+        self.mousePressEvent(event)
+
+
+class WaveReveal(QWidget):
+    """Снимок окна поверх него самого; волна идёт сверху вниз и открывает то, что под снимком."""
+    done = Signal()
+    DURATION = 900  # мс
+    AMPLITUDE = 22  # высота гребня, точек
+
+    def __init__(self, window, snapshot):
+        super().__init__(window)
+        self.snapshot = snapshot
+        self.setGeometry(window.rect())
+        self.progress = 0.0
+        self.animation = QVariantAnimation(self)
+        self.animation.setDuration(self.DURATION)
+        self.animation.setStartValue(0.0)
+        self.animation.setEndValue(1.0)
+        self.animation.setEasingCurve(QEasingCurve.InOutSine)
+        self.animation.valueChanged.connect(self._advance)
+        self.animation.finished.connect(self._finish)
+        self.show()
+        self.raise_()
+        self.animation.start()
+
+    def _finish(self):
+        self.hide()
+        self.done.emit()
+        self.deleteLater()
+
+    def _advance(self, value):
+        self.progress = value
+        self.update()
+
+    def _edge(self):
+        """Линия волны: уходит за верх окна в начале и за низ в конце."""
+        amplitude = self.AMPLITUDE
+        level = -amplitude + self.progress * (self.height() + 2 * amplitude)
+        path = QPainterPath()
+        path.moveTo(0, level + amplitude * math.sin(self.progress * 9))
+        for x in range(0, self.width() + 9, 8):
+            path.lineTo(x, level + amplitude * math.sin(x / 70 + self.progress * 9))
+        return path
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        edge = self._edge()
+        rest = QPainterPath(edge)  # всё, что ниже волны, — ещё старые цвета
+        rest.lineTo(self.width() + 8, self.height() + 1)
+        rest.lineTo(0, self.height() + 1)
+        rest.closeSubpath()
+        painter.setClipPath(rest)
+        painter.drawPixmap(0, 0, self.snapshot)
+        painter.setClipping(False)
+        painter.setPen(QPen(QColor(theme.NEON), 3))
+        painter.drawPath(edge)
+        painter.end()
 
 
 class _DrainingBar(QWidget):

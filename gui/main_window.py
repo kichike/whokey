@@ -3,6 +3,7 @@
 import os
 import shutil
 import sys
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QDate, QSize, Qt, QTimer, QUrl, Signal
@@ -16,8 +17,9 @@ import sites
 from gui import prefs, theme
 from gui.dates import full_date, shown_date
 from gui.dialogs import AboutDialog, ChangeMasterDialog, EntryDialog, ExportDialog, ExtensionDialog, GeneratorDialog, SettingsDialog
-from gui.widgets import ClipboardCountdown, RoundedRowDelegate, ask_yes, choose_csv, save_problem, show_error, show_info
+from gui.widgets import ClickableLabel, ClipboardCountdown, RoundedRowDelegate, WaveReveal, ask_yes, choose_csv, save_problem, show_error, show_info
 from gui.i18n import tr
+from gui.sound import play_fart
 from vault import SaveError
 from version import GITHUB_URL
 
@@ -66,6 +68,9 @@ def site_link(entry):
         if host and ("." in host.split(":")[0] or host.startswith("localhost")):
             return sites.link(text if text == entry.get("url") else host)
     return None
+
+
+EGG_CLICK_GAP = 1.5  # секунд между нажатиями на ключ, чтобы они считались одной серией
 
 
 class MainWindow(QMainWindow):
@@ -173,9 +178,10 @@ class MainWindow(QMainWindow):
         """Заголовок слева, общие действия справа."""
         row = QHBoxLayout()
         row.setSpacing(10)
-        logo = QLabel()
-        logo.setPixmap(theme.logo_pixmap(36))  # пиксельный ключ с иконки WhoKey
-        row.addWidget(logo)
+        self.logo = ClickableLabel()
+        self.logo.setPixmap(theme.logo_pixmap(36))  # пиксельный ключ с иконки WhoKey
+        self.logo.clicked.connect(self._logo_clicked)
+        row.addWidget(self.logo)
         title = theme.neon_title(theme.role(QLabel(tr("WhoKey")), "title"))
         row.addWidget(title)
         # открытый файл — плашкой со щитом (значки — символы шрифта Nerd Font)
@@ -199,7 +205,7 @@ class MainWindow(QMainWindow):
         self.search = QLineEdit()
         self.search.setPlaceholderText(tr("Search by name, login or note"))
         self.search.setClearButtonEnabled(True)
-        self.search.addAction(theme.glyph_icon("search", theme.FAINT, 13), QLineEdit.LeadingPosition)
+        self.search_action = self.search.addAction(theme.glyph_icon("search", theme.FAINT, 13), QLineEdit.LeadingPosition)
         self.search.textChanged.connect(lambda: self.refresh())
         row.addWidget(self.search, 1)
         add = theme.kind(QPushButton("+ " + tr("Add")), "primary")
@@ -273,6 +279,7 @@ class MainWindow(QMainWindow):
         """Пустое хранилище — первое, что видит новый человек: что здесь будет и с чего начать."""
         logo = QLabel()
         logo.setPixmap(theme.logo_pixmap(96))
+        self.big_logo = logo
         heading = theme.role(QLabel(tr("Your passwords will live here")), "heading")
         about = theme.role(QLabel(tr("Everything is stored encrypted on this computer.\nAdd your first entry or move your passwords from a browser.")), "muted")
         first = theme.kind(QPushButton(theme.GLYPHS["plus"] + "  " + tr("Add first entry")), "primary")
@@ -284,15 +291,20 @@ class MainWindow(QMainWindow):
         buttons.addWidget(first)
         buttons.addWidget(import_button)
         buttons.addStretch()
-        extension = theme.role(QLabel(f'{theme.GLYPHS["puzzle"]}  <a href="#" style="color: {theme.ACC}; text-decoration: none;">'
-                                      + tr("Passwords can be filled right on websites — connect the extension") + "</a>"), "accent")
+        extension = theme.role(QLabel(self._extension_link()), "accent")
+        self.extension_link = extension
         extension.setTextFormat(Qt.RichText)  # ссылка — HTML (role() делает надписи простым текстом)
         extension.linkActivated.connect(lambda _: self.extension())
         return self._centered([logo, heading, about, buttons, extension])
 
+    def _extension_link(self):
+        return (f'{theme.GLYPHS["puzzle"]}  <a href="#" style="color: {theme.ACC}; text-decoration: none;">'
+                + tr("Passwords can be filled right on websites — connect the extension") + "</a>")
+
     def _nothing_found_state(self):
         icon = QLabel()
         icon.setPixmap(theme.glyph_pixmap("search", theme.FAINT, 44, 56))
+        self.nothing_icon = icon
         self.nothing_text = theme.role(QLabel(), "heading")
         hint = theme.role(QLabel(tr("Search looks in the name, login, note and website address.")), "muted")
         clear = QPushButton(tr("Clear search"))
@@ -329,13 +341,59 @@ class MainWindow(QMainWindow):
             return None
         return self.table.item(rows[0].row(), 0).data(Qt.UserRole)
 
+    # --- пасхалка: три нажатия на ключ — волна, коричневый фон, жёлтый неон и какашка; одно на какашку — обратно ---
+
+    locking = False  # окно уже закрывается из-за блокировки (см. Controller.lock)
+    lock_state = None  # общие данные окон: сообщение для окна входа
+    _logo_clicks = 0
+    _wave = None
+
+    def _logo_clicked(self):
+        if self._wave is not None:
+            return  # волна ещё идёт
+        now = time.monotonic()
+        self._logo_clicks = self._logo_clicks + 1 if now - self._last_logo_click < EGG_CLICK_GAP else 1
+        self._last_logo_click = now
+        if theme.egg or self._logo_clicks >= 3:
+            self._logo_clicks = 0
+            if not theme.egg:
+                play_fart()  # только на третье нажатие; обратно — тихо
+            self._toggle_egg()
+
+    _last_logo_click = 0.0
+
+    def _toggle_egg(self):
+        before = self.grab()  # снимок старых цветов: волна стирает его сверху вниз
+        theme.set_egg(not theme.egg)
+        self._recolor()
+        self._wave = WaveReveal(self, before)
+        self._wave.done.connect(self._wave_finished)
+
+    def _end_wave(self):
+        """Волна рисует снимок окна: пароль спрятали — на снимке его тоже быть не должно."""
+        if self._wave is not None:
+            self._wave.animation.setCurrentTime(self._wave.DURATION)
+
+    def _wave_finished(self):
+        self._wave = None
+
+    def _recolor(self):
+        """То, что нарисовано заранее и само не перекрасится."""
+        self.logo.setPixmap(theme.logo_pixmap(36))
+        self.big_logo.setPixmap(theme.logo_pixmap(96))
+        self.search_action.setIcon(theme.glyph_icon("search", theme.FAINT, 13))
+        self.nothing_icon.setPixmap(theme.glyph_pixmap("search", theme.FAINT, 44, 56))
+        self.extension_link.setText(self._extension_link())
+        self.refresh(select=self.selected_index())
+
     _monograms = {}  # буква -> значок: рисуем каждую букву один раз
 
     def _monogram(self, name):
         letter = (name.strip() or "?")[0].upper()
-        if letter not in self._monograms:
-            MainWindow._monograms[letter] = QIcon(theme.monogram(letter, 24))
-        return self._monograms[letter]
+        key = (letter, theme.egg)  # у пасхалки свои цвета
+        if key not in self._monograms:
+            MainWindow._monograms[key] = QIcon(theme.monogram(letter, 24))
+        return self._monograms[key]
 
     _chosen = None  # последняя выбранная запись — чтобы выделение пережило поиск без результатов
 
@@ -401,6 +459,7 @@ class MainWindow(QMainWindow):
         # что у надписи есть формы «1 запись / 2 записи / 5 записей»
         count = len(self.vault.entries)
         self.entries_count.setText(self.tr("%n entries", "", count))
+        self._end_wave()  # пароль могли спрятать или поменять, а на снимке волны он ещё виден
 
     def _save(self, change):
         """Выполняет изменение хранилища и сообщает об ошибках записи. True — получилось."""
@@ -428,6 +487,22 @@ class MainWindow(QMainWindow):
                 self.search.clear()
                 self.refresh(select=len(self.vault.entries) - 1)
                 return
+            if self.locking:
+                break
+        if self.locking and password:
+            self._keep_generated(dialog, url)
+
+    def _keep_generated(self, dialog, url):
+        """Блокировка закрыла новую запись из расширения. Пароль уже вписан на сайте: потерять его
+        нельзя, а спрашивать на заблокированном экране некого — сохраняем то, что в окне (ревью 1.6.3)."""
+        values = dialog.values()
+        site = values["site"] = values["site"] or url
+        try:
+            self.vault.add(**values)
+            text = tr("The password generated on {site} was saved to WhoKey.").format(site=site)
+        except SaveError as error:
+            text = tr("⚠ The password generated on {site} was not saved: {error}. It is only on the website now.").format(site=site, error=save_problem(error))
+        self.lock_state["notice"] = (self.lock_state.get("notice", "") + "\n" + text).strip()
 
     def edit(self):
         index = self.selected_index()
@@ -441,6 +516,8 @@ class MainWindow(QMainWindow):
                 return
             if self._save(lambda: self.vault.update(index, **changes)):
                 self.refresh(select=index)
+                return
+            if self.locking:
                 return
 
     def delete(self):

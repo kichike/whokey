@@ -184,6 +184,14 @@ def run():
     app.processEvents()
     check(main.countdown.isVisible(), "после копирования виден таймер буфера")
     shot(main, "main")
+    if SHOTS:  # снимок пасхалки: как выглядит эмодзи на этой системе
+        main._toggle_egg()
+        main._wave.animation.setCurrentTime(main._wave.DURATION)
+        app.processEvents()
+        shot(main, "main_egg")
+        main._toggle_egg()
+        main._wave.animation.setCurrentTime(main._wave.DURATION)
+        app.processEvents()
     buttons_fit(main, "главное окно")
 
     def grab_menu():

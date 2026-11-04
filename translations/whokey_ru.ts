@@ -664,6 +664,14 @@ Add your first entry or move your passwords from a browser.</source>
         <translation>Ничего не найдено по «{query}»</translation>
     </message>
     <message>
+        <source>The password generated on {site} was saved to WhoKey.</source>
+        <translation>Пароль, созданный на {site}, сохранён в WhoKey.</translation>
+    </message>
+    <message>
+        <source>⚠ The password generated on {site} was not saved: {error}. It is only on the website now.</source>
+        <translation>⚠ Пароль, созданный на {site}, не сохранён: {error}. Теперь он есть только на сайте.</translation>
+    </message>
+    <message>
         <source>Delete &quot;{site}&quot; ({login})?
 This cannot be undone.</source>
         <translation>Удалить «{site}» ({login})?
