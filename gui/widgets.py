@@ -6,8 +6,8 @@ import math
 import sys
 
 from PySide6.QtCore import QElapsedTimer, QRectF, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QIcon, QKeySequence, QLinearGradient, QPainter, QPalette
-from PySide6.QtWidgets import (QCheckBox, QHBoxLayout, QLabel, QLineEdit, QMenu, QMessageBox,
+from PySide6.QtGui import QColor, QFont, QIcon, QKeySequence, QLinearGradient, QPainter, QPalette
+from PySide6.QtWidgets import (QCheckBox, QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit, QMenu, QMessageBox,
                                QProgressBar, QPushButton, QSpinBox, QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QToolButton, QVBoxLayout, QWidget)
 
@@ -418,13 +418,18 @@ def ask_code(parent, title, text):
     edit.setAlignment(Qt.AlignCenter)
     font = edit.font()
     font.setPixelSize(28)
-    font.setLetterSpacing(font.AbsoluteSpacing, 8)
+    font.setLetterSpacing(QFont.AbsoluteSpacing, 8)
     edit.setFont(font)
     edit.setFixedWidth(180)
-    # поле — в разметку QMessageBox, под текстом
-    box.layout().addWidget(edit, box.layout().rowCount(), 0, 1, box.layout().columnCount(), Qt.AlignCenter)
     box.addButton(tr("Cancel"), QMessageBox.RejectRole)
     allow = box.addButton(tr("Allow"), QMessageBox.AcceptRole)
+    # поле — в разметку QMessageBox, между текстом и кнопками (кнопки переставляем ниже него)
+    layout, buttons = box.layout(), box.findChild(QDialogButtonBox)
+    columns = layout.columnCount()
+    layout.removeWidget(buttons)
+    row = layout.rowCount()
+    layout.addWidget(edit, row, 0, 1, columns, Qt.AlignCenter)
+    layout.addWidget(buttons, row + 1, 0, 1, columns)
     box.setDefaultButton(allow)
     QTimer.singleShot(0, edit.setFocus)
     box.exec()

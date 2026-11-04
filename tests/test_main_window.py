@@ -155,6 +155,31 @@ class PlainTextLabels(unittest.TestCase):
         self.assertIn("<img", dialog.heading.text())  # название показано как есть, буквами
 
 
+class RealDialogs(unittest.TestCase):
+    """Настоящие окна, а не заглушки: окно кода сопряжения падало, а тесты моста его подменяли."""
+
+    def test_pairing_code_dialog_opens_and_returns_the_code(self):
+        from unittest import mock
+        from PySide6.QtWidgets import QLineEdit, QMessageBox
+        from gui import widgets
+
+        def type_code(box):  # «человек» вводит код и нажимает «Разрешить»
+            field = box.findChild(QLineEdit)
+            field.setText("4821")
+            box.show()
+            QApplication.processEvents()
+            allow = [b for b in box.buttons() if box.buttonRole(b) == QMessageBox.AcceptRole][0]
+            self.assertLess(field.geometry().bottom(), allow.mapTo(box, allow.rect().topLeft()).y())  # поле — над кнопками
+            allow.click()
+            return 0
+        with mock.patch.object(QMessageBox, "exec", type_code):
+            self.assertEqual(widgets.ask_code(None, "Заголовок", "Текст"), "4821")
+
+    def test_long_name_does_not_stretch_the_entry_dialog(self):
+        dialog = D.EntryDialog(None, {"site": "x" * 20000, "login": "", "password": "", "note": ""})
+        self.assertLess(dialog.sizeHint().width(), 1200)
+
+
 class GenerateInSavedEntry(unittest.TestCase):
     def setUp(self):
         self.asked = []

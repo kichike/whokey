@@ -106,7 +106,8 @@ class EntryDialog(QDialog):
 
     def _update_heading(self):
         name = self.site.text().strip()
-        self.heading.setText(name or tr("New entry"))
+        # с многоточием: иначе длинное название растянуло бы окно на весь экран и дальше
+        self.heading.setText(self.heading.fontMetrics().elidedText(name, Qt.ElideRight, 380) or tr("New entry"))
         self.avatar.setPixmap(theme.monogram(name or "?", 40))
 
     def _on_generated(self, password, bits):

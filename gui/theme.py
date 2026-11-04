@@ -13,10 +13,11 @@ import sys
 import traceback
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject, QPoint, QRect, QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QIcon, QLinearGradient, QPainter, QPalette, QPen, QPixmap
-from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QGraphicsDropShadowEffect, QLabel, QLineEdit, QPushButton,
-                               QToolButton, QWidget)
+from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QRectF, Qt, QTimer
+from PySide6.QtGui import (QColor, QCursor, QFont, QFontDatabase, QGradient, QIcon, QLinearGradient, QPainter, QPainterPath,
+                           QPalette, QPen, QPixmap, QRadialGradient)
+from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QDialog, QFrame, QGraphicsDropShadowEffect, QLabel, QLineEdit,
+                               QMainWindow, QPushButton, QToolButton, QWidget)
 from shiboken6 import isValid  # жив ли ещё объект Qt за питоновской обёрткой
 
 # лицензия Apache 2.0 — fonts/LICENSE.txt; обычное начертание и жирное (для кнопок и заголовков)
@@ -380,13 +381,17 @@ class _FocusGlow(QObject):
         # ошибке, и приложение вылетало. Поэтому свечение может только не
         # нарисоваться: ошибку печатаем и работаем дальше.
         try:
+            if event.type() == QEvent.Paint and _paint_glass(obj):
+                return True  # нарисовано здесь (см. «жидкое стекло» ниже)
             self._handle(obj, event)
         except Exception:
             traceback.print_exc()
-        return False  # событие идёт дальше как обычно
+        return False  # событие идёт дальше как обычно; при ошибке рисования — обычный вид из STYLE
 
     def _handle(self, obj, event):
         kind = event.type()
+        if kind == QEvent.HoverMove and _is_glass_button(obj):
+            obj.update()  # пятно света идёт за курсором
         if kind in (QEvent.Move, QEvent.Resize, QEvent.Show, QEvent.Hide) \
                 and _halos and not isinstance(obj, Halo):
             for halo in list(_halos):
@@ -405,7 +410,7 @@ class _FocusGlow(QObject):
                 or (kind == QEvent.KeyRelease and event.key() == Qt.Key_Space)
             flash = getattr(obj, "_press_halo", None)
             if pressed and flash is None:
-                obj._press_halo = Halo(obj, NEON, 9, BUTTON_RADIUS, 170, on_top=True)
+                obj._press_halo = Halo(obj, NEON, 9, _glass_radius(obj), 170, on_top=True)
             elif released and flash is not None:
                 obj._press_halo = None
                 QTimer.singleShot(90, lambda: flash.remove() if isValid(flash) else None)  # гаснет не мгновенно
@@ -565,3 +570,209 @@ def monogram(text, size=24):
     painter.drawText(QRectF(0, 0, size, size), Qt.AlignCenter, (text.strip() or "?")[0].upper())
     painter.end()
     return pixmap
+
+
+# --- жидкое стекло ---
+# Настоящего размытия того, что под элементом, Qt не умеет, а снимок окна при каждой
+# перерисовке был бы медленным. Но под кнопками и карточками лежит только фон окна — его
+# мы рисуем сами. Поэтому фон с пятнами света считаем один раз на размер окна, храним его
+# размытую копию, и каждый стеклянный элемент рисует свой кусочек этой копии, чуть
+# увеличенный, как через линзу. Сверху — блик, затемнение снизу и яркая кромка.
+_SCENES = {}          # (ширина, высота) -> (фон, размытый фон)
+_SCENE_LIMIT = 6      # при растягивании окна размеров много — старые забываем
+_BLUR_SCALE = 0.08    # чем меньше копия, тем сильнее размытие при растягивании
+_SCENE_MAX = 2048     # длинная сторона картинки фона: в ней только плавные переливы, растяжение незаметно
+_LENS = 0.90          # какая доля картинки под стеклом видна: остальное — «увеличение»
+# пятна света: x, y, радиус (доли окна), цвет, яркость
+_LIGHTS = ((0.14, 0.04, 0.42, ACC_DEEP, 150), (0.84, 0.02, 0.36, MAGENTA, 120),
+           (0.92, 0.82, 0.38, ACC_DEEP, 70), (0.06, 0.92, 0.34, MAGENTA, 50))
+
+
+def _scene(width, height):
+    fit = min(1, _SCENE_MAX / max(width, height, 1))
+    width, height = max(1, round(width * fit)), max(1, round(height * fit))
+    key = (width, height)
+    if key not in _SCENES:
+        if len(_SCENES) >= _SCENE_LIMIT:
+            _SCENES.clear()
+        sharp = QPixmap(width, height)
+        painter = QPainter(sharp)
+        painter.setRenderHint(QPainter.Antialiasing)
+        glow_top = QRadialGradient(0.5, -0.15, 1.1)  # то же зарево сверху, что в STYLE
+        glow_top.setCoordinateMode(QGradient.ObjectBoundingMode)
+        for stop, color in ((0, "#3a1a9a"), (0.30, "#2a0f5a"), (0.6, "#120a30"), (1, BG)):
+            glow_top.setColorAt(stop, QColor(color))
+        painter.fillRect(sharp.rect(), glow_top)
+        painter.setPen(Qt.NoPen)
+        reach = max(width, height)
+        for x, y, radius, color, alpha in _LIGHTS:
+            center = QPointF(x * width, y * height)
+            light = QRadialGradient(center, radius * reach)
+            bright = QColor(color)
+            bright.setAlpha(alpha)
+            light.setColorAt(0, bright)
+            light.setColorAt(1, QColor(0, 0, 0, 0))
+            painter.setBrush(light)
+            painter.drawEllipse(center, radius * reach, radius * reach)
+        painter.end()
+        small = sharp.scaled(max(1, int(width * _BLUR_SCALE)), max(1, int(height * _BLUR_SCALE)),
+                             Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        _SCENES[key] = (sharp, small)
+    return _SCENES[key]
+
+
+def _with_alpha(color, alpha):
+    result = QColor(color)
+    result.setAlpha(alpha)
+    return result
+
+
+def _is_glass_button(obj):
+    # крестик «очистить» внутри поля — не кнопка окна, его не трогаем
+    if isinstance(obj.parentWidget() if isinstance(obj, QWidget) else None, QLineEdit):
+        return False
+    # стекло рисует только надпись или (у «глаза») значок: кнопку со значком и надписью,
+    # стрелкой или меню рисует сам Qt — иначе человек не увидел бы, что он нажимает
+    if isinstance(obj, QPushButton):
+        return obj.icon().isNull() and obj.menu() is None
+    if isinstance(obj, QToolButton):
+        return not obj.text() and obj.arrowType() == Qt.NoArrow and obj.menu() is None
+    return False
+
+
+def _glass_radius(button):
+    """Кнопки — почти капсулы: это и даёт ощущение капли."""
+    return min(button.height() / 2, 17)
+
+
+def _draw_glass(painter, widget, rect, radius, tint, dark, sheen, rim_top, rim_bottom, spot=None):
+    """Один кусок стекла. tint — оттенок (цвет или перелив), dark — затемнение основы
+    (чтобы текст читался на ярком пятне),
+    sheen — сила блика, rim_* — яркость кромки вверху и внизу, spot — пятно света под курсором."""
+    window = widget.window()
+    small = _scene(window.width(), window.height())[1]
+    path = QPainterPath()
+    path.addRoundedRect(rect, radius, radius)
+    painter.save()
+    painter.setClipPath(path)
+    # 1. то, что под стеклом: размыто и чуть увеличено, как через линзу
+    corner = widget.mapTo(window, QPoint(0, 0))
+    width, height = rect.width() * _LENS, rect.height() * _LENS
+    source = QRectF(corner.x() + rect.center().x() - width / 2, corner.y() + rect.center().y() - height / 2, width, height)
+    scale_x, scale_y = small.width() / max(window.width(), 1), small.height() / max(window.height(), 1)
+    painter.drawPixmap(rect, small, QRectF(source.x() * scale_x, source.y() * scale_y, width * scale_x, height * scale_y))
+    painter.fillPath(path, QColor(7, 6, 26, dark))
+    # 2. оттенок стекла
+    painter.fillPath(path, tint)
+    # 3. блик сверху — поверхность кажется выпуклой
+    gloss = QLinearGradient(rect.topLeft(), QPointF(rect.x(), rect.y() + rect.height() * 0.55))
+    gloss.setColorAt(0, QColor(255, 255, 255, sheen))
+    gloss.setColorAt(1, QColor(255, 255, 255, 0))
+    painter.fillPath(path, gloss)
+    # 4. затемнение снизу — толщина стекла
+    depth = QLinearGradient(QPointF(rect.x(), rect.bottom() - rect.height() * 0.4), rect.bottomLeft())
+    depth.setColorAt(0, QColor(0, 0, 0, 0))
+    depth.setColorAt(1, QColor(0, 0, 0, 55))
+    painter.fillPath(path, depth)
+    # 5. пятно света под курсором
+    if spot is not None:
+        light = QRadialGradient(spot, rect.height() * 1.6)
+        light.setColorAt(0, QColor(255, 255, 255, 62))
+        light.setColorAt(1, QColor(255, 255, 255, 0))
+        painter.fillPath(path, light)
+    painter.restore()
+    # 6. кромка: свет преломляется на краях — ярко сверху слева и снизу справа, бока тусклые
+    rim = QLinearGradient(rect.topLeft(), rect.bottomRight())
+    rim.setColorAt(0, QColor(255, 255, 255, rim_top))
+    rim.setColorAt(0.35, QColor(255, 255, 255, 34))
+    rim.setColorAt(0.65, QColor(255, 255, 255, 26))
+    rim.setColorAt(1, QColor(255, 255, 255, rim_bottom))
+    painter.setPen(QPen(rim, 1.2))
+    painter.setBrush(Qt.NoBrush)
+    painter.drawRoundedRect(rect.adjusted(0.6, 0.6, -0.6, -0.6), radius, radius)
+
+
+def _paint_button(button):
+    painter = QPainter(button)
+    try:
+        painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform | QPainter.TextAntialiasing)
+        enabled = button.isEnabled()
+        painter.setOpacity(1 if enabled else 0.45)
+        pressed, hover = button.isDown(), enabled and button.underMouse()
+        rect = QRectF(button.rect())
+        if pressed:  # нажатая капля чуть сжимается
+            center = rect.center()
+            painter.translate(center)
+            painter.scale(0.97, 0.97)
+            painter.translate(-center)
+        look = button.property("kind")
+        tint, ink = _with_alpha(WHITE, 42 if hover else 26), QColor(TEXT)
+        if look == "primary":  # главная кнопка переливается как ключ: лавандовый сверху, фуксия снизу
+            tint, ink = QLinearGradient(rect.topLeft(), rect.bottomLeft()), QColor(WHITE)
+            strength = 230 if pressed else 205 if hover else 175
+            tint.setColorAt(0, _with_alpha(ACC, strength))
+            tint.setColorAt(1, _with_alpha(MAGENTA, strength))
+        elif look == "danger":
+            tint, ink = _with_alpha(BAD, 120 if pressed else 70), QColor(BAD_INK)
+        elif pressed or (button.isCheckable() and button.isChecked()):
+            tint = _with_alpha(ACC, 70)
+        if not enabled:
+            ink = QColor(FAINT)
+        spot = QPointF(button.mapFromGlobal(QCursor.pos())) if hover else None
+        radius = _glass_radius(button)
+        _draw_glass(painter, button, rect, radius, tint, dark=50 if look else 88,
+                    sheen=30 if pressed else 62, rim_top=255 if hover else 215, rim_bottom=165, spot=spot)
+        if button.hasFocus():  # фокус с клавиатуры виден, как раньше
+            painter.setPen(QPen(QColor(ACC), 2))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), radius, radius)
+        painter.setOpacity(1)  # затемнено только стекло: FAINT на нём ещё читается, а вдвойне — уже нет
+        icon = button.icon()
+        if isinstance(button, QToolButton) and not icon.isNull():
+            size = button.iconSize()
+            place = QRect(QPoint(0, 0), size)
+            place.moveCenter(button.rect().center())
+            icon.paint(painter, place, Qt.AlignCenter, QIcon.Normal if enabled else QIcon.Disabled,
+                       QIcon.On if button.isChecked() else QIcon.Off)
+        else:
+            painter.setFont(button.font())
+            painter.setPen(ink)
+            painter.drawText(rect, Qt.AlignCenter | Qt.TextHideMnemonic, button.text())
+    finally:
+        painter.end()
+
+
+def _paint_card(card):
+    painter = QPainter(card)
+    try:
+        painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        # большая панель темнее кнопок: на ней читают таблицу
+        _draw_glass(painter, card, QRectF(card.rect()), CARD_RADIUS, _with_alpha(WHITE, 8), dark=135, sheen=22, rim_top=150, rim_bottom=90)
+        painter.setPen(QPen(QColor(RIM_CARD), 1))
+        painter.setBrush(Qt.NoBrush)
+        painter.drawRoundedRect(QRectF(card.rect()).adjusted(0.5, 0.5, -0.5, -0.5), CARD_RADIUS, CARD_RADIUS)
+    finally:
+        painter.end()
+
+
+def _paint_window(window):
+    painter = QPainter(window)
+    try:
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        sharp = _scene(window.width(), window.height())[0]
+        painter.drawPixmap(window.rect(), sharp, sharp.rect())
+    finally:
+        painter.end()
+
+
+def _paint_glass(obj):
+    """Рисует элемент жидким стеклом. True — нарисовано, False — пусть рисует сам Qt."""
+    if _is_glass_button(obj):
+        _paint_button(obj)
+    elif isinstance(obj, QFrame) and obj.property("role") == "card":
+        _paint_card(obj)
+    elif isinstance(obj, (QMainWindow, QDialog)) or (isinstance(obj, QWidget) and obj.property("role") == "backdrop"):
+        _paint_window(obj)
+    else:
+        return False
+    return True
