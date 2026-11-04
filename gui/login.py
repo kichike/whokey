@@ -7,13 +7,14 @@
 import os
 from pathlib import Path
 
-from PySide6.QtCore import QTimer, Signal
+from PySide6.QtCore import QEvent, Qt, QTimer, Signal
 from PySide6.QtWidgets import (QFileDialog, QFrame, QHBoxLayout, QLabel,
                                QPushButton, QVBoxLayout, QWidget)
 
+import csv_io
 from generator import weakness_reasons
 from gui import theme, touchid
-from gui.widgets import PasswordField, StrengthBar, ask_yes, show_error, show_info, weakness_text
+from gui.widgets import PasswordField, StrengthBar, ask_yes, choose_csv, save_problem, show_error, show_info, weakness_text
 from gui.i18n import tr
 from vault import (SaveError, Vault, VaultError, VaultLocked, WrongPassword, backup_path,
                    in_icloud_folder, is_readable, lock, open_backup, tidy_old_files)
@@ -77,15 +78,21 @@ class LoginWindow(QWidget):
 
         tidy_old_files(path)  # копия и замок от прежней версии — на новые места
         # state["create"] — человек нажал «Создать новое», хотя копия есть
+        # пароли из CSV ждут, пока придумают мастер-пароль: (имя файла, записи). На диск — только в новое хранилище.
+        # Выбрали другой файл хранилища — окно пересоздаётся, а выбор сохраняется
+        pending = state.pop("import", None)
         if path.exists():
             self._build_open(column)
         elif backup_path(path).exists() and not state.pop("create", False):
             self._build_missing(column)
         else:
+            self._import = pending
             self._build_create(column)
 
         # сообщение из прошлого окна («WhoKey заблокирован…») — спокойным цветом: это не ошибка
         notice = state.pop("notice", "")
+        if pending and not self._import:  # в существующее хранилище без спроса не добавляем
+            notice = (notice + "\n" + tr("The CSV import was cancelled because a vault or its backup already exists here. After opening the vault, import from the File menu.")).strip()
         self.notice = theme.role(QLabel(notice), "accent")
         self.notice.setWordWrap(True)
         self.notice.setVisible(bool(notice))
@@ -97,6 +104,8 @@ class LoginWindow(QWidget):
 
     _touch_id_on_show = False
     _prompt = None  # окно Touch ID, которое сейчас ждёт палец
+    _import = None
+    _shrink_to = None  # до какой высоты уменьшить окно, как только раскладка её пересчитает
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -107,8 +116,22 @@ class LoginWindow(QWidget):
     def resizeEvent(self, event):
         # подписи с переносом строк (путь к файлу, подсказки) Qt при расчёте высоты
         # окна не учитывает — им не хватало места, и строки обрезались сверху и снизу
-        self.setMinimumHeight(self.layout().totalHeightForWidth(event.size().width()))
+        self._fit_height(event.size().width())
         super().resizeEvent(event)
+
+    def event(self, event):
+        # появилась подпись или ошибка — окно растёт, иначе остальные строки сжимались бы и обрезались
+        handled = super().event(event)
+        if event.type() == QEvent.LayoutRequest:
+            self._fit_height(self.width())
+        return handled
+
+    def _fit_height(self, width):
+        height = self.layout().totalHeightForWidth(width)
+        self.setMinimumHeight(height)
+        if self._shrink_to is not None and height < self.height():
+            self.resize(width, max(height, self._shrink_to))
+            self._shrink_to = None
 
     # --- общие части окна ---
 
@@ -124,7 +147,7 @@ class LoginWindow(QWidget):
         shown = path.replace("\\", "\\\u200b").replace("/", "/\u200b")
         label = theme.role(QLabel(tr("Vault file:") + " " + shown), "muted")
         label.setWordWrap(True)
-        label.setToolTip(str(self.path))
+        label.setToolTip(theme.plain_tip(str(self.path)))
         row.addWidget(label, 1)
         other = QPushButton(tr("Other file…"))
         other.clicked.connect(self._choose_file)
@@ -138,6 +161,8 @@ class LoginWindow(QWidget):
             self, tr("Choose a vault file"), str(self.path), tr("Password vault (*.dat);;All files (*)"),
             options=QFileDialog.DontConfirmOverwrite)
         if name:
+            if self._import:
+                self.state["import"] = self._import
             self.restart.emit(Path(name).resolve())
 
     def _button(self, text, handler, default=False):
@@ -182,6 +207,7 @@ class LoginWindow(QWidget):
 
     def _build_missing(self, column):
         text = QLabel(tr("The main file {name} was not found, but there is a backup {backup}.\n\nRestore from it? If you create a new vault, the old backup will be kept under another name.").format(name=self.path.name, backup=backup_path(self.path).name))
+        text.setTextFormat(Qt.PlainText)  # в тексте — имя файла, это не HTML
         text.setWordWrap(True)
         column.addWidget(text)
         self.master = PasswordField(tr("Master password"), master=True)
@@ -206,7 +232,36 @@ class LoginWindow(QWidget):
         for widget in (self.master, self.repeat, self.strength):
             column.addWidget(widget)
         column.addWidget(self._button(tr("Create vault"), self.on_create, default=True))
+        self.import_button = self._button("", self._toggle_import)
+        column.addWidget(self.import_button)
+        self.import_note = theme.role(QLabel(), "accent")
+        self.import_note.setWordWrap(True)
+        column.addWidget(self.import_note)
+        self._show_import()
         self.master.setFocus()
+
+    def _toggle_import(self):
+        """Пароли из CSV можно выбрать ещё до создания хранилища; второе нажатие — передумали."""
+        if self._import:
+            self._import = None
+            # подпись исчезнет — окно станет меньше ровно на неё (растянутое вручную останется большим)
+            note = self.import_note
+            self._shrink_to = self.height() - note.height() - note.parentWidget().layout().spacing()
+        else:
+            chosen = choose_csv(self)
+            if chosen is None:
+                return
+            self._import = (Path(chosen[0]).name, csv_io.new_only(chosen[1], []))
+        self._show_import()
+
+    def _show_import(self):
+        self.import_button.setText(tr("Don't import") if self._import else tr("Import from CSV…"))
+        self.import_note.setVisible(bool(self._import))
+        if self._import:
+            name, entries = self._import
+            count = len(entries)  # отдельной переменной — см. refresh в главном окне (формы слова для числа)
+            shown = name if len(name) <= 40 else name[:39] + "…"  # имя без пробелов не переносится
+            self.import_note.setText(self.tr("%n passwords from {file} will be added to the new vault.", "", count).format(file=shown))
 
     def _switch_to_create(self):
         """Из режима «файл пропал» — в режим создания (старая копия отложится сама)."""
@@ -239,7 +294,7 @@ class LoginWindow(QWidget):
         try:
             vault.save()
         except SaveError as error:
-            show_error(self, tr("⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.").format(error=error))
+            show_error(self, tr("⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.").format(error=save_problem(error)))
             return
         show_info(self, tr("Backup"), tr("Vault restored from the backup."))
         self._finish(vault)
@@ -312,6 +367,8 @@ class LoginWindow(QWidget):
             # пока окно было открыто, файл появился (например, его создала консольная
             # версия) — не затираем его новым пустым хранилищем, а предлагаем открыть
             self.state["notice"] = tr("This vault file appeared while the window was open — open it with its master password.")
+            if self._import:
+                self.state["import"] = self._import  # новое окно скажет, что импорт отменён
             self.restart.emit(self.path)
             return
         try:
@@ -321,6 +378,20 @@ class LoginWindow(QWidget):
             return
         # «Хранилище создано» отдельным окном не сообщаем — и так видно; окно — только если есть что важное
         notes = []
+        if self._import:
+            entries = self._import[1]
+            count = len(entries)
+            self._import = None
+            try:
+                vault.add_many(entries)
+                notes.append(self.tr("Added %n passwords.", "", count) + "\n\n" +
+                             tr("The CSV file is not encrypted — delete it now (and empty the Trash)."))
+            except SaveError as error:
+                # хранилище уже создано и цело: импорт можно повторить из главного окна
+                notes.append(tr("The vault was created, but the passwords were not added: {error}. Import the CSV file again from the main window.").format(error=save_problem(error)))
+        if vault.backup_error:
+            notes.append(tr("⚠ The change is saved, but the backup was not updated: {error}.").format(error=vault.backup_error))
+            vault.backup_error = None
         if vault.old_backup:
             notes.append(tr("The old backup was set aside as {name} (a hidden file next to the vault).").format(name=vault.old_backup.name))
         if in_icloud_folder(self.path):

@@ -56,6 +56,8 @@ def forward(message, stdin, out, origin):
         # WhoKey есть, но долго думает (человек решает, разрешать ли расширение) —
         # это не «WhoKey закрыт»: открывать его заново и повторять запрос нельзя
         return {"status": "timeout"}
+    except P.ReplyTooLong:
+        return {"status": "error"}
     except P.PeerError:
         return {"status": "fake_app"}  # на сокете не WhoKey — ничего ему не отправили
     except OSError:
@@ -70,6 +72,8 @@ def forward(message, stdin, out, origin):
             return P.ask_app(message)
         except socket.timeout:
             return {"status": "timeout"}
+        except P.ReplyTooLong:
+            return {"status": "error"}
         except P.PeerError:
             return {"status": "fake_app"}
         except OSError:

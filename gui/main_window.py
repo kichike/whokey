@@ -16,7 +16,7 @@ import sites
 from gui import prefs, theme
 from gui.dates import full_date, shown_date
 from gui.dialogs import AboutDialog, ChangeMasterDialog, EntryDialog, ExportDialog, ExtensionDialog, GeneratorDialog, SettingsDialog
-from gui.widgets import ClipboardCountdown, RoundedRowDelegate, ask_yes, show_error, show_info
+from gui.widgets import ClipboardCountdown, RoundedRowDelegate, ask_yes, choose_csv, save_problem, show_error, show_info
 from gui.i18n import tr
 from vault import SaveError
 from version import GITHUB_URL
@@ -180,7 +180,7 @@ class MainWindow(QMainWindow):
         row.addWidget(title)
         # открытый файл — плашкой со щитом (значки — символы шрифта Nerd Font)
         vault_file = theme.role(QLabel(theme.GLYPHS["shield"] + "  " + self.vault.path.name), "chip")
-        vault_file.setToolTip(str(self.vault.path))
+        vault_file.setToolTip(theme.plain_tip(str(self.vault.path)))
         row.addWidget(vault_file, 0, Qt.AlignVCenter)
         row.addStretch()
         glyph = theme.GLYPHS
@@ -374,7 +374,7 @@ class MainWindow(QMainWindow):
                 if field == "site":
                     item.setIcon(self._monogram(text))
                 if field != "password":
-                    item.setToolTip(text if field != "updated" else full_date(text))  # обрезанное — целиком
+                    item.setToolTip(theme.plain_tip(text) if field != "updated" else full_date(text))  # обрезанное — целиком
                 if field == "password" and index == self.revealed:
                     item.setFont(mono)  # в моноширинном шрифте не спутать l и 1, O и 0
                     item.setForeground(QColor(theme.ACC_LIGHT))
@@ -408,7 +408,7 @@ class MainWindow(QMainWindow):
             change()
         except SaveError as error:
             # диск полон, нет прав на запись — изменение не применено
-            show_error(self, tr("⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.").format(error=error))
+            show_error(self, tr("⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.").format(error=save_problem(error)))
             return False
         if self.vault.backup_error:
             self.statusBar().showMessage(tr("⚠ The change is saved, but the backup was not updated: {error}.").format(error=self.vault.backup_error), 10000)
@@ -422,9 +422,12 @@ class MainWindow(QMainWindow):
         (после «Сгенерировать пароль» на странице регистрации)."""
         entry = {"site": url, "login": login, "password": password, "note": "", "url": url} if url else None
         dialog = EntryDialog(self, entry, copy_password=self.copy_password)
-        if dialog.exec() and self._save(lambda: self.vault.add(**dialog.values())):
-            self.search.clear()
-            self.refresh(select=len(self.vault.entries) - 1)
+        # не сохранилось — окно открывается снова: введённое (и пароль, уже вписанный на сайте) не теряется
+        while dialog.exec():
+            if self._save(lambda: self.vault.add(**dialog.values())):
+                self.search.clear()
+                self.refresh(select=len(self.vault.entries) - 1)
+                return
 
     def edit(self):
         index = self.selected_index()
@@ -432,11 +435,13 @@ class MainWindow(QMainWindow):
             return
         entry = self.vault.entries[index]
         dialog = EntryDialog(self, entry, copy_password=self.copy_password)
-        if not dialog.exec():
-            return
-        changes = {k: v for k, v in dialog.values().items() if v != entry.get(k, "")}  # у старых записей нет url
-        if changes and self._save(lambda: self.vault.update(index, **changes)):
-            self.refresh(select=index)
+        while dialog.exec():
+            changes = {k: v for k, v in dialog.values().items() if v != entry.get(k, "")}  # у старых записей нет url
+            if not changes:
+                return
+            if self._save(lambda: self.vault.update(index, **changes)):
+                self.refresh(select=index)
+                return
 
     def delete(self):
         index = self.selected_index()
@@ -494,21 +499,10 @@ class MainWindow(QMainWindow):
 
     def import_csv(self):
         """Пароли из CSV-файла браузера или другого менеджера паролей."""
-        name, _ = QFileDialog.getOpenFileName(self, tr("Import from CSV"), str(Path.home() / "Downloads"),
-                                              tr("CSV files (*.csv);;All files (*)"))
-        if not name:
+        chosen = choose_csv(self)
+        if chosen is None:
             return
-        try:
-            found = csv_io.read(name)
-        except OSError as error:
-            show_error(self, tr("Could not read the file: {error}").format(error=error.strerror or error))
-            return
-        except csv_io.CsvError as error:
-            show_error(self, {
-                "too_big": tr("The file is too big for a password list."),
-                "encoding": tr("The file is not in UTF-8 encoding. Export the passwords again or save the file as UTF-8."),
-            }.get(str(error), tr("No passwords found in this file. It needs columns with the name or website address and the password, as in an export from a browser, Bitwarden or KeePassXC.")))
-            return
+        found = chosen[1]
         entries = csv_io.new_only(found, self.vault.entries)
         skipped = len(found) - len(entries)
         if not entries:

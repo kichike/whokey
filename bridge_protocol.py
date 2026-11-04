@@ -148,6 +148,10 @@ def write_message(stream, message):
 
 # --- запрос к открытому WhoKey ---
 
+class ReplyTooLong(Exception):
+    """WhoKey ответил, но ответ длиннее предела. Он открыт — запускать его снова и повторять незачем."""
+
+
 class PeerError(Exception):
     """На другом конце сокета не WhoKey. Не OSError: мост не должен считать это «WhoKey закрыт»."""
 
@@ -173,8 +177,10 @@ def ask_app(message, timeout=120):
         data = b""
         while b"\n" not in data:
             chunk = conn.recv(4096)
-            if not chunk or len(data) > MAX_LINE:
+            if not chunk:
                 raise OSError("WhoKey closed the connection")
+            if len(data) > MAX_LINE:
+                raise ReplyTooLong("the reply from WhoKey is too long")
             data += chunk
     return json.loads(data.split(b"\n", 1)[0].decode("utf-8"))
 
@@ -438,7 +444,7 @@ def _ask_app_windows(message, timeout):
         data, deadline = b"", time.monotonic() + timeout
         while b"\n" not in data:
             if len(data) > MAX_LINE:
-                raise OSError("reply too long")
+                raise ReplyTooLong("the reply from WhoKey is too long")
             chunk = pipe.read_available()
             if not chunk:
                 if time.monotonic() > deadline:

@@ -11,7 +11,7 @@ import sites
 from generator import weakness_reasons
 from gui import i18n, prefs, theme, touchid
 from gui.dates import full_date, shown_date
-from gui.widgets import ClipboardCountdown, GeneratorPanel, PasswordField, StrengthBar, ask_yes, show_error, weakness_text
+from gui.widgets import ClipboardCountdown, GeneratorPanel, PasswordField, StrengthBar, ask_yes, save_problem, show_error, weakness_text
 from gui.i18n import tr
 from vault import SaveError
 from version import AUTHOR, AUTHOR_URL, GITHUB_URL, VERSION
@@ -261,7 +261,7 @@ class ChangeMasterDialog(QDialog):
         try:
             self.vault.change_password(password)
         except SaveError as error:
-            show_error(self, tr("⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.").format(error=error))
+            show_error(self, tr("⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.").format(error=save_problem(error)))
             return
         # ключ сменился — старый, сохранённый для Touch ID, стираем; при следующем
         # входе по новому паролю WhoKey снова предложит включить Touch ID

@@ -13,8 +13,11 @@ import csv
 import os
 
 import sites
+from regular_file import NotRegularFile, open_regular
 
-MAX_SIZE = 20 * 1024 * 1024  # больше 20 МБ паролей не бывает — это не тот файл
+# с запасом меньше предела хранилища (vault.MAX_FILE_SIZE): шифрование раздувает данные почти вдвое
+MAX_SIZE = 5 * 1024 * 1024
+MAX_ROWS = 50_000
 
 # столбец записи WhoKey -> как он называется в разных программах (без учёта регистра)
 COLUMNS = {
@@ -48,12 +51,21 @@ def read(path):
 
     Строки без пароля (например, заметки Bitwarden) пропускаются. CsvError — если
     файл не похож на экспорт паролей."""
-    if os.path.getsize(path) > MAX_SIZE:
+    try:
+        fd = open_regular(path)
+    except NotRegularFile:
+        raise CsvError("format")
+    if os.fstat(fd).st_size > MAX_SIZE:
+        os.close(fd)
         raise CsvError("too_big")
     try:
         # utf-8-sig — Excel и Windows-программы пишут в начало файла невидимую метку BOM
-        with open(path, encoding="utf-8-sig", newline="") as file:
-            rows = list(csv.reader(file))
+        rows = []
+        with open(fd, encoding="utf-8-sig", newline="") as file:
+            for row in csv.reader(file):
+                rows.append(row)
+                if len(rows) > MAX_ROWS:
+                    raise CsvError("too_big")
     except UnicodeDecodeError:
         raise CsvError("encoding")
     except csv.Error:
@@ -98,12 +110,13 @@ def write(path, entries):
     """Сохраняет записи в CSV. Файл доступен только владельцу (на Mac и Linux — права 600)."""
     # O_TRUNC + режим 600 сразу при создании: пароли ни на миг не лежат в файле, открытом всем
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    if hasattr(os, "fchmod"):
+        try:
+            os.fchmod(fd, 0o600)  # файл уже был — его старые права сужаем до записи паролей
+        except OSError:
+            pass
     with open(fd, "w", encoding="utf-8", newline="") as file:
         out = csv.writer(file)
         out.writerow(EXPORT_HEADER)
         for entry in entries:
             out.writerow([entry["site"], entry.get("url", ""), entry["login"], entry["password"], entry["note"]])
-    try:
-        os.chmod(path, 0o600)  # файл уже был — его старые права тоже сужаем
-    except OSError:
-        pass

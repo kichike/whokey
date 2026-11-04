@@ -33,7 +33,7 @@ WhoKey keeps your logins in one encrypted file that only opens with your master 
 - **Browser extension** (macOS and Windows, Chromium browsers): fills your login and password on websites — see below.
 - **Touch ID** on Mac: unlock WhoKey with your fingerprint (turn it on or off in **Settings**, ⌘,).
 - **Auto-lock** when the screen is locked, the computer goes to sleep or WhoKey is not used for a while (10 minutes by default); ⌘L / Ctrl+L locks it right away.
-- **Import and export CSV** (File menu): move your passwords from a browser, Bitwarden, KeePassXC or 1Password and back. The CSV file is not encrypted — delete it after the move.
+- **Import and export CSV** (File menu, or right on the screen that creates a new vault): move your passwords from a browser, Bitwarden, KeePassXC or 1Password and back. The CSV file is not encrypted — delete it after the move.
 - **Encrypted copy** (File → Save encrypted copy): the vault file itself, safe to keep on a USB stick or in the cloud — it opens only with your master password.
 - **Caps Lock warning** under master password fields.
 - **English and Russian** interface.
@@ -117,7 +117,7 @@ WhoKey хранит логины и пароли в одном зашифров�
 - **Расширение для браузера** (macOS и Windows, браузеры на Chromium): заполняет логин и пароль на сайтах — подробнее ниже.
 - **Touch ID** на Mac: WhoKey открывается по отпечатку пальца (включается и выключается в **Настройках**, ⌘,).
 - **Автоблокировка** при блокировке экрана, сне компьютера и если WhoKey долго не трогают (по умолчанию 10 минут); ⌘L / Ctrl+L — заблокировать сразу.
-- **Импорт и экспорт CSV** (меню «Файл»): перенос паролей из браузера, Bitwarden, KeePassXC или 1Password и обратно. CSV-файл не зашифрован — удалите его после переноса.
+- **Импорт и экспорт CSV** (меню «Файл» или прямо на экране создания хранилища): перенос паролей из браузера, Bitwarden, KeePassXC или 1Password и обратно. CSV-файл не зашифрован — удалите его после переноса.
 - **Зашифрованная копия** (Файл → Сохранить зашифрованную копию): сам файл хранилища, его можно держать на флешке или в облаке — откроется только мастер-паролем.
 - **Предупреждение о Caps Lock** под полями мастер-пароля.
 - Интерфейс на **русском и английском**.

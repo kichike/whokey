@@ -344,6 +344,10 @@ After saving, the old password cannot be recovered.</source>
         <translation>Мастер-пароль</translation>
     </message>
     <message>
+        <source>The CSV import was cancelled because a vault or its backup already exists here. After opening the vault, import from the File menu.</source>
+        <translation>Импорт из CSV отменён: здесь уже есть хранилище или его копия. Откройте хранилище и импортируйте через меню «Файл».</translation>
+    </message>
+    <message>
         <source>Open</source>
         <translation>Открыть</translation>
     </message>
@@ -382,6 +386,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
     <message>
         <source>Create vault</source>
         <translation>Создать хранилище</translation>
+    </message>
+    <message>
+        <source>Don&apos;t import</source>
+        <translation>Не импортировать</translation>
     </message>
     <message>
         <source>This vault is already open in another window. Close it there and try again.</source>
@@ -424,6 +432,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
     <message>
         <source>This vault file appeared while the window was open — open it with its master password.</source>
         <translation>Пока окно было открыто, этот файл хранилища появился — откройте его своим мастер-паролем.</translation>
+    </message>
+    <message>
+        <source>The vault was created, but the passwords were not added: {error}. Import the CSV file again from the main window.</source>
+        <translation>Хранилище создано, но пароли не добавлены: {error}. Импортируйте CSV-файл ещё раз из главного окна.</translation>
     </message>
     <message>
         <source>The old backup was set aside as {name} (a hidden file next to the vault).</source>
@@ -766,6 +778,10 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
         <translation>Разрешить</translation>
     </message>
     <message>
+        <source>the vault would be larger than 10 MB, delete some entries or shorten long notes</source>
+        <translation>хранилище стало бы больше 10 МБ, удалите часть записей или сократите длинные заметки</translation>
+    </message>
+    <message>
         <source>contains a very common word or pattern (qwerty, 123456, password...)</source>
         <translation>содержит очень частое слово или комбинацию (qwerty, 123456, password...)</translation>
     </message>
@@ -804,11 +820,27 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
 <context>
     <name>LoginWindow</name>
     <message numerus="yes">
+        <source>%n passwords from {file} will be added to the new vault.</source>
+        <translation>
+            <numerusform>%n пароль из {file} будет добавлен в новое хранилище.</numerusform>
+            <numerusform>%n пароля из {file} будут добавлены в новое хранилище.</numerusform>
+            <numerusform>%n паролей из {file} будут добавлены в новое хранилище.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <source>Too short: %n characters, at least 12 required.</source>
         <translation>
             <numerusform>Слишком короткий: %n символ, нужно не меньше 12.</numerusform>
             <numerusform>Слишком короткий: %n символа, нужно не меньше 12.</numerusform>
             <numerusform>Слишком короткий: %n символов, нужно не меньше 12.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Added %n passwords.</source>
+        <translation>
+            <numerusform>Добавлен %n пароль.</numerusform>
+            <numerusform>Добавлено %n пароля.</numerusform>
+            <numerusform>Добавлено %n паролей.</numerusform>
         </translation>
     </message>
 </context>

@@ -9,6 +9,7 @@
 родных элементов, в Qt его нет — поэтому стекло нарисовано прозрачностью.
 """
 
+import html
 import sys
 import traceback
 from pathlib import Path
@@ -478,6 +479,14 @@ def rounded_popup(combo):
     popup.setWindowFlags(popup.windowFlags() | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
     popup.setAttribute(Qt.WA_TranslucentBackground)
     return combo
+
+
+def plain_tip(text):
+    """Всплывающая подсказка с данными записи. Qt сам решает, не HTML ли подсказка, и «<img width=…>»
+    из CSV рисовал бы картинкой (как с надписями, см. role) — поэтому текст экранируем."""
+    if not text:
+        return ""  # у пустой ячейки подсказки нет, а «<qt></qt>» показал бы пустой пузырь
+    return "<qt>" + html.escape(text[:500]).replace("\n", "<br>") + "</qt>"
 
 
 def role(widget, name):

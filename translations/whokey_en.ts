@@ -332,6 +332,10 @@ After saving, the old password cannot be recovered.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>The CSV import was cancelled because a vault or its backup already exists here. After opening the vault, import from the File menu.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Open</source>
         <translation type="unfinished"></translation>
     </message>
@@ -367,6 +371,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
     </message>
     <message>
         <source>Create vault</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Don&apos;t import</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -408,6 +416,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
     </message>
     <message>
         <source>This vault file appeared while the window was open — open it with its master password.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The vault was created, but the passwords were not added: {error}. Import the CSV file again from the main window.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -745,6 +757,10 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>the vault would be larger than 10 MB, delete some entries or shorten long notes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>contains a very common word or pattern (qwerty, 123456, password...)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -782,10 +798,24 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
 <context>
     <name>LoginWindow</name>
     <message numerus="yes">
+        <source>%n passwords from {file} will be added to the new vault.</source>
+        <translation>
+            <numerusform>%n password from {file} will be added to the new vault.</numerusform>
+            <numerusform>%n passwords from {file} will be added to the new vault.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <source>Too short: %n characters, at least 12 required.</source>
         <translation>
             <numerusform>Too short: %n character, at least 12 required.</numerusform>
             <numerusform>Too short: %n characters, at least 12 required.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Added %n passwords.</source>
+        <translation>
+            <numerusform>Added %n password.</numerusform>
+            <numerusform>Added %n passwords.</numerusform>
         </translation>
     </message>
 </context>

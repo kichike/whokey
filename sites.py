@@ -181,7 +181,12 @@ def link(text):
     full = address(text)
     if full and "://" in full:
         return full
-    scheme = "http" if site.startswith(("localhost", "127.", "[::1]")) else "https"
+    try:
+        host = (urlsplit("//" + site).hostname or "").lower()
+    except ValueError:
+        return None
+    local = host in ("localhost", "::1") or (host.startswith("127.") and _is_ip(host))
+    scheme = "http" if local else "https"
     return f"{scheme}://{site}"
 
 
@@ -210,8 +215,11 @@ def matches(site, url):
     site = normalize(site)
     if not host or not site:
         return False
-    site_parts = urlsplit("https://" + site)
-    site_host, site_port = site_parts.hostname, site_parts.port
+    try:
+        site_parts = urlsplit("https://" + site)
+        site_host, site_port = site_parts.hostname, site_parts.port
+    except ValueError:
+        return False
     if _is_ip(site_host) or _is_ip(host) or site_host == "localhost":
         # адрес-число и localhost — только точное совпадение (и порта, если он указан в записи)
         try:

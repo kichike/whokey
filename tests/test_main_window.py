@@ -16,7 +16,7 @@ APP = QApplication.instance() or QApplication([])
 import gui.dialogs as D  # noqa: E402
 import gui.main_window as MW  # noqa: E402
 from gui import prefs  # noqa: E402
-from vault import Vault  # noqa: E402
+from vault import Vault, VaultTooLarge  # noqa: E402
 
 
 class Clipboard:
@@ -42,6 +42,32 @@ class MainWindow(unittest.TestCase):
         self.assertIsNone(self.window.selected_index())
         self.window.search.clear()
         self.assertEqual(self.window.selected_index(), 1)
+
+    def test_failed_save_reopens_the_entry_window(self):
+        """Хранилище переполнено: введённое (и пароль, уже вписанный на сайте) не пропадает."""
+        answers, errors = [1, 0], []
+
+        class Dialog:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def exec(self):
+                return answers.pop(0)
+
+            def values(self):
+                return {"site": "x", "login": "", "password": "p" * 500, "note": "", "url": ""}
+
+        def full(*args, **kwargs):
+            raise VaultTooLarge("full")
+        real = MW.EntryDialog, MW.show_error, self.vault.add
+        MW.EntryDialog, MW.show_error, self.vault.add = Dialog, (lambda parent, text: errors.append(text)), full
+        try:
+            self.window.add()
+        finally:
+            MW.EntryDialog, MW.show_error, self.vault.add = real
+        self.assertEqual(answers, [])  # окно показано второй раз
+        self.assertEqual(len(errors), 1)
+        self.assertIn("10 MB", errors[0])
 
     def test_delete_asks_with_red_button(self):
         asked = []

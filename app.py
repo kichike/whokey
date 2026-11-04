@@ -125,7 +125,7 @@ class Controller:
         того, что этот компьютер уже видел, его подменили старой копией: вернулись бы
         отозванный доступ расширения и старые записи. Возвращает прежний номер или None."""
         key = "generation/" + hashlib.sha256(str(vault.path.resolve()).encode("utf-8")).hexdigest()
-        seen = int(self.settings.value(key, 0) or 0)
+        seen = 0 if vault.fresh else int(self.settings.value(key, 0) or 0)
         vault.on_saved = lambda number: self.settings.setValue(key, number)
         self.settings.setValue(key, vault.generation)
         return seen if vault.generation < seen else None

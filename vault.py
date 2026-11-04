@@ -36,6 +36,8 @@ from pathlib import Path
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 
+from regular_file import open_regular
+
 FORMAT = "edu-password-vault"
 VERSION = 1
 
@@ -52,6 +54,9 @@ SALT_SIZE = 16  # 128 бит — как в документации cryptography
 KDF_LIMITS = {"iterations": (1, 10), "lanes": (1, 16), "memory_cost": (2 ** 13, 2 ** 18)}
 ACCESS_LOG_SIZE = 200  # столько последних выдач паролей расширению помнит журнал
 MAX_FILE_SIZE = 10 * 1024 * 1024  # хранилище больше 10 МБ (~25 000 записей) — точно не наше
+# пишем с запасом: номер сохранения растёт и файл на Windows чуть длиннее (CRLF), а уже записанное
+# должно открываться и пересохраняться всегда — например, при восстановлении из копии
+MAX_WRITE_SIZE = MAX_FILE_SIZE - 4096
 
 ENTRY_FIELDS = ["site", "login", "password", "note", "created", "updated"]
 
@@ -70,6 +75,10 @@ class VaultLocked(Exception):
 
 class SaveError(Exception):
     """Не удалось записать файл (диск полон, нет прав...). Изменение не применено."""
+
+
+class VaultTooLarge(SaveError):
+    """С этими данными файл мог бы превысить MAX_FILE_SIZE и больше не открыться."""
 
 
 def derive_key(password, salt, params):
@@ -203,9 +212,11 @@ def _kdf_params(kdf):
 def _read_header(path):
     """Проверяет открытую часть файла и возвращает (соль, настройки, шифровку)."""
     try:
-        if os.path.getsize(path) > MAX_FILE_SIZE:
+        fd = open_regular(path)
+        if os.fstat(fd).st_size > MAX_FILE_SIZE:
+            os.close(fd)
             raise VaultError("file too large")
-        with open(path, encoding="utf-8") as f:
+        with open(fd, encoding="utf-8") as f:
             header = json.load(f, parse_int=_short_int, parse_constant=_no_constant)
         if header.get("format") != FORMAT:
             raise VaultError("not a vault")
@@ -340,6 +351,7 @@ class Vault:
         self.access_log = []
         # номер сохранения (растёт при каждой записи) — чтобы заметить подмену файла старой копией
         self.generation = 0
+        self.fresh = False  # только что создано: прежний номер сохранения этого пути ни при чём
         self.on_saved = None  # вызывается с номером после каждой записи (WhoKey запоминает его)
         self.old_backup = None    # куда отложена чужая старая копия при создании
 
@@ -361,6 +373,7 @@ class Vault:
             except OSError as error:
                 raise SaveError(error.strerror or str(error))
         vault.save()
+        vault.fresh = True
         return vault
 
     @classmethod
@@ -457,6 +470,9 @@ class Vault:
             "data": Fernet(key).encrypt(data).decode("ascii"),
         }
         text = json.dumps(header, indent=2)
+        if len(text) > MAX_WRITE_SIZE:
+            # такой файл _read_header не откроет: и хранилище, и копия были бы потеряны (ревью 1.6.2)
+            raise VaultTooLarge("the vault would be larger than 10 MB")
         try:
             _write_file(self.path, text)
         except OSError as error:

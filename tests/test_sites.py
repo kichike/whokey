@@ -49,6 +49,18 @@ NO_FILL = [  # а здесь — ни в коем случае
 ]
 
 
+class LocalLink(unittest.TestCase):
+    def test_only_real_local_addresses_get_http(self):
+        self.assertEqual(sites.link("localhost:8000"), "http://localhost:8000")
+        self.assertEqual(sites.link("127.0.0.1:8000"), "http://127.0.0.1:8000")
+        self.assertTrue(sites.link("localhost.evil.com").startswith("https://"))
+        self.assertTrue(sites.link("127.0.0.1.evil.com").startswith("https://"))
+
+    def test_malformed_address_does_not_crash(self):
+        self.assertIsNone(sites.link("][a.b["))
+        self.assertFalse(sites.matches("][a.b[", "https://a.b/"))
+
+
 class Matching(unittest.TestCase):
     def test_fill(self):
         for site, url in FILL:

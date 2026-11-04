@@ -4,13 +4,16 @@
 import ctypes
 import math
 import sys
+from pathlib import Path
 
 from PySide6.QtCore import QElapsedTimer, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QIcon, QKeySequence, QLinearGradient, QPainter, QPalette
-from PySide6.QtWidgets import (QCheckBox, QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit, QMenu, QMessageBox,
+from PySide6.QtWidgets import (QCheckBox, QDialogButtonBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QMenu, QMessageBox,
                                QProgressBar, QPushButton, QSpinBox, QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QToolButton, QVBoxLayout, QWidget)
 
+import csv_io
+from vault import VaultTooLarge
 from generator import MAX_LENGTH, MIN_LENGTH, entropy_bits, estimate_bits, generate_password
 from gui import prefs, theme
 from gui.i18n import tr
@@ -444,6 +447,38 @@ def show_error(parent, text):
 
 def show_info(parent, title, text):
     _message(parent, title, text, "i", theme.NEON).exec()
+
+
+def save_problem(error):
+    """Причина ошибки записи для окна: у «слишком большого» хранилища — на языке человека."""
+    if isinstance(error, VaultTooLarge):
+        return tr("the vault would be larger than 10 MB, delete some entries or shorten long notes")
+    return str(error)
+
+
+def choose_csv(parent):
+    """Спрашивает CSV-файл и читает его: (имя файла, записи). None — отказались или в файле нет паролей
+    (об ошибке человеку уже сказали)."""
+    name, _ = QFileDialog.getOpenFileName(parent, tr("Import from CSV"), str(Path.home() / "Downloads"),
+                                          tr("CSV files (*.csv);;All files (*)"))
+    if not name:
+        return None
+    nothing = tr("No passwords found in this file. It needs columns with the name or website address and the password, as in an export from a browser, Bitwarden or KeePassXC.")
+    try:
+        found = csv_io.read(name)
+    except OSError as error:
+        show_error(parent, tr("Could not read the file: {error}").format(error=error.strerror or error))
+        return None
+    except csv_io.CsvError as error:
+        show_error(parent, {
+            "too_big": tr("The file is too big for a password list."),
+            "encoding": tr("The file is not in UTF-8 encoding. Export the passwords again or save the file as UTF-8."),
+        }.get(str(error), nothing))
+        return None
+    if not found:
+        show_error(parent, nothing)
+        return None
+    return name, found
 
 
 def weakness_text(reasons):
