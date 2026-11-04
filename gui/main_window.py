@@ -5,23 +5,24 @@ import shutil
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QDate, QSize, Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import QDate, QFile, QSize, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QColor, QIcon, QDesktopServices, QFontDatabase, QGuiApplication, QKeySequence, QShortcut
-from PySide6.QtWidgets import (QAbstractItemView, QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel,
+from PySide6.QtWidgets import (QAbstractItemView, QApplication, QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel,
                                QLineEdit, QMainWindow, QMenu, QPushButton, QStackedWidget,
                                QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
 import csv_io
 import sites
-from gui import prefs, theme
+from gui import prefs, theme, touchid
 from gui.dates import full_date, shown_date
 from gui.dialogs import AboutDialog, ChangeMasterDialog, EntryDialog, ExportDialog, ExtensionDialog, GeneratorDialog, SettingsDialog
 from gui.widgets import ClipboardCountdown, RoundedRowDelegate, ask_yes, show_error, show_info
 from gui.i18n import tr
-from vault import SaveError
+from vault import FileBusy, PasswordChangedElsewhere, SaveError, Vault, VaultError, WrongPassword, backup_path, cloud_folders
 from version import GITHUB_URL
 
 HIDDEN = "••••••••"   # одинаковые точки — не выдаём даже длину пароля
+SYNC_SECONDS = 5  # как часто смотреть, не изменился ли файл (дёшево: только время и размер)
 COLUMNS = ["site", "login", "password", "note", "updated"]
 
 
@@ -69,6 +70,7 @@ def site_link(entry):
 
 
 class MainWindow(QMainWindow):
+    vault_moved = Signal(object)
     language_changed = Signal(str)  # выбран другой язык в настройках — app.py пересоздаст окно
     lock_requested = Signal()       # «Заблокировать» (⌘L / Ctrl+L) — app.py вернёт окно входа
 
@@ -80,6 +82,17 @@ class MainWindow(QMainWindow):
         self.reveal_timer = QTimer(self)
         self.reveal_timer.setSingleShot(True)
         self.reveal_timer.timeout.connect(self._auto_hide)
+        # файл хранилища мог изменить другой компьютер (облачная папка, см. sync.py)
+        self.vault.on_merged = self._entries_merged
+        self._merge_refresh = QTimer(self)
+        self._merge_refresh.setSingleShot(True)
+        self._merge_refresh.timeout.connect(self._refresh_after_merge)
+        self._handled_copies = set()  # копии от облака, о которых уже спросили
+        self._locking = False
+        self.sync_timer = QTimer(self)
+        self.sync_timer.setInterval(SYNC_SECONDS * 1000)
+        self.sync_timer.timeout.connect(self.check_sync)
+        self.sync_timer.start()
         self.setWindowTitle(tr("WhoKey") + " — " + vault.path.name)
         self.resize(960, 600)
 
@@ -337,19 +350,17 @@ class MainWindow(QMainWindow):
             MainWindow._monograms[letter] = QIcon(theme.monogram(letter, 24))
         return self._monograms[letter]
 
-    _chosen = None  # последняя выбранная запись — чтобы выделение пережило поиск без результатов
+    _chosen = None  # постоянный номер последней выбранной записи: выделение переживает поиск и слияние
 
     def _remember_choice(self):
         index = self.selected_index()
-        if index is not None:
-            self._chosen = index
+        if index is not None and index < len(self.vault.entries):
+            self._chosen = self.vault.entries[index]["id"]
 
     def refresh(self, select=None):
         """Перерисовывает таблицу. select — номер записи, которую выделить."""
-        if select is None:
-            select = self.selected_index()
-        if select is None:
-            select = self._chosen
+        if select is None:  # по постоянному номеру: номер строки после слияния мог стать чужим
+            select = self.vault.index_of(self._chosen)
         query = self.search.text().strip()
         indexes = self.vault.search(query) if query else range(len(self.vault.entries))
 
@@ -402,10 +413,66 @@ class MainWindow(QMainWindow):
         count = len(self.vault.entries)
         self.entries_count.setText(self.tr("%n entries", "", count))
 
+    # --- синхронизация: файл хранилища мог изменить другой компьютер ---
+
+    def _entries_merged(self):
+        """Записи изменились при слиянии. Перерисовка — отдельным шагом: слияние могло случиться
+        посреди сохранения, а строки таблицы до неё указывают на старые места в списке."""
+        self._merge_refresh.start(0)
+
+    def _refresh_after_merge(self):
+        self.revealed = None  # номер показанной записи мог стать чужим
+        index = self.vault.index_of(self._chosen)
+        self.refresh(select=-1 if index is None else index)
+
+    def check_sync(self):
+        """Раз в несколько секунд: подхватить изменения с другого компьютера и копии от облака.
+        Пока открыто какое-нибудь окно, ждём: человек работает с тем, что видит."""
+        if QApplication.activeModalWidget() is not None or self._locking:
+            return
+        try:
+            if self.vault.file_changed() and self.vault.sync():
+                self.statusBar().showMessage(tr("Updated with changes from another device."), 5000)
+            self._merge_cloud_copies()
+        except PasswordChangedElsewhere:
+            self._password_changed_elsewhere()
+        except FileBusy:
+            pass  # облако ещё докачивает файл — посмотрим в следующий раз
+        except SaveError as error:
+            self.statusBar().showMessage(tr("⚠ Could not sync: {error}").format(error=error), 10000)
+
+    def _merge_cloud_copies(self):
+        """Облако не смогло объединить версии и оставило рядом вторую: «vault (conflicted copy).dat»."""
+        for path in self.vault.conflict_copies():
+            if path in self._handled_copies:
+                continue
+            self._handled_copies.add(path)
+            if not self.vault.is_own_copy(path):
+                continue  # другое хранилище или другой пароль — не наше дело
+            if ask_yes(self, tr("Copy of your vault"),
+                       tr("Your cloud left a second copy of this vault: {name}\n\nCombine it with the vault? Nothing is lost: if a password differs, both versions stay. The copy then goes to the Trash.").format(name=path.name)):
+                if self.vault.merge_copy(path):
+                    QFile.moveToTrash(str(path))
+                    self.statusBar().showMessage(tr("The copy is combined with your vault."), 8000)
+
+    def _password_changed_elsewhere(self):
+        if self._locking:
+            return
+        self._locking = True
+        self.sync_timer.stop()
+        show_error(self, tr("The master password was changed on another device, so this vault was locked. Sign in with the new master password. A change you have just made here was not saved: please repeat it."))
+        self.lock_requested.emit()
+
     def _save(self, change):
         """Выполняет изменение хранилища и сообщает об ошибках записи. True — получилось."""
         try:
             change()
+        except PasswordChangedElsewhere:
+            self._password_changed_elsewhere()
+            return False
+        except FileBusy:
+            show_error(self, tr("The vault file cannot be read right now: your cloud may still be downloading it. The change was not applied. Try again in a few seconds."))
+            return False
         except SaveError as error:
             # диск полон, нет прав на запись — изменение не применено
             show_error(self, tr("⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.").format(error=error))
@@ -435,8 +502,9 @@ class MainWindow(QMainWindow):
         if not dialog.exec():
             return
         changes = {k: v for k, v in dialog.values().items() if v != entry.get(k, "")}  # у старых записей нет url
-        if changes and self._save(lambda: self.vault.update(index, **changes)):
-            self.refresh(select=index)
+        # по постоянному номеру: пока окно было открыто, порядок записей мог измениться
+        if changes and self._save(lambda: self.vault.update_id(entry["id"], base=entry, **changes)):
+            self.refresh(select=self.vault.index_of(entry["id"]))
 
     def delete(self):
         index = self.selected_index()
@@ -448,7 +516,7 @@ class MainWindow(QMainWindow):
                     else tr("Delete \"{site}\"?\nThis cannot be undone.").format(site=entry["site"]))
         if not ask_yes(self, tr("Delete entry"), question, danger=tr("Delete")):
             return
-        if self._save(lambda: self.vault.delete(index)):
+        if self._save(lambda: self.vault.delete_id(entry["id"])):
             # номера записей после удалённой сдвинулись — показанный пароль прячем
             self.revealed = None
             self._chosen = None
@@ -589,12 +657,48 @@ class MainWindow(QMainWindow):
     def open_settings(self):
         if self.findChild(SettingsDialog):
             return  # уже открыты (⌘, нажали второй раз)
-        dialog = SettingsDialog(self, self.vault, self.change_master)
+        dialog = SettingsDialog(self, self.vault, self.change_master, self.move_vault)
         dialog.language_chosen.connect(self.language_changed)
         # open(), а не exec(): окно поверх главного, но не останавливает программу —
         # так его можно открыть заново сразу после смены языка (app.change_language)
         dialog.setAttribute(Qt.WA_DeleteOnClose)
         dialog.open()
+
+    def move_vault(self):
+        """Перенос хранилища в папку, которую синхронизирует облако. True — перенесено."""
+        folders = cloud_folders()
+        name = QFileDialog.getExistingDirectory(self, tr("Choose a folder synced by your cloud"),
+                                                str(folders[0][1] if folders else Path.home()))
+        if not name:
+            return False
+        old, target = self.vault.path, Path(name) / self.vault.path.name
+        if target.exists():
+            # на втором компьютере: файл уже приехал, его нельзя затирать
+            show_error(self, tr("There is already a file {name} in this folder. If it is your vault from another device, click \"Other file…\" in the WhoKey window and choose it: nothing needs to be moved.").format(name=target.name))
+            return False
+        self.vault.path = target
+        try:
+            self.vault.save()
+            Vault.open_with_key(target, self.vault.key)  # старый файл убираем, только убедившись, что новый читается
+        except (SaveError, WrongPassword, VaultError, OSError) as error:
+            self.vault.path = old
+            for leftover in (target, backup_path(target)):
+                try:
+                    leftover.unlink()
+                except OSError:
+                    pass
+            show_error(self, tr("Could not write the file: {error}").format(error=getattr(error, "strerror", None) or error))
+            return False
+        for leftover in (old, backup_path(old)):
+            try:
+                leftover.unlink()
+            except OSError:
+                pass
+        touchid.forget(old)  # ключ в Связке привязан к пути; при следующем входе WhoKey предложит Touch ID снова
+        self._locking = True
+        self.sync_timer.stop()
+        self.vault_moved.emit(target)
+        return True
 
     def change_master(self):
         if not ChangeMasterDialog(self, self.vault).exec():

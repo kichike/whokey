@@ -15,6 +15,10 @@ If you did not restore an old copy yourself, check your entries and disconnect t
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>The vault is in the cloud folder now. Enter your master password. On another computer, click &quot;Other file…&quot; and choose this file.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>WhoKey is locked. Enter your master password.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -237,6 +241,26 @@ After saving, the old password cannot be recovered.</source>
     </message>
     <message>
         <source>Master password:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Sync:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>On, through {cloud}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>On another computer, click &quot;Other file…&quot; in the WhoKey window and choose this file.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move to a cloud folder…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>WhoKey keeps the encrypted vault in a folder your cloud syncs (iCloud, Yandex Disk, Dropbox…). Changes from different computers are combined.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -531,6 +555,36 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Updated with changes from another device.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>⚠ Could not sync: {error}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy of your vault</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Your cloud left a second copy of this vault: {name}
+
+Combine it with the vault? Nothing is lost: if a password differs, both versions stay. The copy then goes to the Trash.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The copy is combined with your vault.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The master password was changed on another device, so this vault was locked. Sign in with the new master password. A change you have just made here was not saved: please repeat it.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The vault file cannot be read right now: your cloud may still be downloading it. The change was not applied. Try again in a few seconds.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>⚠ The change is saved, but the backup was not updated: {error}.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -612,6 +666,14 @@ It is encrypted with the same master password. To open it, choose it with the &q
     </message>
     <message>
         <source>CSV files (*.csv)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Choose a folder synced by your cloud</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>There is already a file {name} in this folder. If it is your vault from another device, click &quot;Other file…&quot; in the WhoKey window and choose it: nothing needs to be moved.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

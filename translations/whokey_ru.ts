@@ -18,6 +18,10 @@ If you did not restore an old copy yourself, check your entries and disconnect t
 Если вы сами не восстанавливали старую копию, проверьте записи и отключите расширение (кнопка «Расширение»).</translation>
     </message>
     <message>
+        <source>The vault is in the cloud folder now. Enter your master password. On another computer, click &quot;Other file…&quot; and choose this file.</source>
+        <translation>Хранилище теперь в облачной папке. Введите мастер-пароль. На другом компьютере нажмите «Другой файл…» и выберите этот файл.</translation>
+    </message>
+    <message>
         <source>WhoKey is locked. Enter your master password.</source>
         <translation>WhoKey заблокирован. Введите мастер-пароль.</translation>
     </message>
@@ -250,6 +254,26 @@ After saving, the old password cannot be recovered.</source>
     <message>
         <source>Master password:</source>
         <translation>Мастер-пароль:</translation>
+    </message>
+    <message>
+        <source>Sync:</source>
+        <translation>Синхронизация:</translation>
+    </message>
+    <message>
+        <source>On, through {cloud}</source>
+        <translation>Включена, через {cloud}</translation>
+    </message>
+    <message>
+        <source>On another computer, click &quot;Other file…&quot; in the WhoKey window and choose this file.</source>
+        <translation>На другом компьютере нажмите «Другой файл…» в окне WhoKey и выберите этот файл.</translation>
+    </message>
+    <message>
+        <source>Move to a cloud folder…</source>
+        <translation>Перенести в облачную папку…</translation>
+    </message>
+    <message>
+        <source>WhoKey keeps the encrypted vault in a folder your cloud syncs (iCloud, Yandex Disk, Dropbox…). Changes from different computers are combined.</source>
+        <translation>WhoKey будет хранить зашифрованный файл в папке, которую синхронизирует облако (iCloud, Яндекс Диск, Dropbox…). Изменения с разных компьютеров объединяются.</translation>
     </message>
     <message>
         <source>About WhoKey</source>
@@ -546,6 +570,38 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation>Поиск по названию, логину или заметке</translation>
     </message>
     <message>
+        <source>Updated with changes from another device.</source>
+        <translation>Обновлено: есть изменения с другого устройства.</translation>
+    </message>
+    <message>
+        <source>⚠ Could not sync: {error}</source>
+        <translation>⚠ Не удалось синхронизировать: {error}</translation>
+    </message>
+    <message>
+        <source>Copy of your vault</source>
+        <translation>Копия хранилища</translation>
+    </message>
+    <message>
+        <source>Your cloud left a second copy of this vault: {name}
+
+Combine it with the vault? Nothing is lost: if a password differs, both versions stay. The copy then goes to the Trash.</source>
+        <translation>Облако оставило вторую копию этого хранилища: {name}
+
+Объединить её с хранилищем? Ничего не потеряется: если пароль отличается, останутся обе версии. Сама копия отправится в Корзину.</translation>
+    </message>
+    <message>
+        <source>The copy is combined with your vault.</source>
+        <translation>Копия объединена с хранилищем.</translation>
+    </message>
+    <message>
+        <source>The master password was changed on another device, so this vault was locked. Sign in with the new master password. A change you have just made here was not saved: please repeat it.</source>
+        <translation>На другом устройстве сменили мастер-пароль, поэтому хранилище заблокировано. Войдите с новым мастер-паролем. Изменение, которое вы только что сделали здесь, не сохранилось: повторите его.</translation>
+    </message>
+    <message>
+        <source>The vault file cannot be read right now: your cloud may still be downloading it. The change was not applied. Try again in a few seconds.</source>
+        <translation>Файл хранилища сейчас не прочитать: возможно, облако ещё его докачивает. Изменение не применено. Попробуйте ещё раз через несколько секунд.</translation>
+    </message>
+    <message>
         <source>Delete entry</source>
         <translation>Удалить запись</translation>
     </message>
@@ -608,6 +664,14 @@ It is encrypted with the same master password. To open it, choose it with the &q
     <message>
         <source>CSV files (*.csv)</source>
         <translation>Файлы CSV (*.csv)</translation>
+    </message>
+    <message>
+        <source>Choose a folder synced by your cloud</source>
+        <translation>Выберите папку, которую синхронизирует облако</translation>
+    </message>
+    <message>
+        <source>There is already a file {name} in this folder. If it is your vault from another device, click &quot;Other file…&quot; in the WhoKey window and choose it: nothing needs to be moved.</source>
+        <translation>В этой папке уже есть файл {name}. Если это ваше хранилище с другого устройства, нажмите «Другой файл…» в окне WhoKey и выберите его: переносить ничего не нужно.</translation>
     </message>
     <message>
         <source>Could not write the file: {error}</source>

@@ -134,8 +134,14 @@ class Controller:
         window = MainWindow(vault, self.clipboard)
         window.language_changed.connect(lambda code: self.change_language(vault, code))
         window.lock_requested.connect(lambda: self.lock("manual"))
+        window.vault_moved.connect(self.vault_moved)
         self._replace_window(window)
         return window
+
+    def vault_moved(self, path):
+        """Хранилище перенесено в облачную папку: запомнить новый путь и войти заново."""
+        self.settings.setValue("vault_path", str(path))
+        self.lock("moved")
 
     def change_language(self, vault, code):
         """Язык из настроек: главное окно пересоздаётся с новыми надписями, хранилище остаётся открытым."""
@@ -167,7 +173,9 @@ class Controller:
             elif isinstance(widget, QMenu) and widget.isVisible():
                 widget.close()  # меню правого клика: иначе «Копировать пароль» сработал бы после блокировки
         self.clipboard.clear_now()
-        if reason == "manual":
+        if reason == "moved":
+            self.state["notice"] = tr("The vault is in the cloud folder now. Enter your master password. On another computer, click \"Other file…\" and choose this file.")
+        elif reason == "manual":
             self.state["notice"] = tr("WhoKey is locked. Enter your master password.")
         elif reason == "idle":
             self.state["notice"] = tr("WhoKey locked after {n} min without use. Enter your master password.").format(n=prefs.idle_lock_minutes())

@@ -155,6 +155,169 @@ class PlainTextLabels(unittest.TestCase):
         self.assertIn("<img", dialog.heading.text())  # название показано как есть, буквами
 
 
+class SyncInWindow(unittest.TestCase):
+    """Окно WhoKey и второе устройство, пишущее в тот же файл."""
+
+    def setUp(self):
+        from unittest import mock
+        self.folder = Path(tempfile.mkdtemp())
+        prefs.use_file(self.folder / "p.ini")
+        self.vault = Vault.create(self.folder / "vault.dat", "Зелёный-Кит-Летит-2026!")
+        for site in ("первая", "вторая", "третья"):
+            self.vault.add(site, "egor", "пароль-" + site)
+        self.other = Vault.open_with_key(self.vault.path, self.vault.key)
+        self.window = MW.MainWindow(self.vault, Clipboard())
+        self.errors = []
+        patcher = mock.patch.object(MW, "show_error", lambda parent, text: self.errors.append(text))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(self.window.sync_timer.stop)
+
+    def settle(self):
+        QApplication.processEvents()
+
+    def row_of(self, site):
+        for row in range(self.window.table.rowCount()):
+            if self.window.table.item(row, 0).text() == site:
+                return row
+        return None
+
+    def test_changes_from_another_device_appear_by_themselves(self):
+        self.other.add("с-другого", "x", "новый")
+        self.window.check_sync()
+        self.settle()
+        self.assertIsNotNone(self.row_of("с-другого"))
+        self.assertTrue(self.window.statusBar().currentMessage())  # человеку сказали, что изменилось
+
+    def test_row_never_points_to_someone_elses_password_after_merge(self):
+        """Самое опасное: порядок записей изменился, а на экране старая таблица."""
+        copied = []
+        self.window.clipboard = type("C", (), {"copy": lambda s, text: copied.append(text) or True})()
+        self.window.table.selectRow(self.row_of("третья"))
+        self.other.delete(0)  # на другом устройстве удалили первую — номера записей сдвинулись
+        self.vault.log_access("site", "egor")  # слияние посреди работы (пароль просит расширение)
+        self.settle()
+        self.window.copy()
+        self.assertEqual(copied, ["пароль-третья"])
+        self.assertIsNone(self.row_of("первая"))
+
+    def test_sync_waits_while_a_dialog_is_open(self):
+        from unittest import mock
+        self.other.add("с-другого", "x", "новый")
+        with mock.patch.object(MW.QApplication, "activeModalWidget", return_value=object()):
+            self.window.check_sync()
+        self.settle()
+        self.assertIsNone(self.row_of("с-другого"))
+
+    def test_edit_saved_after_reordering_changes_the_right_entry(self):
+        from unittest import mock
+        self.window.table.selectRow(self.row_of("третья"))
+        other = self.other
+
+        class Dialog:
+            def __init__(self, parent, entry, copy_password=None):
+                self.entry = entry
+
+            def exec(self):
+                other.delete(0)  # пока окно открыто, другое устройство удалило первую запись
+                return True
+
+            def values(self):
+                return dict(self.entry, password="новый")
+        with mock.patch.object(MW, "EntryDialog", Dialog):
+            self.window.edit()
+        self.settle()
+        found = {e["site"]: e["password"] for e in self.vault.entries}
+        self.assertEqual(found, {"вторая": "пароль-вторая", "третья": "новый"})
+
+    def test_password_changed_elsewhere_locks_and_keeps_file(self):
+        locked = []
+        self.window.lock_requested.connect(lambda: locked.append(True))
+        self.other.change_password("Новый-Длинный-Пароль-2026!")
+        before = self.vault.path.read_bytes()
+        self.window.check_sync()
+        self.assertEqual(locked, [True])
+        self.assertEqual(len(self.errors), 1)
+        self.assertEqual(self.vault.path.read_bytes(), before)
+        self.window.check_sync()  # спрашиваем один раз
+        self.assertEqual(len(self.errors), 1)
+
+    def test_saving_after_password_change_elsewhere_locks_too(self):
+        locked = []
+        self.window.lock_requested.connect(lambda: locked.append(True))
+        self.other.change_password("Новый-Длинный-Пароль-2026!")
+        self.assertFalse(self.window._save(lambda: self.vault.add("своё", "x", "1")))
+        self.assertEqual(locked, [True])
+
+    def test_half_downloaded_file_waits_silently_and_blocks_save(self):
+        self.vault.path.write_text("{ ещё докачивается")
+        self.window.check_sync()
+        self.assertEqual(self.errors, [])
+        self.assertFalse(self.window._save(lambda: self.vault.add("своё", "x", "1")))
+        self.assertEqual(len(self.errors), 1)
+        self.assertEqual(self.vault.path.read_text(), "{ ещё докачивается")
+
+    def test_cloud_copy_is_offered_once_merged_and_trashed(self):
+        from unittest import mock
+        self.other.add("в-копии", "x", "пароль-копии")
+        copy = self.folder / "vault (conflicted copy).dat"
+        copy.write_bytes(self.vault.path.read_bytes())
+        self.vault.save()  # основной файл снова без неё
+        self.other = None
+        asked = []
+        with mock.patch.object(MW, "ask_yes", lambda *a, **k: asked.append(a) or True), \
+                mock.patch.object(MW.QFile, "moveToTrash", return_value=True) as trash:
+            self.window.check_sync()
+            self.window.check_sync()
+        self.assertEqual(len(asked), 1)
+        trash.assert_called_once()
+        self.assertIn("пароль-копии", {e["password"] for e in self.vault.entries})
+
+    def test_foreign_file_with_similar_name_is_not_offered(self):
+        from unittest import mock
+        Vault.create(self.folder / "vault 2.dat", "Совсем-Другой-Пароль-2026!")
+        with mock.patch.object(MW, "ask_yes") as ask:
+            self.window.check_sync()
+        ask.assert_not_called()
+
+    def _pick_folder(self, folder):
+        from unittest import mock
+        return mock.patch.object(MW.QFileDialog, "getExistingDirectory", staticmethod(lambda *a, **k: str(folder)))
+
+    def test_move_to_cloud_folder(self):
+        moved = []
+        self.window.vault_moved.connect(moved.append)
+        cloud = Path(tempfile.mkdtemp())
+        old = self.vault.path
+        with self._pick_folder(cloud):
+            self.assertTrue(self.window.move_vault())
+        self.assertEqual(moved, [cloud / "vault.dat"])
+        self.assertFalse(old.exists())
+        self.assertFalse(MW.backup_path(old).exists())
+        self.assertEqual(len(Vault.open(cloud / "vault.dat", "Зелёный-Кит-Летит-2026!").entries), 3)
+
+    def test_move_never_overwrites_a_file_already_there(self):
+        cloud = Path(tempfile.mkdtemp())
+        (cloud / "vault.dat").write_text("хранилище с другого устройства")
+        old = self.vault.path
+        with self._pick_folder(cloud):
+            self.assertFalse(self.window.move_vault())
+        self.assertEqual((cloud / "vault.dat").read_text(), "хранилище с другого устройства")
+        self.assertEqual(self.vault.path, old)
+        self.assertTrue(old.exists())
+        self.assertEqual(len(self.errors), 1)
+
+    def test_failed_move_keeps_the_old_file(self):
+        from unittest import mock
+        cloud = Path(tempfile.mkdtemp())
+        old = self.vault.path
+        with self._pick_folder(cloud), mock.patch.object(MW.Vault, "open_with_key", side_effect=OSError(5, "сбой")):
+            self.assertFalse(self.window.move_vault())
+        self.assertEqual(self.vault.path, old)
+        self.assertTrue(old.exists())
+        self.assertFalse((cloud / "vault.dat").exists())
+
+
 class RealDialogs(unittest.TestCase):
     """Настоящие окна, а не заглушки: окно кода сопряжения падало, а тесты моста его подменяли."""
 
