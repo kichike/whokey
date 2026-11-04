@@ -337,8 +337,50 @@ def set_egg(on):
             widget.recolor()
 
 
+def _has_color(pixmap):
+    """Есть ли на картинке цвет. Без цветного шрифта вместо эмодзи рисуется чёрный значок или пустой квадрат."""
+    image = pixmap.toImage()
+    step = max(1, image.width() // 40)
+    for y in range(0, image.height(), step):
+        for x in range(0, image.width(), step):
+            color = image.pixelColor(x, y)
+            if color.alpha() > 128 and color.hsvSaturation() > 80:
+                return True
+    return False
+
+
+def _drawn_poop(height):
+    """Какашка своими силами — если в системе нет цветного шрифта эмодзи."""
+    pixmap = QPixmap(height * _SCALE, height * _SCALE)
+    pixmap.setDevicePixelRatio(_SCALE)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(Qt.NoPen)
+    h = height
+    fill = QLinearGradient(0, 0, 0, h)
+    fill.setColorAt(0, QColor("#a8703a"))
+    fill.setColorAt(1, QColor("#6b4120"))
+    painter.setBrush(fill)
+    painter.drawEllipse(QRectF(h * 0.40, h * 0.04, h * 0.22, h * 0.22))  # кончик
+    painter.drawRoundedRect(QRectF(h * 0.28, h * 0.17, h * 0.44, h * 0.24), h * 0.12, h * 0.12)
+    painter.drawRoundedRect(QRectF(h * 0.16, h * 0.36, h * 0.68, h * 0.28), h * 0.14, h * 0.14)
+    painter.drawRoundedRect(QRectF(h * 0.04, h * 0.60, h * 0.92, h * 0.34), h * 0.17, h * 0.17)
+    painter.setBrush(QColor(WHITE))
+    for x in (0.31, 0.53):
+        painter.drawEllipse(QRectF(h * x, h * 0.40, h * 0.16, h * 0.18))
+    painter.setBrush(QColor("#1c1008"))
+    for x in (0.36, 0.58):
+        painter.drawEllipse(QRectF(h * x, h * 0.45, h * 0.07, h * 0.08))
+    painter.setPen(QPen(QColor("#1c1008"), max(1.0, h * 0.04), Qt.SolidLine, Qt.RoundCap))
+    painter.setBrush(Qt.NoBrush)
+    painter.drawArc(QRectF(h * 0.32, h * 0.60, h * 0.36, h * 0.20), 200 * 16, 140 * 16)  # улыбка
+    painter.end()
+    return pixmap
+
+
 def _poop_pixmap(height):
-    """Эмодзи вместо ключа. Цветной шрифт эмодзи есть в каждой системе, картинка в программу не встроена."""
+    """Эмодзи вместо ключа. Цветной шрифт эмодзи есть почти в каждой системе, картинка в программу не встроена."""
     side = height * _SCALE
     pixmap = QPixmap(side, side)
     pixmap.setDevicePixelRatio(_SCALE)
@@ -350,7 +392,7 @@ def _poop_pixmap(height):
     painter.setFont(font)
     painter.drawText(QRectF(0, 0, height, height), Qt.AlignCenter, "\U0001F4A9")
     painter.end()
-    return pixmap
+    return pixmap if _has_color(pixmap) else _drawn_poop(height)
 
 
 def glow(widget, color=ACC, radius=24, alpha=170):

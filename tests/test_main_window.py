@@ -155,6 +155,14 @@ class EasterEgg(unittest.TestCase):
         self.assertEqual(add.graphicsEffect().color().name(), usual_glow)
         self.assertEqual(self.window._monogram("github").pixmap(24).toImage(), letter)
 
+    def test_poop_is_always_a_colored_picture(self):
+        """На сборке для Windows без цветного шрифта вместо эмодзи вышел пустой квадрат."""
+        self.assertTrue(theme._has_color(theme._drawn_poop(36)))
+        self.assertTrue(theme._has_color(theme._poop_pixmap(36)))
+        tofu = theme.QPixmap(36, 36)
+        tofu.fill(theme.QColor("#000000"))
+        self.assertFalse(theme._has_color(tofu))
+
     def test_slow_clicks_do_not_count(self):
         for _ in range(3):
             self.window._logo_clicked()
