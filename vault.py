@@ -29,6 +29,7 @@ import os
 import secrets
 import sys
 import tempfile
+import time
 import unicodedata
 from datetime import datetime
 from pathlib import Path
@@ -53,6 +54,7 @@ SALT_SIZE = 16  # 128 бит — как в документации cryptography
 # занять всю память. Верхний предел памяти — 256 МБ.
 KDF_LIMITS = {"iterations": (1, 10), "lanes": (1, 16), "memory_cost": (2 ** 13, 2 ** 18)}
 ACCESS_LOG_SIZE = 200  # столько последних выдач паролей расширению помнит журнал
+REPLACE_ATTEMPTS, REPLACE_PAUSE = 10, 0.2  # файл занят другой программой: ждём до 2 секунд
 MAX_FILE_SIZE = 10 * 1024 * 1024  # хранилище больше 10 МБ (~25 000 записей) — точно не наше
 
 ENTRY_FIELDS = ["site", "login", "password", "note", "created", "updated"]
@@ -188,6 +190,12 @@ def cloud_name(path):
             return name
         except (ValueError, OSError):
             continue
+    # папку облака можно выбрать при установке: узнаём и по названию в пути
+    parts = " ".join(resolved.parts[:-1]).lower()
+    for mark, name in (("yandex", "Яндекс Диск"), ("яндекс", "Яндекс Диск"), ("dropbox", "Dropbox"),
+                       ("onedrive", "OneDrive"), ("google drive", "Google Drive"), ("googledrive", "Google Drive")):
+        if mark in parts:
+            return name
     return "iCloud Drive" if in_icloud_folder(path) else None
 
 
@@ -370,6 +378,19 @@ def _sync_folder(folder):
         os.close(fd)
 
 
+def _replace(tmp, path):
+    """Подмена файла. На Windows её не дают, пока файл открыт другой программой, а программа
+    синхронизации (Яндекс Диск) открывает его для отправки в облако: это длится мгновения."""
+    for attempt in range(REPLACE_ATTEMPTS):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if attempt == REPLACE_ATTEMPTS - 1:
+                raise
+            time.sleep(REPLACE_PAUSE)
+
+
 def _write_file(path, text):
     """Безопасная запись: временный файл -> подмена.
 
@@ -380,11 +401,13 @@ def _write_file(path, text):
     folder = path.parent
     fd, tmp = tempfile.mkstemp(dir=folder, prefix="." + path.name + ".", suffix=".tmp")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
+        # newline="\n": на Windows Python иначе заменил бы \n на \r\n, и в файле оказалось бы не то,
+        # что мы считаем записанным: WhoKey принимал бы собственное сохранение за чужие изменения
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
             f.flush()
             _full_sync(f.fileno())
-        os.replace(tmp, path)
+        _replace(tmp, path)
     except BaseException:
         try:
             os.unlink(tmp)
@@ -600,6 +623,8 @@ class Vault:
             digest = _digest(self.path)
         except FileNotFoundError:
             return None  # облако сейчас его перекладывает, а наша версия цела
+        except PermissionError:
+            raise FileBusy("the vault file is held by another program")  # на Windows: программа синхронизации
         except OSError as error:
             raise SaveError(error.strerror or str(error))
         if digest == self._seen:
@@ -697,8 +722,10 @@ class Vault:
         except OSError:
             return []
         found = []
+        stem = unicodedata.normalize("NFC", stem)  # Mac и Windows хранят «й» в именах файлов по-разному
         for name in names:
-            rest = name[len(stem):-len(suffix)] if suffix and name.startswith(stem) and name.endswith(suffix) else ""
+            plain = unicodedata.normalize("NFC", name)
+            rest = plain[len(stem):-len(suffix)] if suffix and plain.startswith(stem) and plain.endswith(suffix) else ""
             if rest and not rest[0].isalnum():
                 found.append(self.path.with_name(name))
         return sorted(found)

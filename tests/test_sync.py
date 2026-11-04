@@ -1,6 +1,7 @@
 """Синхронизация: два устройства пишут в один файл, а облако иногда мешает. Пароль нельзя потерять."""
 
 import json
+import os
 import random
 import sys
 import tempfile
@@ -26,7 +27,7 @@ def passwords(vault):
     return {e["password"] for e in vault.entries}
 
 
-class Devices(unittest.TestCase):
+class TwoDevices(unittest.TestCase):
     """A и B — два компьютера: два открытых Vault над одним файлом (его возит облако)."""
 
     @classmethod
@@ -45,6 +46,8 @@ class Devices(unittest.TestCase):
     def device(self):
         return Vault.open_with_key(self.path, self.key)
 
+
+class Devices(TwoDevices):
     def test_additions_on_both_devices_are_kept(self):
         self.a.add("почта", "a", "pw-a")
         self.b.add("банк", "b", "pw-b")  # B не видел запись A
@@ -347,6 +350,95 @@ class Devices(unittest.TestCase):
             with mock.patch.object(self.a, "_pull", wraps=self.a._pull) as pull:
                 action()
             pull.assert_called_once()
+
+
+class WindowsAndYandexDisk(TwoDevices):
+    """То, чем Windows и программа синхронизации отличаются от Mac."""
+
+    def test_own_write_is_not_taken_for_a_change_from_another_device(self):
+        self.a.add("почта", "a", "1")
+        self.assertEqual(V._digest(self.path), self.a._seen)  # в файле ровно то, что записали (без \\r\\n)
+        self.assertFalse(self.a.file_changed())
+        with mock.patch.object(self.a, "_absorb") as absorb:
+            self.a.sync()
+            self.a.add("ещё", "b", "2")
+        absorb.assert_not_called()
+
+    def test_replace_waits_for_a_program_holding_the_file(self):
+        real = os.replace
+        calls = []
+
+        def busy_twice(source, target):
+            calls.append(target)
+            if len(calls) <= 2:
+                raise PermissionError(13, "The process cannot access the file")
+            real(source, target)
+        with mock.patch.object(V.os, "replace", busy_twice), mock.patch.object(V, "REPLACE_PAUSE", 0):
+            self.a.add("почта", "a", "1")
+        self.assertEqual(names(self.device()), ["почта"])
+        self.assertGreater(len(calls), 2)
+
+    def test_file_held_for_too_long_is_an_error_and_changes_nothing(self):
+        def always_busy(source, target):
+            raise PermissionError(13, "The process cannot access the file")
+        with mock.patch.object(V.os, "replace", always_busy), mock.patch.object(V, "REPLACE_PAUSE", 0):
+            with self.assertRaises(V.SaveError):
+                self.a.add("почта", "a", "1")
+        self.assertEqual(self.a.entries, [])
+        self.assertFalse([n for n in os.listdir(self.folder) if n.endswith(".tmp")])  # без мусора в папке облака
+
+    def test_file_held_while_reading_means_try_later(self):
+        self.a.add("почта", "a", "1")
+        self.b.add("банк", "b", "2")
+        with mock.patch.object(V, "_digest", side_effect=PermissionError(13, "busy")):
+            with self.assertRaises(FileBusy):
+                self.a.sync()
+        self.a.sync()
+        self.assertEqual(names(self.a), ["банк", "почта"])
+
+    @unittest.skipUnless(sys.platform == "win32", "только на Windows файл нельзя подменить, пока он открыт")
+    def test_real_open_handle_on_windows(self):
+        import threading
+        holder = open(self.path, "rb")
+        threading.Timer(0.5, holder.close).start()
+        self.a.add("почта", "a", "1")  # ждёт, пока «Яндекс Диск» отпустит файл
+        self.assertEqual(names(self.device()), ["почта"])
+
+    def test_yandex_style_conflict_names_are_found(self):
+        self.a.add("почта", "a", "1")
+        found = []
+        for name in ("vault[MacBook].dat", "vault (2).dat", "vault_conflict.dat"):
+            copy = self.folder / name
+            copy.write_bytes(self.path.read_bytes())
+            found.append(copy)
+        self.assertEqual(sorted(self.a.conflict_copies()), sorted(found))
+
+    def test_cloud_folder_is_recognized_by_name_anywhere(self):
+        self.assertEqual(V.cloud_name(Path(tempfile.gettempdir()) / "Мои" / "YandexDisk" / "vault.dat"), "Яндекс Диск")
+        self.assertEqual(V.cloud_name(Path(tempfile.gettempdir()) / "Yandex.Disk.localized" / "vault.dat"), "Яндекс Диск")
+
+    def test_vault_name_in_cyrillic_written_differently_is_found(self):
+        import unicodedata
+        path = self.folder / "мой.dat"
+        vault = Vault.open_with_key(self.path, self.key)
+        vault.path = path
+        vault.save()
+        copy = self.folder / unicodedata.normalize("NFD", "мой (2).dat")
+        copy.write_bytes(path.read_bytes())
+        self.assertEqual(len(vault.conflict_copies()), 1)
+
+    def test_old_entry_version_does_not_depend_on_time_zone(self):
+        entry = {"site": "s", "login": "l", "password": "p", "note": "", "created": "2025-01-01 10:00", "updated": "2025-02-02 10:00"}
+        first = sync.upgrade([entry])[0]["modified"]
+        if hasattr(time, "tzset"):
+            with mock.patch.dict(os.environ, {"TZ": "Asia/Tokyo"}):
+                time.tzset()
+                try:
+                    self.assertEqual(sync.upgrade([entry])[0]["modified"], first)
+                finally:
+                    os.environ.pop("TZ")
+                    time.tzset()
+        self.assertEqual(first, 1738490400000)  # 2025-02-02 10:00 UTC
 
 
 class MergeRules(unittest.TestCase):

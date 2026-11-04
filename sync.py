@@ -19,7 +19,7 @@ import hashlib
 import json
 import secrets
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 MAX_PREVS = 16             # сколько прошлых версий записи помнить
 TOMBSTONE_MS = 365 * 24 * 3600 * 1000  # пометки об удалении старше года забываем
@@ -36,7 +36,9 @@ def new_id():
 
 def _stamp_ms(text):
     try:
-        return int(datetime.strptime(text, "%Y-%m-%d %H:%M").timestamp() * 1000)
+        # как UTC, а не местное время: иначе на компьютерах в разных часовых поясах
+        # у одной и той же старой записи получились бы разные версии
+        return int(datetime.strptime(text, "%Y-%m-%d %H:%M").replace(tzinfo=timezone.utc).timestamp() * 1000)
     except (ValueError, OverflowError, OSError):
         return 0
 
