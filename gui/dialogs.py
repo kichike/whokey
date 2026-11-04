@@ -13,7 +13,7 @@ from gui import i18n, prefs, theme, touchid
 from gui.dates import full_date, shown_date
 from gui.widgets import ClipboardCountdown, GeneratorPanel, PasswordField, StrengthBar, ask_yes, show_error, weakness_text
 from gui.i18n import tr
-from vault import SaveError, cloud_name
+from vault import SaveError
 from version import AUTHOR, AUTHOR_URL, GITHUB_URL, VERSION
 
 MASTER_MIN_LENGTH = 12
@@ -309,15 +309,13 @@ class SettingsDialog(QDialog):
 
     language_chosen = Signal(str)  # окна пересоздаются на новом языке — это делает app.py
 
-    def __init__(self, parent, vault, change_master, move_vault=None):
-        """change_master — смена мастер-пароля главного окна (там же сообщения об ошибках),
-        move_vault — перенос хранилища в облачную папку."""
+    def __init__(self, parent, vault, change_master):
+        """change_master — смена мастер-пароля главного окна (там же сообщения об ошибках)."""
         super().__init__(parent)
         self.setWindowTitle(tr("Settings"))
         self.resize(460, 1)
         self.vault = vault
         self.change_master = change_master
-        self.move_vault = move_vault
 
         form = QFormLayout()
         form.setSpacing(14)
@@ -350,28 +348,11 @@ class SettingsDialog(QDialog):
         change.clicked.connect(self._change_master)
         form.addRow(tr("Master password:"), change)
 
-        cloud = cloud_name(vault.path)
-        hint = None
-        if cloud:
-            form.addRow(tr("Sync:"), QLabel(tr("On, through {cloud}").format(cloud=cloud)))
-            hint = theme.role(QLabel(tr("On another computer, click \"Other file…\" in the WhoKey window and choose this file.")), "muted")
-            hint.setWordWrap(True)
-            # с переносом строк Qt иначе считает высоту окна по неверной ширине и обрезает текст
-            hint.setMinimumWidth(420)
-            hint.setMinimumHeight(hint.heightForWidth(420))
-        elif move_vault is not None:
-            move = QPushButton(tr("Move to a cloud folder…"))
-            move.setToolTip(tr("WhoKey keeps the encrypted vault in a folder your cloud syncs (iCloud, Yandex Disk, Dropbox…). Changes from different computers are combined."))
-            move.clicked.connect(self._move_vault)
-            form.addRow(tr("Sync:"), move)
-
         close = QDialogButtonBox(QDialogButtonBox.Close)
         close.button(QDialogButtonBox.Close).setText(tr("Close"))
         close.rejected.connect(self.reject)
         column = QVBoxLayout(self)
         column.addLayout(form)
-        if hint is not None:
-            column.addWidget(hint)
         column.addWidget(close)
 
     def _choice(self, name, choices, current, label):
@@ -394,11 +375,6 @@ class SettingsDialog(QDialog):
         elif not touchid.save_key(self.vault.path, self.vault.key):
             show_error(self, tr("macOS did not allow saving the key to the Keychain. Touch ID is off."))
             self.touch_id.setChecked(False)
-
-    def _move_vault(self):
-        self.hide()
-        self.move_vault()
-        self.reject()
 
     def _change_master(self):
         had_touch_id = touchid.is_enabled(self.vault.path)

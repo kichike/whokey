@@ -36,7 +36,6 @@ WhoKey keeps your logins in one encrypted file that only opens with your master 
 - **Import and export CSV** (File menu): move your passwords from a browser, Bitwarden, KeePassXC or 1Password and back. The CSV file is not encrypted — delete it after the move.
 - **Encrypted copy** (File → Save encrypted copy): the vault file itself, safe to keep on a USB stick or in the cloud — it opens only with your master password.
 - **Caps Lock warning** under master password fields.
-- **Sync between computers** without any server of ours: keep the vault in a folder your cloud syncs (iCloud Drive, Yandex Disk, Dropbox…). The cloud only ever sees the encrypted file. See [Sync](#sync).
 - **English and Russian** interface.
 
 By default the vault lives in `~/Library/Application Support/EduPasswords/vault.dat` on macOS (not synced to iCloud) and in `%APPDATA%\EduPasswords\vault.dat` on Windows. You can choose another file in the login window.
@@ -56,18 +55,6 @@ Download the installer from [Releases](../../releases).
 1. Run **WhoKey Installer.exe**. No administrator rights needed.
 2. The installer is not code-signed, so Windows SmartScreen may warn you. Click **More info → Run anyway**.
 3. WhoKey appears in the Start menu. Uninstall it from **Settings → Apps**; your vault is kept.
-
-### Sync
-
-1. On the first computer: **Settings → Move to a cloud folder…** and choose a folder your cloud syncs.
-2. On the other computer: install the same version of WhoKey, wait for the file to arrive, click **Other file…** in the WhoKey window and choose it.
-
-- Changes from different computers are combined automatically, and an open WhoKey picks them up by itself within a few seconds.
-- A password is never silently lost: if the same entry was changed on two computers independently, both versions stay, the older one marked ⚠ with its date. Check it and delete the one you don't need.
-- A deleted entry stays deleted, but an edit the deleting computer had not seen is kept.
-- If the master password was changed on another computer, WhoKey locks and asks for the new one.
-- Update WhoKey on all your computers: versions before 1.7 don't know about sync and can bring deleted entries back.
-- The security of the file in the cloud rests on your master password: make it long. Phones are not supported yet.
 
 ### Browser extension
 
@@ -133,7 +120,6 @@ WhoKey хранит логины и пароли в одном зашифров�
 - **Импорт и экспорт CSV** (меню «Файл»): перенос паролей из браузера, Bitwarden, KeePassXC или 1Password и обратно. CSV-файл не зашифрован — удалите его после переноса.
 - **Зашифрованная копия** (Файл → Сохранить зашифрованную копию): сам файл хранилища, его можно держать на флешке или в облаке — откроется только мастер-паролем.
 - **Предупреждение о Caps Lock** под полями мастер-пароля.
-- **Синхронизация между компьютерами** без какого-либо нашего сервера: хранилище лежит в папке, которую синхронизирует ваше облако (iCloud Drive, Яндекс Диск, Dropbox…). Облако видит только зашифрованный файл. Подробнее — в разделе [Синхронизация](#синхронизация).
 - Интерфейс на **русском и английском**.
 
 По умолчанию хранилище лежит в `~/Library/Application Support/EduPasswords/vault.dat` на macOS (эта папка не синхронизируется с iCloud) и в `%APPDATA%\EduPasswords\vault.dat` на Windows. Другой файл можно выбрать в окне входа.
@@ -153,18 +139,6 @@ WhoKey хранит логины и пароли в одном зашифров�
 1. Запустите **WhoKey Installer.exe**. Права администратора не нужны.
 2. Установщик не подписан, поэтому Windows SmartScreen может предупредить. Нажмите «Подробнее → Выполнить в любом случае».
 3. WhoKey появится в меню «Пуск». Удалить его можно в «Параметры → Приложения»; хранилище при этом сохранится.
-
-### Синхронизация
-
-1. На первом компьютере: **Настройки → Перенести в облачную папку…** и выберите папку, которую синхронизирует облако.
-2. На другом компьютере: установите ту же версию WhoKey, дождитесь, пока файл приедет, нажмите **Другой файл…** в окне WhoKey и выберите его.
-
-- Изменения с разных компьютеров объединяются сами, а открытый WhoKey подхватывает их за несколько секунд.
-- Пароль не теряется молча: если одну запись независимо изменили на двух компьютерах, останутся обе версии, старая — с пометкой ⚠ и датой. Проверьте её и удалите ненужную.
-- Удалённая запись остаётся удалённой, но правка, которой удалявший компьютер не видел, сохраняется.
-- Если на другом компьютере сменили мастер-пароль, WhoKey заблокируется и спросит новый.
-- Обновите WhoKey на всех компьютерах: версии до 1.7 не знают о синхронизации и могут вернуть удалённые записи.
-- Безопасность файла в облаке держится на мастер-пароле: сделайте его длинным. Телефоны пока не поддерживаются.
 
 ### Расширение для браузера
 
