@@ -17,6 +17,8 @@ main::-webkit-scrollbar-thumb { background: var(--rim); border-radius: 3px; }
 [hidden] { display: none !important; }
 #status { margin: 4px 8px 6px; color: var(--muted); white-space: pre-line; }
 #status:empty { display: none; }
+#notice { margin: 6px 8px 2px; color: var(--bad); }
+#notice:empty { display: none; }
 #status.bad { color: var(--bad); }
 #status.good { color: var(--neon); }
 #code { margin: 0 0 8px; text-align: center; font-size: 28px; font-weight: 800; letter-spacing: 8px; color: var(--neon); }

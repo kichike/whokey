@@ -20,6 +20,9 @@
   "add_entry": {
     "message": "Add to WhoKey"
   },
+  "menu_not_ready": {
+    "message": "The menu isn't ready or something covers it. Click again."
+  },
   "filling": {
     "message": "Filling…"
   },

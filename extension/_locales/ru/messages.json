@@ -20,6 +20,9 @@
   "add_entry": {
     "message": "Добавить в WhoKey"
   },
+  "menu_not_ready": {
+    "message": "Меню ещё не готово или чем-то закрыто. Нажмите ещё раз."
+  },
   "filling": {
     "message": "Заполняю…"
   },

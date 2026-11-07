@@ -20,7 +20,11 @@ try {
     if (!("isVisible" in entry)) return;
     trackingWorks = true;
     visibleSince = entry.isVisible ? visibleSince || performance.now() : null;
-  }, { trackVisibility: true, delay: 100, threshold: [1.0] }).observe($("menu"));
+  // порог 0.9, а не 1: при дробном масштабе экрана (125%, 133%) меню из-за округления видно
+  // на 99,7%, и браузер считал его невидимым — все нажатия отбрасывались. От подвоха защищает
+  // isVisible: он проверяет прозрачность и всё, что лежит поверх меню, при любом пороге.
+  // Маску и обрезку на предках он не видит — их проверяет inline.js (tampered)
+  }, { trackVisibility: true, delay: 100, threshold: [0.9] }).observe($("menu"));
 } catch (e) { /* старый браузер без проверки видимости */ }
 
 // меню сдвинули — снова ждём полсекунды видимости (см. placeMenu в inline.js).
@@ -67,9 +71,17 @@ const TEXTS = {
   window_busy: ["window_busy", "bad"],
 };
 
+// Нажатие не приняли. Подпись — под списком: строки не должны уехать из-под курсора,
+// иначе повторное нажатие на том же месте выбрало бы другой аккаунт
+function rejected() {
+  $("notice").textContent = msg("menu_not_ready");
+  resize();
+}
+
 function status(text, kind = "") {
   $("status").textContent = text;
   $("status").className = kind;
+  $("notice").textContent = "";
   $("code").hidden = true;
   resize();
 }
@@ -160,7 +172,7 @@ function showItems(items, host) {
     add.textContent = msg("add_entry");
     add.hidden = false;
     add.onclick = async (event) => {
-      if (!trustedClick(event)) return;
+      if (!trustedClick(event)) return rejected();
       add.disabled = true;
       const reply = await send({ kind: "menu_show" });
       if (reply.status !== "ok") showResult(reply);
@@ -186,7 +198,7 @@ function showItems(items, host) {
     text.append(site, login);
     button.append(avatar, text);
     button.addEventListener("click", async (event) => {
-      if (!trustedClick(event)) return;
+      if (!trustedClick(event)) return rejected();
       list.querySelectorAll("button").forEach((b) => (b.disabled = true));
       status(msg("filling"));
       showResult(await send({ kind: "menu_fill", index: item.index, login: item.login }));
@@ -247,7 +259,7 @@ function showGenerate() {
   button.textContent = msg("generate_password");
   button.hidden = false;
   button.onclick = async (event) => {
-    if (!trustedClick(event)) return;
+    if (!trustedClick(event)) return rejected();
     button.disabled = true;
     status(msg("filling"));
     const reply = await send({ kind: "menu_generate" });

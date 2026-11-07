@@ -23,6 +23,7 @@
   const host = document.createElement("whokey-root");
   host.style.cssText = "all: initial !important; position: fixed !important; inset: 0 !important;"
     + " width: 0 !important; height: 0 !important; z-index: 2147483647 !important;";
+  const HOST_STYLE = host.getAttribute("style");
   const root = host.attachShadow({ mode: "closed" });
   const style = document.createElement("style");
   style.textContent = `
@@ -114,20 +115,31 @@
     const box = menu.field.getBoundingClientRect();
     const width = Math.max(MENU_WIDTH, Math.min(box.width, 420));
     // меню целиком на экране: под полем, а если там мало места — над ним; не выше 360 точек
-    // (длинный список прокручивается внутри). Обрезанное краем окна меню не принимало
-    // бы нажатий — защита от подвоха засчитывает только полностью видимое
+    // (длинный список прокручивается внутри). Сильно обрезанное краем окна меню не принимало
+    // бы нажатий — защита от подвоха требует, чтобы было видно хотя бы 90%
     const below = innerHeight - box.bottom - 12;
     const above = box.top - 12;
     const wanted = Math.min(menu.wanted, 360);
     const down = below >= wanted || below >= above;
     const height = Math.max(40, Math.min(wanted, down ? below : above));
     menu.frame.style.height = `${height}px`;
-    const left = `${Math.min(Math.max(8, box.left), innerWidth - width - 8)}px`;
-    const top = `${down ? box.bottom + 6 : box.top - 6 - height}px`;
-    const moved = menu.frame.style.left !== left || menu.frame.style.top !== top;
+    const left = Math.min(Math.max(8, box.left), innerWidth - width - 8);
+    const top = down ? box.bottom + 6 : box.top - 6 - height;
+    // сравниваем числа, а не строки из style: браузер округляет дробные значения при чтении,
+    // и при масштабе 125% или 133% меню считалось бы сдвинутым при каждой проверке
+    const moved = menu.left === undefined || Math.abs(menu.left - left) > 0.5 || Math.abs(menu.top - top) > 0.5;
     menu.frame.style.width = `${width}px`;
-    menu.frame.style.left = left;
-    menu.frame.style.top = top;
+    if (moved) {
+      // запоминаем только настоящий сдвиг: иначе сайт мог бы тащить меню маленькими шагами
+      menu.left = left;
+      menu.top = top;
+      menu.frame.style.left = `${left}px`;
+      menu.frame.style.top = `${top}px`;
+      // где меню оказалось на самом деле (при zoom на странице это не те же числа)
+      const placed = menu.frame.getBoundingClientRect();
+      menu.placedLeft = placed.left;
+      menu.placedTop = placed.top;
+    }
     // меню сдвинулось (страница двигает поле) — нажатия в нём снова ждут полсекунды:
     // так сайт не «подвезёт» меню под чужое нажатие. Сообщение несёт только «сдвинулось»
     if (moved && menu.frame.contentWindow) menu.frame.contentWindow.postMessage("whokey-moved", "*");
@@ -175,6 +187,27 @@
     root.append(frame);
     menu = { frame, field, wanted: 120 };
     placeMenu();
+    requestAnimationFrame(watchMenu);
+  }
+
+  // Браузерная проверка видимости (menu.js) не замечает маску и обрезку на предках, а сдвиг
+  // корня через transform не меняет положение поля. Поэтому каждый кадр проверяем сами:
+  // корень лежит прямо в <html>, его стиль не тронут, меню стоит там, куда мы его поставили.
+  // Что-то не так — закрываем меню: выбрать аккаунт в подделанном меню нельзя
+  function tampered() {
+    if (host.parentNode !== document.documentElement || host.getAttribute("style") !== HOST_STYLE) return true;
+    for (const el of [document.documentElement, host]) {
+      const style = getComputedStyle(el);
+      if (style.maskImage !== "none" || style.webkitMaskBoxImageSource !== "none" || style.clipPath !== "none") return true;
+    }
+    const box = menu.frame.getBoundingClientRect();
+    return Math.abs(box.left - menu.placedLeft) > 1 || Math.abs(box.top - menu.placedTop) > 1;
+  }
+
+  function watchMenu() {
+    if (!menu) return;
+    if (tampered()) closeMenu();
+    else requestAnimationFrame(watchMenu);
   }
 
   function closeMenu() {
