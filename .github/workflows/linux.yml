@@ -61,6 +61,8 @@ jobs:
 
       - name: Install, run, uninstall
         run: |
+          # на компьютерах GitHub эта переменная указывает мимо нашей временной домашней папки
+          unset XDG_CONFIG_HOME XDG_DATA_HOME
           # не в /tmp: из временной папки WhoKey мост в браузерах не прописывает
           export HOME="$(mktemp -d -p "$RUNNER_TEMP")" XDG_RUNTIME_DIR="$(mktemp -d)"
           mkdir -p "$HOME/.config/chromium" unpacked
