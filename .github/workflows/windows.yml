@@ -8,6 +8,9 @@ on:
   workflow_dispatch:       # запуск вручную: Actions → Windows build → Run workflow
   push:
     branches: [main]
+    paths-ignore:   # правка только сайта программу не пересобирает
+      - "site/**"
+      - ".github/workflows/pages.yml"
 
 # сборке достаточно читать код — ничего в репозитории она менять не может
 permissions:

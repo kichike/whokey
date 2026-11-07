@@ -45,7 +45,7 @@ By default the vault lives in `~/Library/Application Support/EduPasswords/vault.
 
 ### Install
 
-Download the installer from [Releases](../../releases).
+Website: [kichike.github.io/whokey](https://kichike.github.io/whokey/). Download the installer there or from [Releases](../../releases).
 
 **macOS (Apple Silicon):**
 1. Open **WhoKey Installer.dmg** and drag WhoKey into **Applications**.
@@ -56,7 +56,7 @@ Download the installer from [Releases](../../releases).
 2. The installer is not code-signed, so Windows SmartScreen may warn you. Click **More info → Run anyway**.
 3. WhoKey appears in the Start menu. Uninstall it from **Settings → Apps**; your vault is kept.
 
-**Linux (x86-64, glibc 2.34+: Ubuntu 22.04, Debian 12, Fedora 35, Arch and newer):**
+**Linux (x86-64, glibc 2.35+: Ubuntu 22.04, Debian 12, Fedora 36, Arch and newer):**
 1. Unpack **WhoKey-linux-x86_64.tar.gz** and run `WhoKey/install.sh`. No administrator rights needed.
 2. WhoKey appears in the applications menu; the command is `~/.local/bin/whokey`. Uninstall with `~/.local/opt/WhoKey/uninstall.sh`; your vault is kept.
 
@@ -133,7 +133,7 @@ WhoKey хранит логины и пароли в одном зашифров�
 
 ### Установка
 
-Скачайте установщик в разделе [Releases](../../releases).
+Сайт: [kichike.github.io/whokey](https://kichike.github.io/whokey/). Скачайте установщик там или в разделе [Releases](../../releases).
 
 **macOS (Apple Silicon):**
 1. Откройте **WhoKey Installer.dmg** и перетащите WhoKey в «Программы».
@@ -144,7 +144,7 @@ WhoKey хранит логины и пароли в одном зашифров�
 2. Установщик не подписан, поэтому Windows SmartScreen может предупредить. Нажмите «Подробнее → Выполнить в любом случае».
 3. WhoKey появится в меню «Пуск». Удалить его можно в «Параметры → Приложения»; хранилище при этом сохранится.
 
-**Linux (x86-64, glibc 2.34+: Ubuntu 22.04, Debian 12, Fedora 35, Arch и новее):**
+**Linux (x86-64, glibc 2.35+: Ubuntu 22.04, Debian 12, Fedora 36, Arch и новее):**
 1. Распакуйте **WhoKey-linux-x86_64.tar.gz** и запустите `WhoKey/install.sh`. Права администратора не нужны.
 2. WhoKey появится в меню приложений, команда — `~/.local/bin/whokey`. Удалить его можно через `~/.local/opt/WhoKey/uninstall.sh`; хранилище при этом сохранится.
 

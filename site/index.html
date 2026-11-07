@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#07061a">
+<title>WhoKey</title>
+<meta name="description" content="WhoKey: простой менеджер паролей с открытым кодом для macOS, Windows и Linux. Любительский проект, весь код написал ИИ, профессиональной проверки безопасности не было. WhoKey: a simple open-source password manager for macOS, Windows and Linux. A hobby project, all code written by AI, no professional security audit.">
+<link rel="icon" href="assets/icon-180.png">
+<link rel="stylesheet" href="style.css">
+<script src="sound.js" defer></script>
+<script src="crypto.js" defer></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+<svg class="defs" width="0" height="0" aria-hidden="true"><filter id="lg" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency=".007 .013" numOctaves="2" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="46" xChannelSelector="R" yChannelSelector="G"/></filter></svg>
+<div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+
+<input class="langr" type="radio" name="lang" id="l-ru" checked aria-label="Русский">
+<input class="langr" type="radio" name="lang" id="l-en" aria-label="English">
+
+<header class="nav glass">
+  <a class="brand" href="#top"><img src="assets/key.webp" alt="" width="17" height="33"><b>WhoKey</b></a>
+  <nav>
+    <a href="#honest"><span class="ru">Честно</span><span class="en">Before you install</span></a>
+    <a class="hl" href="#download"><span class="ru">Скачать</span><span class="en">Download</span></a>
+    <a class="navtg" href="https://t.me/kichik_e" rel="noopener noreferrer">Telegram</a>
+    <a href="https://github.com/kichike/whokey" rel="noopener noreferrer">GitHub</a>
+  </nav>
+  <button type="button" id="snd" class="snd" aria-pressed="false" hidden>
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path class="sp" d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M16.5 9.5l5 5m0-5l-5 5"/></svg>
+    <span class="lb"><span class="off"><span class="ru">Включить звук</span><span class="en">Turn on sound</span></span><span class="onn"><span class="ru">Звук включён</span><span class="en">Sound on</span></span></span>
+  </button>
+  <div class="lang"><label for="l-ru">RU</label><label for="l-en">EN</label></div>
+</header>
+<div class="progress" aria-hidden="true"><i id="bar"></i></div>
+
+<main id="top">
+<div id="story">
+  <div id="stage" aria-hidden="true">
+    <canvas id="gl"></canvas>
+    <canvas id="arcs"></canvas>
+
+    <div id="s-login" class="s">
+      <div class="lg-field"><span id="dots"></span><i class="caret"></i></div>
+    </div>
+
+    <div id="s-grid" class="s hud">
+      <span id="h-pass"></span><span id="h-blk"></span><span id="h-addr"></span>
+    </div>
+
+    <div id="s-key" class="s keyout glass">
+      <small><span class="ru">ключ, 32 байта, только что посчитан</span><span class="en">the key: 32 bytes, computed just now</span></small>
+      <code data-v="key"></code>
+    </div>
+
+    <div id="s-slab" class="s glass liquid"></div>
+    <div id="s-token" class="s tokenout">
+      <code id="tok"><i class="f0"></i><i class="f1"></i><i class="f2"></i><i class="f3"></i></code>
+      <div class="legend"><b class="f0"><span class="ru">версия, время</span><span class="en">version, time</span></b><b class="f1">IV</b><b class="f2"><span class="ru">шифротекст</span><span class="en">ciphertext</span></b><b class="f3">HMAC</b></div>
+    </div>
+
+    <div id="s-file" class="s glass filecard">
+      <code data-v="path"></code>
+      <small><span class="ru">Путь по умолчанию. Другой файл можно выбрать в окне входа.</span><span class="en">The default path. You can pick another file in the login window.</span></small>
+    </div>
+
+    <ol id="rail">
+      <li data-c="1"><span class="ru">ввод</span><span class="en">input</span></li>
+      <li data-c="2"><span class="ru">ключ</span><span class="en">key</span></li>
+      <li data-c="3"><span class="ru">шифрование</span><span class="en">encryption</span></li>
+      <li data-c="4"><span class="ru">файл</span><span class="en">file</span></li>
+    </ol>
+  </div>
+
+  <section class="act hero" data-act="0">
+    <div class="card herocard">
+      <h1>WhoKey</h1>
+      <p class="lead"><span class="ru">Менеджер паролей для macOS, Windows и&nbsp;Linux. Логины и пароли лежат в&nbsp;одном зашифрованном файле. Открыть его можно только мастер-паролем.</span><span class="en">A password manager for macOS, Windows and Linux. All your logins live in one encrypted file that only opens with your master password.</span></p>
+      <p class="scrollhint"><span class="arrow" aria-hidden="true">↓</span><span><span class="ru">Листайте, чтобы увидеть, как он работает</span><span class="en">Scroll to see how it works</span> <span id="snd-hint" class="hintsnd" hidden><span class="ru">(со звуком интереснее)</span><span class="en">(better with sound)</span></span></span></p>
+      <div class="cta">
+        <a class="btn primary" id="cta" href="#download"><span class="ru" id="cta-ru">Скачать</span><span class="en" id="cta-en">Download</span></a>
+        <a class="btn" href="https://github.com/kichike/whokey" rel="noopener noreferrer"><span class="ru">Исходный код</span><span class="en">Source code</span></a>
+      </div>
+      <p class="chip"><span class="ru">Любительский проект, весь код написал ИИ. Профессиональной проверки безопасности не было. <a href="#honest">Что это значит</a></span><span class="en">A hobby project, all code written by AI. No professional security audit. <a href="#honest">What that means</a></span></p>
+    </div>
+  </section>
+
+  <section class="act a1" data-act="1">
+    <div class="card glass">
+      <p class="eyebrow">01</p>
+      <h2><span class="ru">Вы вводите мастер-пароль</span><span class="en">You type your master password</span></h2>
+      <p><span class="ru">В окне видны только точки. Пароль для примера страница придумала сама: <strong>полей ввода здесь нет</strong>, и настоящий пароль сюда вводить некуда.</span><span class="en">The window shows only dots. The page made up this example password itself: <strong>there are no input fields here</strong>, so there is nowhere to type a real one.</span></p>
+      <p class="demo-pw"><span class="ru">Пример:</span><span class="en">Example:</span> <code data-v="pw"><span class="ru">пельмени-42</span><span class="en">zebra-tuba-7</span></code> <button type="button" id="dice" hidden><span class="ru">другой</span><span class="en">another</span></button></p>
+      <p class="fine"><span class="ru">Со страницы ничего не уходит: её правила (CSP в начале исходного кода) разрешают только загрузку собственных файлов.</span><span class="en">Nothing leaves the page: its rules (the CSP at the top of the source) only allow loading its own files.</span></p>
+    </div>
+  </section>
+
+  <section class="act a2" data-act="2">
+    <div class="card glass">
+      <p class="eyebrow">02</p>
+      <h2><span class="ru">Argon2id превращает его в&nbsp;ключ</span><span class="en">Argon2id turns it into a key</span></h2>
+      <p><span class="ru">Функция специально медленная и требует много памяти: каждый новый блок зависит от прежних. Поэтому каждая попытка подобрать пароль стоит времени и памяти.</span><span class="en">The function is slow and memory-hungry on purpose: each new block depends on earlier ones. That makes every guess at a password expensive.</span></p>
+      <p class="fine"><span class="ru">Клетка здесь — настоящий блок памяти, линия — настоящая ссылка на блок. Здесь для наглядности 1 МиБ и 3 прохода; в приложении настройки другие, они в <a href="https://github.com/kichike/whokey/blob/main/vault.py" rel="noopener noreferrer">vault.py</a>.</span><span class="en">Each cell is a real memory block, each line a real reference to one. This demo uses 1 MiB and 3 passes; the app uses other settings, see <a href="https://github.com/kichike/whokey/blob/main/vault.py" rel="noopener noreferrer">vault.py</a>.</span></p>
+      <div class="proof">
+        <canvas id="sgrid" width="320" height="320" hidden></canvas>
+        <small class="st"><span class="ru">Пример, посчитан заранее. Ключ:</span><span class="en">An example computed in advance. The key:</span></small>
+        <small class="lv"><span class="ru">Посчитано только что. Ключ:</span><span class="en">Computed just now. The key:</span></small>
+        <code data-v="key"><span class="ru">c2af07e7af3a33aa85ac27277aaff68d77831aa3238c69eb89d887dcfce1375e</span><span class="en">ac6d71f5df7c7ae31f877711d4ea217ebdb7e0ce95d181481b11b334d2639103</span></code>
+      </div>
+    </div>
+  </section>
+
+  <section class="act a3" data-act="3">
+    <div class="card glass">
+      <p class="eyebrow">03</p>
+      <h2><span class="ru">Fernet шифрует записи</span><span class="en">Fernet encrypts the entries</span></h2>
+      <p><span class="ru">Ключом шифруется то, что вы храните: логин, пароль, заметка. Каждая светящаяся точка — настоящий бит результата шифрования.</span><span class="en">The key encrypts what you store: login, password, note. Every glowing dot is a real bit of the encrypted result.</span></p>
+      <div class="proof">
+        <small class="st"><span class="ru">Пример, зашифрован заранее:</span><span class="en">An example encrypted in advance:</span></small>
+        <small class="lv"><span class="ru">Зашифровано только что:</span><span class="en">Encrypted just now:</span></small>
+        <code data-v="token"><span class="ru">gAAAAABq72tEcvDUtoOiBG2A8v3PhvT3UI8D1qIffXIea0vwGJNBOU1BKj2M4svd44NqibgmrCdQvB5EwUm9WP6UyqT1XrjXVn4GPTnuQP8WkI5-76M7_Jz3vUxQAntgYhbsvm_a35KE0sOQ1FRPqQfCE8mtRl4KDl24oMnFF2ruILNKo0Qniao=</span><span class="en">gAAAAABq74J0f3fOM1Jc5NOv8Tb4whmMkIAktss221g1RFA9whZZMuBvoQAwetfSq2y8qBOBIXPkj4tT-FMVGff6snDXQcQsW0jcVTSCZN5FAyPjXeaVEHmypDGPTu-gEXREFEMB4rkJKkNm1IMvXw2NdfvSa561xw==</span></code>
+      </div>
+    </div>
+  </section>
+
+  <section class="act a4" data-act="4">
+    <div class="card glass">
+      <p class="eyebrow">04</p>
+      <h2><span class="ru">И всё лежит в&nbsp;одном файле</span><span class="en">And it all sits in one file</span></h2>
+      <p><span class="ru">Рядом лежит скрытая резервная копия, так что в папке виден один файл. Сам файл можно хранить на флешке или в облаке: откроется только мастер-паролем.</span><span class="en">A hidden backup sits next to it, so you only see one file. The file itself can live on a USB stick or in the cloud: it opens only with your master password.</span></p>
+      <div class="proof paths">
+        <code>~/Library/Application Support/EduPasswords/vault.dat</code>
+        <code>%APPDATA%\EduPasswords\vault.dat</code>
+        <code>~/.local/share/EduPasswords/vault.dat</code>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="after">
+
+<section id="door" class="wrap">
+  <p class="eyebrow">05</p>
+  <h2><span class="ru">Один неверный символ</span><span class="en">One wrong character</span></h2>
+  <p class="sub"><span class="ru">Та же основа, тот же Argon2id, другой символ в пароле. Ключ получается совсем другим, подпись Fernet не совпадает, и файл не открывается. Если мастер-пароль забыт, случится то же: восстановить его нельзя.</span><span class="en">The same base, the same Argon2id, one different character. The key comes out completely different, the Fernet signature fails, and the file stays shut. A forgotten master password ends the same way: it cannot be recovered.</span></p>
+  <div class="doors">
+    <div class="glass door ok">
+      <small><span class="ru">верный пароль</span><span class="en">correct password</span></small>
+      <code class="pw" id="d-a"><span class="ru">пельмени-42</span><span class="en">zebra-tuba-7</span></code>
+      <code class="k" id="d-ka"><span class="ru">c2af07e7af3a33aa85ac27277aaff68d77831aa3238c69eb89d887dcfce1375e</span><span class="en">ac6d71f5df7c7ae31f877711d4ea217ebdb7e0ce95d181481b11b334d2639103</span></code>
+      <p id="d-ra"><span class="ru">Подпись совпала, файл открылся.</span><span class="en">Signature matches, the file opens.</span></p>
+    </div>
+    <div class="glass door bad">
+      <small><span class="ru">один символ другой</span><span class="en">one character off</span></small>
+      <code class="pw" id="d-b"><span class="ru">пельмени-43</span><span class="en">zebra-tuba-8</span></code>
+      <code class="k" id="d-kb"><span class="ru">4cecde74f82275621c39978bdedccb2c4939148b1caa68260ce83bfab1d8d702</span><span class="en">acbf639c93fbe472d225c1cd2e66d6e180e5a9ba90e4e96dfa585cf7db1baa63</span></code>
+      <p id="d-rb"><span class="ru">Подпись не совпала, файл не открылся.</span><span class="en">Signature doesn't match, the file stays shut.</span></p>
+    </div>
+  </div>
+  <p class="door-foot">
+    <button type="button" class="btn" id="d-next" hidden><span class="ru">Заменить другой символ</span><span class="en">Change another character</span></button>
+    <span id="d-stat"><span class="ru">Разных битов ключа: 118 из 256. Пример посчитан заранее.</span><span class="en">123 of 256 key bits differ. An example computed in advance.</span></span>
+  </p>
+</section>
+
+<section class="wrap" id="more">
+  <p class="eyebrow"><span class="ru">что умеет WhoKey</span><span class="en">what WhoKey can do</span></p>
+  <h2><span class="ru">Обычное приложение</span><span class="en">An ordinary app</span></h2>
+  <figure class="shot glass"><img src="assets/main.webp" width="960" height="632" loading="lazy" alt="Главное окно WhoKey: список записей со скрытыми паролями / WhoKey main window: a list of entries with hidden passwords"></figure>
+  <div class="tiles">
+    <div class="tile glass"><h3><span class="ru">Буфер обмена</span><span class="en">Clipboard</span></h3><div class="drain" aria-hidden="true"><i></i></div><p><span class="ru">Скопированный пароль стирается через 30 секунд (меняется в настройках) и при выходе. Полоска показывает, сколько осталось.</span><span class="en">A copied password is wiped after 30 seconds (changeable in Settings) and on quit. A bar shows the time left.</span></p></div>
+    <div class="tile glass"><h3><span class="ru">Расширение</span><span class="en">Extension</span></h3><p><span class="ru">Для браузеров на Chromium. Заполняет только по нажатию, только на сайте из записи и его поддоменах, только на https (и на localhost).</span><span class="en">For Chromium browsers. Fills only on click, only on the entry's own site and subdomains, only on https (and localhost).</span></p></div>
+    <div class="tile glass"><h3><span class="ru">Генератор</span><span class="en">Generator</span></h3><p><span class="ru">Длина, буквы, цифры, символы и примерная шкала надёжности.</span><span class="en">Length, letters, digits, symbols and a rough strength meter.</span></p></div>
+    <div class="tile glass"><h3><span class="ru">Автоблокировка</span><span class="en">Auto-lock</span></h3><p><span class="ru">Когда блокируется экран, засыпает компьютер или WhoKey долго не трогают (по умолчанию 10 минут). На Mac можно открывать по Touch ID.</span><span class="en">When the screen locks, the computer sleeps or the app sits idle (10 minutes by default). On a Mac it can unlock with Touch ID.</span></p></div>
+    <div class="tile glass"><h3><span class="ru">Импорт и экспорт</span><span class="en">Import and export</span></h3><p><span class="ru">CSV из браузера, Bitwarden, KeePassXC или 1Password и обратно. CSV не зашифрован, после переноса удалите его.</span><span class="en">CSV from a browser, Bitwarden, KeePassXC or 1Password and back. The CSV is not encrypted, so delete it after the move.</span></p></div>
+    <div class="tile glass"><h3><span class="ru">Скрытые пароли</span><span class="en">Hidden passwords</span></h3><p><span class="ru">Показанный пароль сам прячется через 15 секунд. Интерфейс на русском и английском.</span><span class="en">A revealed password hides itself after 15 seconds. The interface is in English and Russian.</span></p></div>
+  </div>
+</section>
+
+<section id="download" class="wrap">
+  <p class="eyebrow"><span class="ru">macOS, Windows, Linux и расширение</span><span class="en">macOS, Windows, Linux and the extension</span></p>
+  <h2><span class="ru">Скачать WhoKey</span><span class="en">Download WhoKey</span></h2>
+  <p class="sub" id="os-note" hidden></p>
+  <div class="dl">
+    <article class="glass dlc" data-os="mac">
+      <h3>macOS</h3><p class="req">Apple Silicon</p>
+      <a class="btn primary" href="https://github.com/kichike/whokey/releases/latest/download/WhoKey.Installer.dmg" rel="noopener noreferrer">WhoKey.Installer.dmg</a>
+      <p><span class="ru">Перетащите WhoKey в «Программы». Приложение не заверено Apple, поэтому первый запуск будет заблокирован: «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть».</span><span class="en">Drag WhoKey into Applications. The app is not notarized by Apple, so the first launch is blocked: System Settings → Privacy &amp; Security → Open Anyway.</span></p>
+    </article>
+    <article class="glass dlc" data-os="win">
+      <h3>Windows</h3><p class="req"><span class="ru">10/11, 64-бит</span><span class="en">10/11, 64-bit</span></p>
+      <a class="btn primary" href="https://github.com/kichike/whokey/releases/latest/download/WhoKey.Installer.exe" rel="noopener noreferrer">WhoKey.Installer.exe</a>
+      <p><span class="ru">Права администратора не нужны. Установщик не подписан, поэтому SmartScreen может предупредить: «Подробнее → Выполнить в любом случае».</span><span class="en">No administrator rights needed. The installer is not code-signed, so SmartScreen may warn you: More info → Run anyway.</span></p>
+    </article>
+    <article class="glass dlc" data-os="linux">
+      <h3>Linux</h3><p class="req">x86-64, glibc 2.35+</p>
+      <a class="btn primary" href="https://github.com/kichike/whokey/releases/latest/download/WhoKey-linux-x86_64.tar.gz" rel="noopener noreferrer">WhoKey-linux-x86_64.tar.gz</a>
+      <p><span class="ru">Ubuntu 22.04, Debian 12, Fedora 36, Arch и новее. Распакуйте и запустите <code>WhoKey/install.sh</code>, права администратора не нужны.</span><span class="en">Ubuntu 22.04, Debian 12, Fedora 36, Arch and newer. Unpack and run <code>WhoKey/install.sh</code>, no administrator rights needed.</span></p>
+    </article>
+    <article class="glass dlc" data-os="ext">
+      <h3><span class="ru">Расширение</span><span class="en">Extension</span></h3><p class="req"><span class="ru">браузеры на Chromium</span><span class="en">Chromium browsers</span></p>
+      <a class="btn" href="https://github.com/kichike/whokey/releases/latest/download/WhoKey-extension.zip" rel="noopener noreferrer">WhoKey-extension.zip</a>
+      <p><span class="ru">Сначала установите WhoKey и откройте его. Затем распакуйте архив, включите «Режим разработчика» в <code>chrome://extensions</code> и нажмите «Загрузить распакованное».</span><span class="en">Install WhoKey and open it first. Then unzip, turn on Developer mode in <code>chrome://extensions</code> and click Load unpacked.</span></p>
+    </article>
+  </div>
+  <p class="repo"><a href="https://github.com/kichike/whokey" rel="noopener noreferrer">github.com/kichike/whokey</a> · <a href="https://github.com/kichike/whokey/releases" rel="noopener noreferrer">Releases</a></p>
+</section>
+
+<section id="honest" class="wrap">
+  <p class="eyebrow"><span class="ru">а теперь честно</span><span class="en">to be honest</span></p>
+  <h2><span class="ru">Что важно знать перед установкой</span><span class="en">What to know before you install</span></h2>
+  <ul class="plain">
+    <li><strong><span class="ru">Это любительская программа.</span><span class="en">This is a hobby app.</span></strong> <span class="ru">Весь код написал ИИ. Профессиональной проверки безопасности она не проходила. Для важных аккаунтов надёжнее проверенные менеджеры, например Bitwarden или KeePassXC.</span><span class="en">All the code was written by AI. The app has not had a professional security audit. For important accounts, an established manager such as Bitwarden or KeePassXC is a safer choice.</span></li>
+    <li><strong><span class="ru">Установщики не подписаны.</span><span class="en">The installers are not code-signed.</span></strong> <span class="ru">macOS заблокирует первый запуск, а Windows SmartScreen может показать предупреждение. Что нажать, написано рядом со ссылками выше.</span><span class="en">macOS blocks the first launch, and Windows SmartScreen may warn you. What to click is written next to the links above.</span></li>
+    <li><strong><span class="ru">Мастер-пароль нельзя восстановить.</span><span class="en">The master password cannot be recovered.</span></strong> <span class="ru">Забыли его — хранилище не открыть.</span><span class="en">If you forget it, the vault is gone.</span></li>
+    <li><strong><span class="ru">От вируса на компьютере полностью не защитит.</span><span class="en">WhoKey can't fully stop malware on your computer.</span></strong> <span class="ru">Ни один менеджер паролей не защищает полностью от программы, уже запущенной под вашим пользователем. WhoKey усложняет ей жизнь, но не более.</span><span class="en">No password manager can fully protect you from malware already running under your user account. WhoKey only makes its job harder.</span></li>
+    <li><strong>Touch ID</strong> <span class="ru">— для удобства: ключ лежит в Связке ключей, а отпечаток проверяет сам WhoKey. Вредоносная программа, запущенная под вашим пользователем, может получить ключ без отпечатка. Если это беспокоит, не включайте Touch ID.</span><span class="en">is a convenience: the key sits in your login Keychain and WhoKey itself checks the fingerprint. Malware running under your user account could get the key without a fingerprint. If that worries you, keep it off.</span></li>
+    <li><strong><span class="ru">Расширению нужен доступ ко всем сайтам,</span><span class="en">The extension needs access to all websites</span></strong> <span class="ru">чтобы показывать значок в полях входа. Chrome так и напишет. Ставьте его только из репозитория WhoKey на GitHub.</span><span class="en">to show its icon in login fields, and Chrome will say so. Install it only from the WhoKey repository on GitHub.</span></li>
+    <li><strong><span class="ru">Эта страница</span><span class="en">This page</span></strong> <span class="ru">не загружает чужие скрипты, шрифты и аналитику и не ставит cookie. Её расчёты — демонстрация с облегчёнными настройками, а не код приложения.</span><span class="en">loads no third-party scripts, fonts or analytics and sets no cookies. Its calculations are a demo with lighter settings, not the app's code.</span></li>
+  </ul>
+</section>
+
+<section id="contact" class="wrap">
+  <p class="eyebrow"><span class="ru">вопросы и идеи</span><span class="en">questions and ideas</span></p>
+  <a class="tg" href="https://t.me/kichik_e" rel="noopener noreferrer"><span class="tg-label">Telegram</span><span class="tg-name">@kichik_e</span></a>
+</section>
+
+<footer class="wrap foot">
+  <p><span class="ru">Шрифт MesloLGS Nerd Font, лицензия Apache 2.0: <a href="assets/FONT-LICENSE.txt">текст и изменения</a>.</span><span class="en">MesloLGS Nerd Font, Apache License 2.0: <a href="assets/FONT-LICENSE.txt">text and changes</a>.</span></p>
+</footer>
+</div>
+</main>
+</body>
+</html>

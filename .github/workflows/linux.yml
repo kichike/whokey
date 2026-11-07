@@ -1,12 +1,15 @@
 # Сборка WhoKey для Linux на компьютере GitHub. Шаги: проверки → сборка → запуск собранной
 # программы и моста → установка и удаление. Ubuntu 22.04 — самая старая система, на которой
-# есть подходящий Qt (glibc 2.34+): собранное на ней работает и на более новых.
+# есть подходящий Qt (glibc 2.35): собранное на ней работает и на более новых.
 name: Linux build
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
+    paths-ignore:   # правка только сайта программу не пересобирает
+      - "site/**"
+      - ".github/workflows/pages.yml"
 
 permissions:
   contents: read
