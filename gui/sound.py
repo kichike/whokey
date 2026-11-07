@@ -20,3 +20,8 @@ def play_fart():
             pass
     elif sys.platform == "darwin":
         QProcess.startDetached("/usr/bin/afplay", [str(FART_FILE)])  # полный путь: не чужая программа из PATH
+    else:
+        for player in ("/usr/bin/pw-play", "/usr/bin/paplay", "/usr/bin/aplay"):  # PipeWire, PulseAudio, ALSA
+            if QFile.exists(player):
+                QProcess.startDetached(player, [str(FART_FILE)])
+                break

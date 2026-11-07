@@ -285,17 +285,29 @@ class Limits(unittest.TestCase):
             with self.assertRaises(V.VaultError):
                 V._read_header(path)
 
-    def test_export_over_open_file_narrows_rights_first(self):
+    def test_export_over_open_file_is_private_and_leaves_no_trash(self):
         path = self.folder / "o.csv"
-        path.write_text("")
+        path.write_text("старое")
         os.chmod(path, 0o644)
-        seen = []
-        real = csv_io.csv.writer
-        csv_io.csv.writer = lambda f: seen.append(stat.S_IMODE(os.stat(path).st_mode)) or real(f)
-        self.addCleanup(setattr, csv_io.csv, "writer", real)
         csv_io.write(path, [])
+        self.assertNotIn("старое", path.read_text(encoding="utf-8"))
+        self.assertEqual(sorted(p.name for p in self.folder.glob(".*.tmp")), [])
         if sys.platform != "win32":
-            self.assertEqual(seen, [0o600])
+            self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
+
+    @unittest.skipIf(sys.platform == "win32", "ссылки и каналы — только Mac и Linux")
+    def test_export_does_not_follow_a_link_or_hang_on_a_pipe(self):
+        victim = self.folder / "victim.txt"
+        victim.write_text("не трогать")
+        link = self.folder / "l.csv"
+        link.symlink_to(victim)
+        csv_io.write(link, [])
+        self.assertEqual(victim.read_text(), "не трогать")
+        self.assertFalse(link.is_symlink())
+        pipe = self.folder / "p.csv"
+        os.mkfifo(pipe)
+        csv_io.write(pipe, [])  # раньше здесь программа зависала навсегда
+        self.assertTrue(pipe.is_file())
 
     def test_every_written_vault_can_be_saved_again(self):
         self.assertLess(V.MAX_WRITE_SIZE, V.MAX_FILE_SIZE)

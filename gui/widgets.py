@@ -6,8 +6,8 @@ import math
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QEasingCurve, QElapsedTimer, QRectF, QSize, Qt, QTimer, QVariantAnimation, Signal
-from PySide6.QtGui import QColor, QFont, QIcon, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPalette, QPen
+from PySide6.QtCore import QEasingCurve, QElapsedTimer, QEvent, QRectF, QSize, Qt, QTimer, QVariantAnimation, Signal
+from PySide6.QtGui import QClipboard, QColor, QFont, QGuiApplication, QIcon, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPalette, QPen
 from PySide6.QtWidgets import (QCheckBox, QDialogButtonBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QMenu, QMessageBox,
                                QProgressBar, QPushButton, QSpinBox, QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QToolButton, QVBoxLayout, QWidget)
@@ -22,6 +22,17 @@ from gui.i18n import tr
 GOOD, WARNING, BAD = theme.OK, theme.WARN, theme.BAD
 
 
+
+
+def forget_selection(edit):
+    """Linux: выделенное мышью само попадает в отдельный буфер (вставка средней кнопкой),
+    и автоочистка о нём не знает. Открытый пароль оттуда сразу убираем."""
+    board = QGuiApplication.clipboard()
+    if edit.echoMode() != QLineEdit.Normal:
+        return  # скрытый пароль Qt туда не кладёт
+    if board is not None and board.supportsSelection() and edit.hasSelectedText() \
+            and board.text(QClipboard.Selection) == edit.selectedText():
+        board.clear(QClipboard.Selection)
 
 
 class SecretEdit(QLineEdit):
@@ -48,6 +59,15 @@ class SecretEdit(QLineEdit):
             self._copy_out()  # «вырезать» тоже только копирует: пароль из поля не пропадает
             return
         super().keyPressEvent(event)
+        forget_selection(self)
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        forget_selection(self)
+
+    def mouseDoubleClickEvent(self, event):
+        super().mouseDoubleClickEvent(event)
+        forget_selection(self)
 
     def contextMenuEvent(self, event):
         # своё меню вместо стандартного: в стандартном «Копировать» шло бы мимо нас
@@ -59,8 +79,13 @@ class SecretEdit(QLineEdit):
         menu.exec(event.globalPos())
 
 
+_linux_caps = False  # последнее, что Linux сообщил о Caps Lock (см. PasswordField.eventFilter)
+
+
 def caps_lock_on():
-    """Включён ли Caps Lock (macOS и Windows; на остальных — «не знаем», False)."""
+    """Включён ли Caps Lock. На Linux спросить нельзя, ответ приходит с нажатиями клавиш в поле."""
+    if sys.platform.startswith("linux"):
+        return _linux_caps
     try:
         if sys.platform == "darwin":
             from AppKit import NSEvent  # PyObjC, ставится вместе с Touch ID (requirements.txt)
@@ -114,6 +139,13 @@ class PasswordField(QWidget):
             self.caps_timer = QTimer(self)
             self.caps_timer.timeout.connect(self._check_caps)
             self.caps_timer.start(300)
+            self.edit.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if event.type() in (QEvent.KeyPress, QEvent.KeyRelease) and sys.platform.startswith("linux"):
+            global _linux_caps
+            _linux_caps = bool(event.nativeModifiers() & 2)  # 2 — бит Lock и в X11, и в Wayland
+        return False
 
     def _check_caps(self):
         shown = self.edit.hasFocus() and caps_lock_on()

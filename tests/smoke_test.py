@@ -64,11 +64,12 @@ try:
     check(False, "второе окно на то же хранилище — «уже открыто»")
 except V.VaultLocked:
     check(True, "второе окно на то же хранилище — «уже открыто»")
-try:
-    V.lock(folder / "VAULT.DAT")
-    check(False, "тот же файл ЗАГЛАВНЫМИ — тот же замок")
-except V.VaultLocked:
-    check(True, "тот же файл ЗАГЛАВНЫМИ — тот же замок")
+if sys.platform in ("win32", "darwin"):  # на Linux это разные файлы
+    try:
+        V.lock(folder / "VAULT.DAT")
+        check(False, "тот же файл ЗАГЛАВНЫМИ — тот же замок")
+    except V.VaultLocked:
+        check(True, "тот же файл ЗАГЛАВНЫМИ — тот же замок")
 os.close(fd)
 
 old = Path(tempfile.mkdtemp())

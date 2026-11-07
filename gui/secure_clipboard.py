@@ -18,6 +18,8 @@
 
 import ctypes
 import ctypes.util
+import os
+import subprocess
 import sys
 
 from PySide6.QtCore import QMimeData, QObject, QTimer
@@ -71,6 +73,25 @@ def _copy_macos(secret):
         set_string(board, objc.sel_registerName(b"setString:forType:"), nsstring(""), mark)
 
 
+def _wipe_wayland_copy(secret):
+    """Wayland: программа вроде wl-clip-persist могла забрать пароль себе. Тогда он в буфере
+    уже не наш: окну без фокуса Qt его не покажет, а наша очистка его не уберёт.
+    Смотрим и стираем через wl-clipboard (пароль не в аргументах). True — стёрли.
+    Вызывать, только если буфер не наш: иначе wl-paste ждал бы ответа от нас самих."""
+    if QGuiApplication.platformName() != "wayland":
+        return False
+    if not (os.path.exists("/usr/bin/wl-paste") and os.path.exists("/usr/bin/wl-copy")):
+        return False
+    try:
+        now = subprocess.run(["/usr/bin/wl-paste", "--no-newline"], capture_output=True, timeout=1)
+        if now.stdout != secret.encode("utf-8"):
+            return False
+        subprocess.run(["/usr/bin/wl-copy", "--clear"], capture_output=True, timeout=1)
+        return True
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 class SecureClipboard(QObject):
     """То же, что clipboard.Clipboard у консольной версии: copy / clear / clear_now."""
 
@@ -119,8 +140,11 @@ class SecureClipboard(QObject):
             return False
         board = QGuiApplication.clipboard()
         cleared = False
+        owned = board is not None and board.ownsClipboard()  # спрашиваем до очистки: после неё уже не наш
         if board is not None and board.text() == self._secret:
             board.clear()
+            cleared = True
+        if not owned and _wipe_wayland_copy(self._secret):
             cleared = True
         self._secret = None
         return cleared

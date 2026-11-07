@@ -306,7 +306,9 @@ def _apply_colors(app):
     app.setPalette(palette)
     app.setStyleSheet(STYLE + (
         # на Mac кнопки окон в системном порядке: «Отмена» слева, главное действие справа
-        "QDialogButtonBox { button-layout: 1; }" if sys.platform == "darwin" else ""))
+        "QDialogButtonBox { button-layout: 1; }" if sys.platform == "darwin" else
+        # на Linux Qt добавляет на кнопки значки системной темы, которые не подходят к оформлению
+        "QDialogButtonBox { dialogbuttonbox-buttons-have-icons: 0; }" if sys.platform.startswith("linux") else ""))
 
 
 egg = False  # включена ли пасхалка

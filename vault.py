@@ -112,7 +112,7 @@ def app_data_dir():
         return home / "Library" / "Application Support" / "EduPasswords"
     if sys.platform == "win32":
         return Path(os.environ.get("APPDATA", home / "AppData" / "Roaming")) / "EduPasswords"
-    return Path(os.environ.get("XDG_DATA_HOME", home / ".local" / "share")) / "EduPasswords"
+    return Path(os.environ.get("XDG_DATA_HOME") or home / ".local" / "share") / "EduPasswords"
 
 
 def lock_path(path):

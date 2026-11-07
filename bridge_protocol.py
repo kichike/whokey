@@ -37,6 +37,7 @@ EXTENSION_ID = "pchmmhgfnhhkginkifminckbjcojodgl"  # закреплён ключ
 MAX_LINE = 64 * 1024                               # больше запрос/ответ быть не может
 
 WINDOWS = sys.platform == "win32"
+LINUX = sys.platform.startswith("linux")
 
 # Папки, где браузеры на основе Chromium ищут описания мостов (macOS)
 BROWSER_DIRS = [
@@ -45,6 +46,12 @@ BROWSER_DIRS = [
     "net.imput.helium",
 ]
 
+# То же на Linux (в ~/.config). Браузеры из Flatpak и Snap живут в своих песочницах
+# и запустить мост не могут, поэтому их здесь нет.
+LINUX_BROWSER_DIRS = [
+    "google-chrome", "google-chrome-beta", "google-chrome-unstable", "chromium", "microsoft-edge",
+    "BraveSoftware/Brave-Browser", "vivaldi", "yandex-browser", "net.imput.helium",
+]
 
 # Ключи реестра, где их ищут на Windows (в HKEY_CURRENT_USER\Software\…)
 WINDOWS_BROWSER_KEYS = [
@@ -67,12 +74,22 @@ def socket_address():
     """
     if WINDOWS:
         return "whokey-" + user_tag()
-    path = app_data_dir() / "bridge.sock"
+    return _unix_socket("bridge")
+
+
+def instance_address():
+    """Адрес, по которому вторая копия WhoKey просит первую показать окно (Linux)."""
+    return _unix_socket("instance")
+
+
+def _unix_socket(name):
+    path = app_data_dir() / f"{name}.sock"
     if len(str(path)) < 100:  # у Unix-сокета путь не длиннее ~104 символов
         return str(path)
-    # личная временная папка (на Mac у каждого пользователя своя, права 700),
-    # а не общий /tmp, где другой пользователь мог бы занять имя первым
-    return os.path.join(tempfile.gettempdir(), f"whokey-{os.getuid()}.sock")
+    # личная временная папка (на Mac у каждого пользователя своя, на Linux это
+    # XDG_RUNTIME_DIR, права 700), а не общий /tmp, где другой пользователь мог бы занять имя первым
+    folder = (LINUX and os.environ.get("XDG_RUNTIME_DIR")) or tempfile.gettempdir()
+    return os.path.join(folder, f"whokey-{name}-{os.getuid()}.sock")
 
 
 # --- кто на другом конце сокета ---
@@ -83,7 +100,14 @@ def new_key():
 
 
 def _program_of(pid):
-    """Путь к программе процесса pid (macOS, через libproc) или None."""
+    """Путь к программе процесса pid (macOS — через libproc, Linux — через /proc) или None."""
+    if LINUX:
+        try:
+            # ядро отдаёт настоящий путь; у обновлённой, но ещё работающей программы
+            # он с пометкой « (deleted)» — такой не совпадёт, и это правильно
+            return os.readlink(f"/proc/{pid}/exe")
+        except OSError:
+            return None
     try:
         libproc = ctypes.CDLL(ctypes.util.find_library("proc") or "/usr/lib/libproc.dylib")
         buffer = ctypes.create_string_buffer(4096)
@@ -100,7 +124,7 @@ def own_program():
     Не sys.executable: системный Python на Mac при запуске подменяет себя
     программой внутри Python.app, и пути не совпали бы.
     """
-    if sys.platform == "darwin":
+    if sys.platform == "darwin" or LINUX:
         path = _program_of(os.getpid())
         if path:
             return path
@@ -110,7 +134,13 @@ def own_program():
 
 
 def peer_program(sock):
-    """Путь к программе процесса на другом конце Unix-сокета (macOS) или None."""
+    """Путь к программе процесса на другом конце Unix-сокета (macOS, Linux) или None."""
+    if LINUX:
+        try:
+            pid, uid, _gid = struct.unpack("3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
+        except (OSError, struct.error):
+            return None
+        return _program_of(pid) if uid == os.getuid() else None  # чужой пользователь — не мы
     if sys.platform != "darwin":
         return None
     try:
@@ -121,10 +151,15 @@ def peer_program(sock):
 
 
 def trusted_peer(sock):
-    """Тот ли процесс на другом конце: та же программа, что и мы (WhoKey ↔ его мост)."""
-    if sys.platform != "darwin":
+    """Тот ли процесс на другом конце: та же программа, что и мы (WhoKey ↔ его мост).
+
+    Отсекает случайные и подставные программы, но не защищает от кода, уже работающего
+    под этим пользователем: тот может запустить настоящий WhoKey и управлять им.
+    """
+    if WINDOWS:
         return True  # Windows проверяет по-своему (trusted_pipe_client, WinPipe.server_program)
-    return peer_program(sock) == own_program()
+    program = peer_program(sock)
+    return program is not None and program == own_program()
 
 
 # --- native messaging: как браузер разговаривает с мостом ---
@@ -204,13 +239,25 @@ def launch_app():
             subprocess.Popen(command, creationflags=flags, **quiet)
         return  # вторую копию WhoKey не откроет: она передаст окно первой (app.py)
     quiet["start_new_session"] = True
-    if getattr(sys, "frozen", False) and bundle is not None and bundle.suffix == ".app":
+    if sys.platform == "darwin" and getattr(sys, "frozen", False) and bundle is not None and bundle.suffix == ".app":
         subprocess.Popen(["open", str(bundle)], **quiet)  # open сам не запустит вторую копию
+    elif getattr(sys, "frozen", False):  # Linux: вторая копия передаст окно первой (app.py)
+        # без этой пометки новая копия решила бы, что уже подготовлена мостом,
+        # и не нашла бы свои библиотеки (restore_library_path их убрал)
+        subprocess.Popen([sys.executable], env=dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT="1"), **quiet)
     else:  # запуск из исходников (разработка)
         subprocess.Popen([sys.executable, str(Path(__file__).resolve().parent / "app.py")], **quiet)
 
 
 # --- регистрация моста в браузерах ---
+
+def _temporary_path(executable):
+    """Запуск из места, которое исчезнет: образ диска и «карантин» macOS, временные папки Linux."""
+    text = str(executable)
+    if LINUX:
+        return text.startswith(("/tmp/", "/var/tmp/", "/dev/shm/", "/run/"))
+    return text.startswith("/Volumes/") or "/AppTranslocation/" in text
+
 
 def install_native_host(executable):
     """Пишет описание моста во все установленные Chromium-браузеры.
@@ -220,13 +267,13 @@ def install_native_host(executable):
     WhoKey: если программу перенесли в другую папку, путь обновится.
     Возвращает, в какие браузеры записано.
 
-    Не прописывает временные пути: запуск прямо из установщика (/Volumes/…)
-    или из «карантинной» копии macOS (AppTranslocation) — после закрытия
-    образа мост бы сломался.
+    Не прописывает временные пути: запуск прямо из установщика (/Volumes/…),
+    из «карантинной» копии macOS (AppTranslocation) или из временной папки Linux —
+    потом мост бы сломался.
     """
     if WINDOWS:
         return _install_native_host_windows(executable)
-    if str(executable).startswith("/Volumes/") or "/AppTranslocation/" in str(executable):
+    if _temporary_path(executable):
         return []
     manifest = {
         "name": HOST_NAME,
@@ -235,9 +282,14 @@ def install_native_host(executable):
         "type": "stdio",
         "allowed_origins": [f"chrome-extension://{EXTENSION_ID}/"],
     }
-    support = Path.home() / "Library" / "Application Support"
+    if LINUX:
+        support = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+        browsers = LINUX_BROWSER_DIRS
+    else:
+        support = Path.home() / "Library" / "Application Support"
+        browsers = BROWSER_DIRS
     done = []
-    for browser in BROWSER_DIRS:
+    for browser in browsers:
         base = support / browser
         if not base.is_dir():  # браузер не установлен — его папок не трогаем
             continue
@@ -255,7 +307,7 @@ def install_native_host(executable):
                 os.chmod(tmp, 0o644)
                 os.replace(tmp, target)
             done.append(browser)
-        except OSError:
+        except (OSError, ValueError):  # ValueError: в старом файле не UTF-8 — не повод не запускаться
             pass
     return done
 

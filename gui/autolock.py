@@ -16,6 +16,7 @@
 
 import ctypes
 import ctypes.util
+import os
 import struct
 import sys
 import time
@@ -75,10 +76,81 @@ def monotonic():
     return time.monotonic()  # на Mac монотонные часы во сне и так стоят
 
 
+# Программы блокировки экрана на Linux. У окружений без общего сервиса блокировки
+# (Hyprland, Sway, i3) другого признака нет. Ошибочное совпадение безопасно: хранилище просто закроется.
+_LINUX_LOCKERS = {"hyprlock", "swaylock", "gtklock", "waylock", "i3lock", "xsecurelock", "slock", "physlock"}
+
+# Кто ещё может знать о блокировке: (сервис, объект, интерфейс)
+_SCREENSAVERS = (
+    ("org.freedesktop.ScreenSaver", "/org/freedesktop/ScreenSaver", "org.freedesktop.ScreenSaver"),  # KDE, Xfce
+    ("org.freedesktop.ScreenSaver", "/ScreenSaver", "org.freedesktop.ScreenSaver"),
+    ("org.gnome.ScreenSaver", "/org/gnome/ScreenSaver", "org.gnome.ScreenSaver"),
+    ("org.cinnamon.ScreenSaver", "/org/cinnamon/ScreenSaver", "org.cinnamon.ScreenSaver"),
+    ("org.mate.ScreenSaver", "/org/mate/ScreenSaver", "org.mate.ScreenSaver"),
+)
+_DBUS_TIMEOUT_MS = 200  # таймер блокировки работает в потоке окон — надолго его не держим
+
+
+def _locker_running():
+    """Запущена ли у этого пользователя программа блокировки экрана."""
+    uid = os.getuid()
+    try:
+        processes = [name for name in os.listdir("/proc") if name.isdigit()]
+    except OSError:
+        return False
+    for pid in processes:
+        try:
+            if os.stat(f"/proc/{pid}").st_uid != uid:
+                continue
+            with open(f"/proc/{pid}/comm", encoding="utf-8", errors="replace") as f:
+                if f.read().strip() in _LINUX_LOCKERS:
+                    return True
+        except OSError:
+            continue  # процесс уже завершился
+    return False
+
+
+def _dbus_answer(bus, service, path, interface, method, *args):
+    """Ответ сервиса D-Bus или None, если сервиса нет. Сам сервис не запускаем."""
+    from PySide6.QtDBus import QDBus, QDBusMessage, QDBusVariant
+    message = QDBusMessage.createMethodCall(service, path, interface, method)
+    message.setArguments(list(args))
+    message.setAutoStartService(False)
+    reply = bus.call(message, QDBus.Block, _DBUS_TIMEOUT_MS)
+    if reply.type() != QDBusMessage.ReplyMessage or not reply.arguments():
+        return None
+    answer = reply.arguments()[0]
+    # свойство приходит завёрнутым в «вариант»: без этого «is True» никогда не сработает
+    return answer.variant() if isinstance(answer, QDBusVariant) else answer
+
+
+def _linux_screen_locked():
+    if _locker_running():
+        return True
+    try:
+        from PySide6.QtDBus import QDBusConnection
+    except ImportError:
+        return False
+    # systemd-logind: блокировку отмечают GNOME, KDE и другие. «auto» — сеанс этой программы.
+    system = QDBusConnection.systemBus()
+    if system.isConnected() and _dbus_answer(
+            system, "org.freedesktop.login1", "/org/freedesktop/login1/session/auto",
+            "org.freedesktop.DBus.Properties", "Get", "org.freedesktop.login1.Session", "LockedHint") is True:
+        return True
+    session = QDBusConnection.sessionBus()
+    if session.isConnected():
+        for service, path, interface in _SCREENSAVERS:
+            if _dbus_answer(session, service, path, interface, "GetActive") is True:
+                return True
+    return False
+
+
 def screen_locked():
-    """Заблокирован ли экран (macOS, Windows). На других системах — False."""
+    """Заблокирован ли экран (macOS, Windows, Linux). На других системах — False."""
     if sys.platform == "win32":
         return _windows_screen_locked()
+    if sys.platform.startswith("linux"):
+        return _linux_screen_locked()
     if sys.platform != "darwin":
         return False
     try:

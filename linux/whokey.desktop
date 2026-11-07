@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=WhoKey
+Comment=Password manager
+Comment[ru]=Менеджер паролей
+Icon=whokey
+Terminal=false
+Categories=Utility;Security;
+StartupWMClass=whokey

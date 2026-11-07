@@ -11,6 +11,8 @@ CSV — обычный текст: пароли в нём НЕ зашифров�
 
 import csv
 import os
+import tempfile
+from pathlib import Path
 
 import sites
 from regular_file import NotRegularFile, open_regular
@@ -108,15 +110,20 @@ def new_only(entries, existing):
 
 def write(path, entries):
     """Сохраняет записи в CSV. Файл доступен только владельцу (на Mac и Linux — права 600)."""
-    # O_TRUNC + режим 600 сразу при создании: пароли ни на миг не лежат в файле, открытом всем
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    if hasattr(os, "fchmod"):
+    # Новый файл с правами 600 и подмена в конце: пароли ни на миг не лежат в файле, открытом всем,
+    # а на месте выбранного файла ссылка или канал не уведут их в другое место и не повесят программу.
+    path = Path(path)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix="." + path.name + ".", suffix=".tmp")
+    try:
+        with open(fd, "w", encoding="utf-8", newline="") as file:
+            out = csv.writer(file)
+            out.writerow(EXPORT_HEADER)
+            for entry in entries:
+                out.writerow([entry["site"], entry.get("url", ""), entry["login"], entry["password"], entry["note"]])
+        os.replace(tmp, path)
+    except BaseException:
         try:
-            os.fchmod(fd, 0o600)  # файл уже был — его старые права сужаем до записи паролей
+            os.unlink(tmp)
         except OSError:
             pass
-    with open(fd, "w", encoding="utf-8", newline="") as file:
-        out = csv.writer(file)
-        out.writerow(EXPORT_HEADER)
-        for entry in entries:
-            out.writerow([entry["site"], entry.get("url", ""), entry["login"], entry["password"], entry["note"]])
+        raise

@@ -5,6 +5,7 @@
 """
 
 import os
+import sys
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, Qt, QTimer, Signal
@@ -37,6 +38,9 @@ def hold_lock(path):
     _lock["path"] = path
 
 
+LOGIN_WIDTH = 560
+
+
 class LoginWindow(QWidget):
     opened = Signal(object)   # хранилище открыто — передаём Vault
     restart = Signal(object)  # выбрали другой файл и т.п. — окно пересоздаётся (передаём путь)
@@ -48,7 +52,7 @@ class LoginWindow(QWidget):
         self.path = path
         self.state = state
         self.setWindowTitle(tr("WhoKey"))
-        self.resize(560, 1)  # начальная ширина, а не минимум — см. EntryDialog
+        self.resize(LOGIN_WIDTH, 1)  # начальная ширина, а не минимум — см. EntryDialog
 
         # всё содержимое — внутри «карточки» с неоновым ореолом
         outer = QVBoxLayout(self)
@@ -108,6 +112,7 @@ class LoginWindow(QWidget):
     _shrink_to = None  # до какой высоты уменьшить окно, как только раскладка её пересчитает
 
     def showEvent(self, event):
+        self._fit_height(self.width())  # до показа: так тайловый менеджер сразу видит постоянный размер
         super().showEvent(event)
         if self._touch_id_on_show:
             self._touch_id_on_show = False
@@ -128,6 +133,10 @@ class LoginWindow(QWidget):
 
     def _fit_height(self, width):
         height = self.layout().totalHeightForWidth(width)
+        if sys.platform.startswith("linux"):
+            # окно постоянного размера тайловые менеджеры (Hyprland, Sway, i3) не растягивают на весь экран
+            self.setFixedSize(LOGIN_WIDTH, self.layout().totalHeightForWidth(LOGIN_WIDTH))
+            return
         self.setMinimumHeight(height)
         if self._shrink_to is not None and height < self.height():
             self.resize(width, max(height, self._shrink_to))

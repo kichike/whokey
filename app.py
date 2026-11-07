@@ -11,13 +11,45 @@
 """
 
 import hashlib
+import os
 import signal
+import socket
 import sys
 import traceback
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))  # чтобы найти vault.py и остальные модули рядом
+
+
+
+def restore_library_path():
+    """Linux: собранный WhoKey указывает системе на свои библиотеки (LD_LIBRARY_PATH).
+    Запущенные из него программы — браузер, проигрыватель звука — должны видеть
+    системные, иначе не откроются. Самому WhoKey это уже не мешает: свои он нашёл при старте."""
+    if not (getattr(sys, "frozen", False) and sys.platform.startswith("linux")):
+        return
+    original = os.environ.pop("LD_LIBRARY_PATH_ORIG", None)
+    if original is None:
+        os.environ.pop("LD_LIBRARY_PATH", None)
+    else:
+        os.environ["LD_LIBRARY_PATH"] = original
+
+
+restore_library_path()
+
+
+def no_core_dumps():
+    """При падении система может сохранить снимок памяти программы на диск, а в нём —
+    мастер-пароль и пароли. Запрещаем такие снимки для WhoKey (macOS, Linux)."""
+    try:
+        import resource
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    except (ImportError, ValueError, OSError):
+        pass  # на Windows этого механизма нет
+
+
+no_core_dumps()  # сразу: и окнам, и мосту для расширения (через него тоже идут пароли)
 
 # Браузер запускает этот же файл как мост для расширения, передавая адрес
 # расширения (chrome-extension://…/). Тогда никаких окон — сразу работа моста.
@@ -32,7 +64,7 @@ from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication, QDialog, QMenu, QMessageBox
 
 import bridge_protocol
-from vault import SaveError
+from vault import SaveError, app_data_dir
 from gui.secure_clipboard import SecureClipboard
 from gui import theme
 from gui.autolock import AutoLock
@@ -195,6 +227,47 @@ INSTANCE_NAME = "whokey-instance-" + bridge_protocol.user_tag()
 
 
 def hand_over_to_running():
+    """WhoKey уже открыт — показать его окно вместо второй копии. True — выходим."""
+    if sys.platform == "win32":
+        return _hand_over_windows()
+    if sys.platform.startswith("linux"):
+        return _hand_over_linux()
+    return False  # на Mac вторую копию не даёт открыть сама система
+
+
+def _hand_over_linux():
+    """Кто уже работает, узнаём по замку на файл: его снимает сама система, даже если
+    первая копия упала. Показывать окно просим только настоящий WhoKey."""
+    import fcntl
+    try:
+        folder = app_data_dir()
+        folder.mkdir(mode=0o700, parents=True, exist_ok=True)
+        fd = os.open(folder / "instance.lock", os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    except OSError:
+        return False  # замок не создать — лучше запуститься, чем молча не открыться
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as error:
+        os.close(fd)
+        if not isinstance(error, BlockingIOError):
+            return False  # замок на этом диске не работает — это ещё не значит, что копия открыта
+        sock = QLocalSocket()
+        sock.connectToServer(bridge_protocol.instance_address())
+        if sock.waitForConnected(1000):
+            try:
+                with socket.socket(fileno=os.dup(int(sock.socketDescriptor()))) as peer:
+                    if bridge_protocol.trusted_peer(peer):
+                        sock.write(b"show\n")
+                        sock.waitForBytesWritten(500)
+            except OSError:
+                pass
+            sock.disconnectFromServer()
+        return True
+    _hand_over_linux.lock = fd  # держим, пока программа работает
+    return False
+
+
+def _hand_over_windows():
     """Windows: WhoKey уже открыт — показать его окно вместо второй копии. True — выходим.
 
     На Mac вторую копию не даёт открыть сама система; на Windows её запустил бы,
@@ -231,10 +304,15 @@ def hand_over_to_running():
 
 
 def listen_for_second_copy(controller):
-    """Windows: вторая копия просит показать окно — выводим его вперёд."""
+    """Windows и Linux: вторая копия просит показать окно — выводим его вперёд."""
     server = QLocalServer()
     server.setSocketOptions(QLocalServer.UserAccessOption)  # только этот пользователь
-    if not server.listen(INSTANCE_NAME):
+    if sys.platform == "win32":
+        address = INSTANCE_NAME
+    else:
+        address = bridge_protocol.instance_address()
+        QLocalServer.removeServer(address)  # от упавшей копии: замок наш, значит, других нет
+    if not server.listen(address):
         return server
 
     def show():
@@ -249,26 +327,16 @@ def listen_for_second_copy(controller):
     return server
 
 
-def no_core_dumps():
-    """При падении система может сохранить снимок памяти программы на диск, а в нём —
-    мастер-пароль и пароли. Запрещаем такие снимки для WhoKey (macOS, Linux)."""
-    try:
-        import resource
-        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-    except (ImportError, ValueError, OSError):
-        pass  # на Windows этого механизма нет
-
-
 def main():
-    no_core_dumps()
     app = QApplication(sys.argv)
-    if sys.platform == "win32" and hand_over_to_running():
+    if hand_over_to_running():
         return
     # APP_NAME — имя папки с данными, его не меняем (иначе «потеряется» уже
     # созданное хранилище); видимое название программы — WhoKey
     app.setApplicationName(APP_NAME)
     app.setApplicationDisplayName("WhoKey")
     app.setWindowIcon(QIcon(str(theme.ICON_FILE)))  # иконка в Dock при запуске без .app
+    app.setDesktopFileName("whokey")  # Wayland: по этому имени система находит значок и название
     theme.apply(app)
 
     # обработчик ошибок ставим ДО создания окон — иначе ошибка при запуске
@@ -282,7 +350,7 @@ def main():
     sys.excepthook = on_error
 
     controller = Controller()
-    if sys.platform == "win32":
+    if sys.platform == "win32" or sys.platform.startswith("linux"):
         controller.instance_server = listen_for_second_copy(controller)  # держим, пока программа работает
 
     # что бы ни случилось — при выходе не оставляем пароль в буфере обмена

@@ -4,7 +4,7 @@
 
 <h1 align="center">WhoKey</h1>
 
-<p align="center">A small password manager for macOS and Windows · Простой менеджер паролей для macOS и Windows</p>
+<p align="center">A small password manager for macOS, Windows and Linux · Простой менеджер паролей для macOS, Windows и Linux</p>
 
 <p align="center"><a href="#english">English</a> · <a href="#русский">Русский</a></p>
 
@@ -30,7 +30,7 @@ WhoKey keeps your logins in one encrypted file that only opens with your master 
 - **Password generator** with length, letters, digits and symbols, plus a rough strength meter.
 - **Search,** and right-click actions on any entry: show, copy password, copy login, open the website (⌘O / Ctrl+O), edit, delete.
 - **Backup copy:** a hidden backup sits next to the vault, so you only see one file. If the vault gets damaged, WhoKey offers to restore it.
-- **Browser extension** (macOS and Windows, Chromium browsers): fills your login and password on websites — see below.
+- **Browser extension** (macOS, Windows and Linux, Chromium browsers): fills your login and password on websites — see below.
 - **Touch ID** on Mac: unlock WhoKey with your fingerprint (turn it on or off in **Settings**, ⌘,).
 - **Auto-lock** when the screen is locked, the computer goes to sleep or WhoKey is not used for a while (10 minutes by default); ⌘L / Ctrl+L locks it right away.
 - **Import and export CSV** (File menu, or right on the screen that creates a new vault): move your passwords from a browser, Bitwarden, KeePassXC or 1Password and back. The CSV file is not encrypted — delete it after the move.
@@ -38,7 +38,7 @@ WhoKey keeps your logins in one encrypted file that only opens with your master 
 - **Caps Lock warning** under master password fields.
 - **English and Russian** interface.
 
-By default the vault lives in `~/Library/Application Support/EduPasswords/vault.dat` on macOS (not synced to iCloud) and in `%APPDATA%\EduPasswords\vault.dat` on Windows. You can choose another file in the login window.
+By default the vault lives in `~/Library/Application Support/EduPasswords/vault.dat` on macOS (not synced to iCloud), in `%APPDATA%\EduPasswords\vault.dat` on Windows and in `~/.local/share/EduPasswords/vault.dat` on Linux. You can choose another file in the login window.
 
 > ⚠️ The master password **cannot be recovered**. If you forget it, the vault is gone.
 > WhoKey is a hobby app that has not had a professional security audit. For important accounts, an established manager such as Bitwarden or KeePassXC is a safer choice.
@@ -56,9 +56,13 @@ Download the installer from [Releases](../../releases).
 2. The installer is not code-signed, so Windows SmartScreen may warn you. Click **More info → Run anyway**.
 3. WhoKey appears in the Start menu. Uninstall it from **Settings → Apps**; your vault is kept.
 
+**Linux (x86-64, glibc 2.34+: Ubuntu 22.04, Debian 12, Fedora 35, Arch and newer):**
+1. Unpack **WhoKey-linux-x86_64.tar.gz** and run `WhoKey/install.sh`. No administrator rights needed.
+2. WhoKey appears in the applications menu; the command is `~/.local/bin/whokey`. Uninstall with `~/.local/opt/WhoKey/uninstall.sh`; your vault is kept.
+
 ### Browser extension
 
-Fills the login and password on a website with one click or **⌘⇧L** (**Ctrl+Shift+L** on Windows). Works in Chrome, Edge, Brave, Vivaldi and Yandex Browser on macOS and Windows, plus Arc and Helium on macOS.
+Fills the login and password on a website with one click or **⌘⇧L** (**Ctrl+Shift+L** on Windows and Linux). Works in Chrome, Chromium, Edge, Brave, Vivaldi and Yandex Browser on macOS, Windows and Linux, plus Arc and Helium on macOS. On Linux, browsers from Flatpak and Snap can't start the bridge.
 
 1. Install WhoKey and open it once — it registers itself in your browsers.
 2. Download **WhoKey-extension.zip** from [Releases](../../releases) and unzip it (or use the `extension` folder of this repository).
@@ -94,7 +98,7 @@ python3 -m venv .venv
 
 On Windows, use `.venv\Scripts\python app.py`.
 
-To build the installers yourself: on macOS run `./build_dmg.sh`; on Windows run `python build_windows.py`, then compile `installer.iss` with [Inno Setup](https://jrsoftware.org/isinfo.php). Both appear in `dist/`. GitHub Actions builds and tests the Windows version automatically. Tests: `python -m unittest discover tests`.
+To build the installers yourself: on macOS run `./build_dmg.sh`; on Windows run `python build_windows.py`, then compile `installer.iss` with [Inno Setup](https://jrsoftware.org/isinfo.php); on Linux run `python build_linux.py`. All of them appear in `dist/`. GitHub Actions builds and tests the Windows and Linux versions automatically. Tests: `python -m unittest discover tests`.
 
 ### Contact
 
@@ -114,7 +118,7 @@ WhoKey хранит логины и пароли в одном зашифров�
 - **Генератор паролей:** длина, буквы, цифры, символы и примерная шкала надёжности.
 - **Поиск** и действия с записью по правому клику: показать, скопировать пароль или логин, открыть сайт (⌘O / Ctrl+O), изменить, удалить.
 - **Резервная копия:** скрытая копия лежит рядом с хранилищем, так что в папке виден один файл. Если хранилище испортится, WhoKey предложит восстановить его.
-- **Расширение для браузера** (macOS и Windows, браузеры на Chromium): заполняет логин и пароль на сайтах — подробнее ниже.
+- **Расширение для браузера** (macOS, Windows и Linux, браузеры на Chromium): заполняет логин и пароль на сайтах — подробнее ниже.
 - **Touch ID** на Mac: WhoKey открывается по отпечатку пальца (включается и выключается в **Настройках**, ⌘,).
 - **Автоблокировка** при блокировке экрана, сне компьютера и если WhoKey долго не трогают (по умолчанию 10 минут); ⌘L / Ctrl+L — заблокировать сразу.
 - **Импорт и экспорт CSV** (меню «Файл» или прямо на экране создания хранилища): перенос паролей из браузера, Bitwarden, KeePassXC или 1Password и обратно. CSV-файл не зашифрован — удалите его после переноса.
@@ -122,7 +126,7 @@ WhoKey хранит логины и пароли в одном зашифров�
 - **Предупреждение о Caps Lock** под полями мастер-пароля.
 - Интерфейс на **русском и английском**.
 
-По умолчанию хранилище лежит в `~/Library/Application Support/EduPasswords/vault.dat` на macOS (эта папка не синхронизируется с iCloud) и в `%APPDATA%\EduPasswords\vault.dat` на Windows. Другой файл можно выбрать в окне входа.
+По умолчанию хранилище лежит в `~/Library/Application Support/EduPasswords/vault.dat` на macOS (эта папка не синхронизируется с iCloud), в `%APPDATA%\EduPasswords\vault.dat` на Windows и в `~/.local/share/EduPasswords/vault.dat` на Linux. Другой файл можно выбрать в окне входа.
 
 > ⚠️ Мастер-пароль **нельзя восстановить**. Забыли его — хранилище не открыть.
 > WhoKey — любительская программа, профессиональной проверки безопасности она не проходила. Для важных аккаунтов надёжнее проверенные менеджеры, например Bitwarden или KeePassXC.
@@ -140,9 +144,13 @@ WhoKey хранит логины и пароли в одном зашифров�
 2. Установщик не подписан, поэтому Windows SmartScreen может предупредить. Нажмите «Подробнее → Выполнить в любом случае».
 3. WhoKey появится в меню «Пуск». Удалить его можно в «Параметры → Приложения»; хранилище при этом сохранится.
 
+**Linux (x86-64, glibc 2.34+: Ubuntu 22.04, Debian 12, Fedora 35, Arch и новее):**
+1. Распакуйте **WhoKey-linux-x86_64.tar.gz** и запустите `WhoKey/install.sh`. Права администратора не нужны.
+2. WhoKey появится в меню приложений, команда — `~/.local/bin/whokey`. Удалить его можно через `~/.local/opt/WhoKey/uninstall.sh`; хранилище при этом сохранится.
+
 ### Расширение для браузера
 
-Заполняет логин и пароль на сайте одним нажатием или **⌘⇧L** (на Windows — **Ctrl+Shift+L**). Работает в Chrome, Edge, Brave, Vivaldi и Яндекс Браузере на macOS и Windows, а на macOS ещё в Arc и Helium.
+Заполняет логин и пароль на сайте одним нажатием или **⌘⇧L** (на Windows и Linux — **Ctrl+Shift+L**). Работает в Chrome, Chromium, Edge, Brave, Vivaldi и Яндекс Браузере на macOS, Windows и Linux, а на macOS ещё в Arc и Helium. На Linux браузеры из Flatpak и Snap запустить мост не могут.
 
 1. Установите WhoKey и откройте его хотя бы раз — он сам пропишется в браузерах.
 2. Скачайте **WhoKey-extension.zip** в разделе [Releases](../../releases) и распакуйте (или возьмите папку `extension` из этого репозитория).
@@ -178,7 +186,7 @@ python3 -m venv .venv
 
 На Windows: `.venv\Scripts\python app.py`.
 
-Чтобы самому собрать установщики: на macOS запустите `./build_dmg.sh`; на Windows — `python build_windows.py`, а потом соберите `installer.iss` в [Inno Setup](https://jrsoftware.org/isinfo.php). Оба появятся в папке `dist/`. Windows-версию GitHub Actions собирает и проверяет автоматически. Тесты: `python -m unittest discover tests`.
+Чтобы самому собрать установщики: на macOS запустите `./build_dmg.sh`; на Windows — `python build_windows.py`, а потом соберите `installer.iss` в [Inno Setup](https://jrsoftware.org/isinfo.php); на Linux — `python build_linux.py`. Всё появится в папке `dist/`. Версии для Windows и Linux GitHub Actions собирает и проверяет автоматически. Тесты: `python -m unittest discover tests`.
 
 ### Связь
 

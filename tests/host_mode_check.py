@@ -1,6 +1,6 @@
-"""Проверка собранного WhoKey.exe в режиме моста (как его запускает браузер). Только для CI Windows.
+"""Проверка собранного WhoKey.exe в режиме моста (как его запускает браузер). Для CI Windows и Linux.
 
-Запуск: python tests/host_mode_check.py dist\\WhoKey\\WhoKey.exe
+Запуск: python tests/host_mode_check.py dist\\WhoKey\\WhoKey.exe (на Linux — dist/WhoKey/WhoKey)
 Браузер пишет мосту в stdin: 4 байта длины + JSON. На не-JSON мост должен ответить
 {"status": "error"} и ничего не открывать — так видно, что программа с окнами
 действительно получила каналы stdin/stdout и пишет в них в двоичном виде.

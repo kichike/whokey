@@ -38,6 +38,7 @@ from vault import Vault  # noqa: E402
 APP = QApplication.instance() or QApplication([])
 MAC = sys.platform == "darwin"
 WINDOWS = sys.platform == "win32"
+LINUX = sys.platform.startswith("linux")
 PASSWORD = "Зелёный-Кит-Летит-2026!"
 
 
@@ -186,7 +187,7 @@ class Requests(unittest.TestCase):
         self.assertEqual(self.ask(type="logins", url="https://mail.ru"), {"status": "pair_required"})
 
 
-@unittest.skipUnless(MAC, "сокет и проверка собеседника — пока только macOS")
+@unittest.skipUnless(MAC or LINUX, "сокет и проверка собеседника — macOS и Linux")
 class Socket(unittest.TestCase):
     """Настоящий сокет: проверка собеседника, отказ в обслуживании, «медленный человек»."""
 
@@ -253,6 +254,7 @@ class Socket(unittest.TestCase):
         for _ in range(100):
             try:
                 c = socket.socket(socket.AF_UNIX)
+                c.settimeout(0.2)  # очередь полна: на Linux connect ждал бы, а сервер в этом же процессе
                 c.connect(self.address)
                 c.sendall(b'{"type":')
                 conns.append(c)
@@ -342,23 +344,30 @@ class Host(unittest.TestCase):
         self.assertEqual((r, launched), ({"status": "timeout"}, []))
 
 
-@unittest.skipUnless(MAC, "описание моста в браузерах — пока только macOS (и ссылки на Windows требуют особых прав)")
+@unittest.skipUnless(MAC or LINUX, "описание моста в файлах — macOS и Linux (ссылки на Windows требуют особых прав)")
 class NativeHost(unittest.TestCase):
     def test_symlink_and_temporary_paths(self):
         home = Path(tempfile.mkdtemp())
-        folder = home / "Library/Application Support/Google/Chrome/NativeMessagingHosts"
+        browser = "google-chrome" if LINUX else "Google/Chrome"
+        support = ".config" if LINUX else "Library/Application Support"
+        folder = home / support / browser / "NativeMessagingHosts"
         folder.mkdir(parents=True)
         victim = home / "victim.txt"
         victim.write_text("не трогать")
         (folder / f"{P.HOST_NAME}.json").symlink_to(victim)
         real_home = Path.home
         Path.home = classmethod(lambda cls: home)
+        config = os.environ.pop("XDG_CONFIG_HOME", None)
         try:
-            self.assertEqual(P.install_native_host("/Users/x/Applications/WhoKey.app/Contents/MacOS/WhoKey"),
-                             ["Google/Chrome"])
-            self.assertEqual(P.install_native_host("/Volumes/WhoKey Installer/WhoKey.app/Contents/MacOS/WhoKey"), [])
+            self.assertEqual(P.install_native_host(
+                "/home/x/.local/opt/WhoKey/WhoKey" if LINUX else "/Users/x/Applications/WhoKey.app/Contents/MacOS/WhoKey"),
+                [browser])
+            self.assertEqual(P.install_native_host(
+                "/tmp/WhoKey/WhoKey" if LINUX else "/Volumes/WhoKey Installer/WhoKey.app/Contents/MacOS/WhoKey"), [])
         finally:
             Path.home = real_home
+            if config is not None:
+                os.environ["XDG_CONFIG_HOME"] = config
         self.assertEqual(victim.read_text(), "не трогать")
         manifest = json.loads((folder / f"{P.HOST_NAME}.json").read_text())
         self.assertEqual(manifest["allowed_origins"], [f"chrome-extension://{P.EXTENSION_ID}/"])
