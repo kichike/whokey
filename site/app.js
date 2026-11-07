@@ -353,8 +353,10 @@
       });
       // the memory
       const R2 = rect.a2, q = DEMO.m, side = Math.round(Math.sqrt(q));
-      const gs = Math.min(R2.w, R2.h - 34, 640), cell = gs / side;
-      const gx = R2.x + (R2.w - gs) / 2, gy = R2.y + (R2.h - gs - 28) / 2;
+      // место под подписью: на телефоне она занимает две-три строки и не должна залезать на карточку
+      const capH = W < 370 ? 74 : isNarrow ? 54 : 28;
+      const gs = Math.min(R2.w, R2.h - capH - 6, 640), cell = gs / side;
+      const gx = R2.x + (R2.w - gs) / 2, gy = R2.y + (R2.h - gs - capH) / 2;
       gridGeom = { gx, gy, gs, cell, side, q };
       const hud = $('#s-grid');
       hud.style.left = R2.x + 'px'; hud.style.width = R2.w + 'px'; hud.style.top = (gy + gs + 8) + 'px';
