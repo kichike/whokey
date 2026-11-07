@@ -5,7 +5,7 @@
 --vh:100vh;color-scheme:dark}
 @supports(height:100svh){:root{--vh:100svh}}
 *{box-sizing:border-box}
-html{background:var(--bg);-webkit-text-size-adjust:100%}
+html{background:var(--bg);-webkit-text-size-adjust:100%;scroll-behavior:smooth}
 body{margin:0;color:var(--text);font:400 16px/1.55 Meslo,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-x:clip}
 a{color:var(--light)}a:hover{color:#fff}
 code{font-family:inherit;overflow-wrap:anywhere}

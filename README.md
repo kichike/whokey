@@ -6,6 +6,8 @@
 
 <p align="center">A small password manager for macOS, Windows and Linux · Простой менеджер паролей для macOS, Windows и Linux</p>
 
+<p align="center"><a href="https://kichike.github.io/whokey/"><b>kichike.github.io/whokey</b></a></p>
+
 <p align="center"><a href="#english">English</a> · <a href="#русский">Русский</a></p>
 
 <p align="center">
