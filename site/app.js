@@ -500,8 +500,8 @@
     let sm = scrollY, last = performance.now(), t0 = last, visible = true, arcsDirty = false, lastDots = -1, lastHud = '';
     new IntersectionObserver(es => { visible = es[0].isIntersecting; if (visible) kick(); }).observe($('#story'));
     document.addEventListener('visibilitychange', () => { if (!document.hidden) kick(); });
-    let raf = 0;
-    function kick() { if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); } }
+    let raf = 0, lost = false;
+    function kick() { if (!raf && !lost) { last = performance.now(); raf = requestAnimationFrame(frame); } }
     addEventListener('scroll', kick, { passive: true });
 
     function drawArcs(pass, f) {
@@ -534,7 +534,7 @@
 
     function frame(now) {
       raf = 0;
-      if (!visible || document.hidden) return;
+      if (!visible || document.hidden || lost) return;
       const dt = Math.min(.05, (now - last) / 1000); last = now;
       const y = scrollY, prev = sm;
       sm += (y - sm) * (1 - Math.exp(-dt * 8));
@@ -638,12 +638,13 @@
     }
 
     function layoutAll() {
+      if (lost) return;
       measure();
       buildStatic();
       buildDemo();
       metrics();
     }
-    rebuildDemoFormations = () => { lastHud = ''; buildDemo(); metrics(); };
+    rebuildDemoFormations = () => { if (lost) return; lastHud = ''; buildDemo(); metrics(); };
     layoutAll();
     onLang = () => { layoutAll(); seg = null; };
     let rt = 0, lastW = innerWidth, lastH = innerHeight;
@@ -651,13 +652,19 @@
       // phones change height when the address bar hides: not a reason to rebuild
       if (innerWidth === lastW && Math.abs(innerHeight - lastH) < 130) return;
       lastW = innerWidth; lastH = innerHeight;
+      // видеокарту у страницы отняли: остаётся спокойная версия без частиц, иначе вместо сцены будет пустота
+      if (lost) { drawStaticGrid(); return; }
       clearTimeout(rt);
       if (innerHeight < 500) { docEl.classList.remove('fx'); visible = false; drawStaticGrid(); return; }
       docEl.classList.add('fx');
       rt = setTimeout(() => { layoutAll(); seg = null; visible = true; kick(); }, 180);
     });
     addEventListener('load', metrics);
-    gl.canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); docEl.classList.remove('fx'); drawStaticGrid(); });
+    gl.canvas.addEventListener('webglcontextlost', e => {
+      e.preventDefault();
+      lost = true; clearTimeout(rt); cancelAnimationFrame(raf); raf = 0;
+      docEl.classList.remove('fx'); drawStaticGrid();
+    });
     kick();
   }
 

@@ -2,6 +2,7 @@
 // Звуковых файлов нет: всё синтезируется прямо в браузере.
 window.whoSound = (() => {
   let ctx = null, master, analyser, enabled = false;
+  let jumping = false, settled = true, settleTimer = 0;
   let lastNoteAt = 0, lastDots = -1, lastStep = -1, lastSeal = -1, lastPass = 0, lastC = 0, thudArmed = true;
   const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
   // ноты мажорной пентатоники: любые из них звучат вместе без фальши
@@ -51,7 +52,10 @@ window.whoSound = (() => {
   function frame({ c, speed, dots, grid, uProg, passes, sealing, sealProgress }) {
     if (!enabled || !ctx) return;
     const now = performance.now();
-    if (dots > lastDots && lastDots >= 0) key();
+    // прыжок по ссылке из меню пролетает всю историю за секунду: молчим, пока страница не встанет
+    if (jumping && settled && speed < .02) jumping = false;
+    const loud = !jumping;
+    if (dots > lastDots && lastDots >= 0 && loud) key();
     lastDots = dots;
 
     if (grid > .01 && uProg > 0 && uProg < passes) {
@@ -59,25 +63,25 @@ window.whoSound = (() => {
       const step = Math.floor(uProg * 16), pass = Math.floor(uProg);
       if (step !== lastStep && lastStep >= 0 && now - lastNoteAt > 85) {
         const within = step % 16;
-        pluck(pass * 2 + [0, 2, 4, 3, 5, 7, 6, 8][within % 8] + (within >> 3) * 2);
+        if (loud) pluck(pass * 2 + [0, 2, 4, 3, 5, 7, 6, 8][within % 8] + (within >> 3) * 2);
         lastNoteAt = now;
       }
       lastStep = step;
-      if (pass > lastPass) chord();
+      if (pass > lastPass && loud) chord();
       lastPass = pass;
     } else {
       lastStep = -1;
       if (c < 2.1) lastPass = 0;
-      if (c > 2.8 && lastC <= 2.8) chord();
+      if (c > 2.8 && lastC <= 2.8 && loud) chord();
     }
 
     if (sealing) {
       const seal = Math.floor(clamp(sealProgress) * 6);
-      if (seal !== lastSeal && lastSeal >= 0 && now - lastNoteAt > 160) { bell(seal); lastNoteAt = now; }
+      if (seal !== lastSeal && lastSeal >= 0 && now - lastNoteAt > 160) { if (loud) bell(seal); lastNoteAt = now; }
       lastSeal = seal;
     } else lastSeal = -1;
 
-    if (c >= 4.3 && lastC < 4.3 && thudArmed) { thud(); thudArmed = false; }
+    if (c >= 4.3 && lastC < 4.3 && thudArmed) { if (loud) thud(); thudArmed = false; }
     if (c < 4.1) thudArmed = true;
     lastC = c;
   }
@@ -95,6 +99,19 @@ window.whoSound = (() => {
     else { setTimeout(() => { if (!enabled) ctx.suspend(); }, 250); }
     return enabled;
   }
+
+  // ссылка внутри страницы («Скачать», «Честно», логотип): дальше прокрутка — не человека
+  document.addEventListener('click', e => {
+    const link = e.target.closest && e.target.closest('a[href^="#"]');
+    if (link && !e.defaultPrevented) { jumping = true; settled = false; clearTimeout(settleTimer); settleTimer = setTimeout(() => { settled = true; }, 250); }
+  });
+  addEventListener('scroll', () => {
+    if (!jumping) return;
+    settled = false; clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => { settled = true; }, 250);
+  }, { passive: true });
+  // человек сам взялся за прокрутку — снова его звук
+  for (const type of ['wheel', 'touchstart', 'keydown']) addEventListener(type, () => { jumping = false; }, { passive: true });
 
   document.addEventListener('visibilitychange', () => {
     if (!ctx || !enabled) return;
