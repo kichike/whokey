@@ -755,23 +755,6 @@ def monogram(text, size=24):
     return pixmap
 
 
-def site_tile(image, size=24):
-    """Значок сайта на светлой плитке той же формы, что буква-кружок: тёмный значок (GitHub)
-    на тёмном фоне окна иначе пропал бы."""
-    pixmap = QPixmap(size * _SCALE, size * _SCALE)
-    pixmap.setDevicePixelRatio(_SCALE)
-    pixmap.fill(Qt.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
-    painter.setBrush(QColor("#f6f3ff"))
-    painter.setPen(Qt.NoPen)
-    painter.drawRoundedRect(QRectF(0, 0, size, size), size * 0.29, size * 0.29)
-    inner = size * 0.72
-    painter.drawImage(QRectF((size - inner) / 2, (size - inner) / 2, inner, inner), image)
-    painter.end()
-    return pixmap
-
-
 # --- жидкое стекло ---
 # Настоящего размытия того, что под элементом, Qt не умеет, а снимок окна при каждой
 # перерисовке был бы медленным. Но под кнопками и карточками лежит только фон окна — его

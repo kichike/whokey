@@ -16,7 +16,6 @@ import csv_io
 import sites
 from gui import prefs, theme
 from gui.dates import full_date, shown_date
-from gui.site_icons import SiteIcons
 from gui.dialogs import AboutDialog, ChangeMasterDialog, EntryDialog, ExportDialog, ExtensionDialog, GeneratorDialog, SettingsDialog
 from gui.widgets import ClickableLabel, ClipboardCountdown, RoundedRowDelegate, WaveReveal, ask_yes, choose_csv, save_problem, show_error, show_info
 from gui.i18n import tr
@@ -88,10 +87,6 @@ class MainWindow(QMainWindow):
         self.reveal_timer.timeout.connect(self._auto_hide)
         self.setWindowTitle(tr("WhoKey") + " — " + vault.path.name)
         self.resize(960, 600)
-        # значки сайтов: из хранилища, недостающие докачиваются в фоне после показа окна
-        self.site_icons = SiteIcons(vault, self)
-        self.site_icons.changed.connect(self._update_icons)
-        QTimer.singleShot(0, self.site_icons, self.site_icons.request)
 
         column = QVBoxLayout()
         column.setContentsMargins(24, 20, 24, 12)
@@ -438,7 +433,7 @@ class MainWindow(QMainWindow):
                 else:
                     item = SortItem(text, text.casefold())
                 if field == "site":
-                    item.setIcon(self.site_icons.icon(entry) or self._monogram(text))
+                    item.setIcon(self._monogram(text))
                 if field != "password":
                     item.setToolTip(theme.plain_tip(text) if field != "updated" else full_date(text))  # обрезанное — целиком
                 if field == "password" and index == self.revealed:
@@ -469,17 +464,6 @@ class MainWindow(QMainWindow):
         self.entries_count.setText(self.tr("%n entries", "", count))
         self._end_wave()  # пароль могли спрятать или поменять, а на снимке волны он ещё виден
 
-    def _update_icons(self):
-        """Докачались значки сайтов: меняем только картинки, а не всю таблицу — выделение и прокрутка не прыгают."""
-        for row in range(self.table.rowCount()):
-            item = self.table.item(row, 0)
-            entry = self.vault.entries[item.data(Qt.UserRole)]
-            item.setIcon(self.site_icons.icon(entry) or self._monogram(entry["site"]))
-
-    def closeEvent(self, event):
-        self.site_icons.stop()  # блокировка или выход: недокачанные значки больше не нужны
-        super().closeEvent(event)
-
     def _save(self, change):
         """Выполняет изменение хранилища и сообщает об ошибках записи. True — получилось."""
         try:
@@ -491,7 +475,6 @@ class MainWindow(QMainWindow):
         if self.vault.backup_error:
             self.statusBar().showMessage(tr("⚠ The change is saved, but the backup was not updated: {error}.").format(error=self.vault.backup_error), 10000)
             self.vault.backup_error = None
-        QTimer.singleShot(0, self.site_icons, self.site_icons.request)  # новый или изменённый адрес — может, нужен значок
         return True
 
     # --- действия ---
