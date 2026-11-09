@@ -15,6 +15,7 @@ from unittest import mock
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ["WHOKEY_TESTING"] = "1"  # значки сайтов не скачиваются (favicons.fetch)
 
 LINUX = sys.platform.startswith("linux")
 

@@ -60,6 +60,9 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # хранилище больше 10 МБ (~25
 MAX_WRITE_SIZE = MAX_FILE_SIZE - 4096
 
 ENTRY_FIELDS = ["site", "login", "password", "note", "created", "updated"]
+# значки сайтов (favicons.py): {сайт: {"png": base64 или "" — не нашёлся, "time": когда пробовали}}
+ICON_SIZE_LIMIT = 16 * 1024        # один значок (base64) — больше наши 48×48 не бывают
+ICONS_TOTAL_LIMIT = 3 * 1024 * 1024  # все значки вместе: хранилище не должно упереться в 10 МБ из-за картинок
 
 
 class VaultError(Exception):
@@ -378,6 +381,7 @@ class Vault:
         self.fresh = False  # только что создано: прежний номер сохранения этого пути ни при чём
         self.on_saved = None  # вызывается с номером после каждой записи (WhoKey запоминает его)
         self.old_backup = None    # куда отложена чужая старая копия при создании
+        self.icons = {}  # значки сайтов, см. ICON_SIZE_LIMIT
 
     # --- создание и открытие ---
 
@@ -452,6 +456,7 @@ class Vault:
         except (ValueError, KeyError, TypeError, AttributeError, RecursionError) as error:
             raise VaultError(str(error))
         vault = cls(path, key, salt, params, entries)
+        vault.icons = _valid_icons(content.get("icons"))
         vault.bridge_keys = bridge_keys
         vault.access_log = access_log[-ACCESS_LOG_SIZE:]
         vault.generation = generation
@@ -471,7 +476,7 @@ class Vault:
 
     # --- сохранение ---
 
-    def _write(self, entries, key, salt, params, bridge_keys=None, access_log=None, new=False):
+    def _write(self, entries, key, salt, params, bridge_keys=None, access_log=None, new=False, icons=None):
         """Шифрует записи и сохраняет файл + резервную копию. SaveError — если не вышло."""
         generation = self.generation + 1
         content = {"entries": entries,
@@ -483,6 +488,9 @@ class Vault:
         access_log = self.access_log if access_log is None else access_log
         if access_log:
             content["access_log"] = access_log
+        icons = self.icons if icons is None else icons
+        if icons:
+            content["icons"] = icons
         data = json.dumps(content, ensure_ascii=False).encode("utf-8")
         header = {
             "format": FORMAT,
@@ -561,6 +569,12 @@ class Vault:
         self._write(self.entries, self._key, self._salt, self._params, bridge_keys=list(keys))
         self.bridge_keys = list(keys)
 
+    def set_icons(self, icons):
+        """Значки сайтов: сначала на диск, потом в память. SaveError — если не вышло."""
+        icons = _valid_icons(icons)
+        self._write(self.entries, self._key, self._salt, self._params, icons=icons)
+        self.icons = icons
+
     def add(self, site, login, password, note="", url=""):
         self.add_many([{"site": site, "login": login, "password": password, "note": note, "url": url}])
 
@@ -585,6 +599,24 @@ class Vault:
                 or text in entry["login"].lower()
                 or text in entry["note"].lower()
                 or text in entry.get("url", "").lower()]
+
+
+def _valid_icons(icons):
+    """Значки — не главное: испорченные или лишние просто отбрасываем, а не отказываемся открыть хранилище."""
+    if not isinstance(icons, dict):
+        return {}
+    result, total = {}, 0
+    for host, icon in icons.items():
+        if not (isinstance(host, str) and 0 < len(host) <= 255 and isinstance(icon, dict)):
+            continue
+        png, time = icon.get("png"), icon.get("time")
+        if not (isinstance(png, str) and isinstance(time, str) and len(png) <= ICON_SIZE_LIMIT and len(time) <= 32):
+            continue
+        total += len(png) + len(host) + 64
+        if total > ICONS_TOTAL_LIMIT:
+            break
+        result[host] = {"png": png, "time": time}
+    return result
 
 
 def _now():
