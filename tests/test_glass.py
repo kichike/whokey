@@ -187,3 +187,25 @@ class SystemGlass(unittest.TestCase):
         column.setContentsMargins(24, 20, 24, 20)  # как у главного окна и окна входа
         sysglass._trim_top(dialog)
         self.assertEqual(column.contentsMargins().top(), 8)
+
+    def test_window_drags_by_empty_places_only(self):
+        """Полосу заголовка закрывает стекло: окно тянется за фон и подписи, но не за кнопки и ссылки."""
+        from PySide6.QtGui import QWindow
+        from PySide6.QtWidgets import QLabel
+        label, link, button = QLabel("Подпись"), QLabel('<a href="#x">ссылка</a>'), QPushButton("Кнопка")
+        dialog = make_dialog(label, link, button)
+        clicks = []
+        button.pressed.connect(lambda: clicks.append(1))
+        with mock.patch.object(theme, "SYSTEM", True), \
+                mock.patch.object(QWindow, "startSystemMove", return_value=True) as move:
+            link.adjustSize()
+            for widget, point in ((button, QPoint(3, 3)), (link, QPoint(8, link.height() // 2))):
+                QTest.mousePress(widget, Qt.LeftButton, Qt.NoModifier, point)
+                QTest.mouseRelease(widget, Qt.LeftButton, Qt.NoModifier, point)
+            move.assert_not_called()
+            QTest.mousePress(label, Qt.LeftButton, Qt.NoModifier, QPoint(3, 3))
+            QTest.mousePress(dialog, Qt.LeftButton, Qt.NoModifier, QPoint(1, 1))
+            self.assertEqual(move.call_count, 2)
+        self.assertEqual(clicks, [1])
+        self.errors.assert_not_called()
+        dialog.close()

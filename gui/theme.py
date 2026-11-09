@@ -524,6 +524,8 @@ class _FocusGlow(QObject):
         try:
             if event.type() == QEvent.Paint and _paint_glass(obj):
                 return True  # нарисовано здесь (см. «жидкое стекло» ниже)
+            if SYSTEM and event.type() == QEvent.MouseButtonPress and _drag_window(obj, event):
+                return True  # окно поехало за мышью — нажатие больше никому не нужно
             self._handle(obj, event)
         except Exception:
             traceback.print_exc()
@@ -575,6 +577,27 @@ class _FocusGlow(QObject):
             elif kind == QEvent.FocusOut and halo is not None:
                 halo.remove()
                 obj._halo = None
+
+
+def _drag_window(obj, event):
+    """Системное стекло: полосу заголовка закрывает содержимое окна, и macOS не может тянуть окно сама.
+    Поэтому окно тянется за любое пустое место — фон, контейнеры, обычные подписи. Кнопки, поля, таблица,
+    ссылки и ключ-логотип (пасхалка) получают нажатие как обычно."""
+    if event.button() != Qt.LeftButton or not isinstance(obj, QWidget):
+        return False
+    window = obj.window()
+    if not sysglass.is_window(window) or isinstance(window, QFileDialog):
+        return False
+    # нажатие, которое элемент не взял (ссылка, поле), Qt передаёт родителю — такое окно не тянет
+    target = window.childAt(window.mapFromGlobal(event.globalPosition().toPoint())) or window
+    if obj is not target:
+        return False
+    if obj is not window and type(obj) not in (QWidget, QFrame, QLabel) and obj.metaObject().className() != "QStatusBar":
+        return False
+    if isinstance(obj, QLabel) and ("<a " in obj.text() or obj.textInteractionFlags() & Qt.TextSelectableByMouse):
+        return False
+    handle = window.windowHandle()
+    return handle is not None and handle.startSystemMove()
 
 
 def badge(symbol, color=NEON, size=56):
