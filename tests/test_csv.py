@@ -94,6 +94,36 @@ class Export(unittest.TestCase):
             self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
 
 
+    def test_export_removes_drafts_left_by_a_crash(self):
+        folder = Path(tempfile.mkdtemp())
+        left = folder / ".out.csv.abc123.tmp"
+        left.write_text("name,password\nmail,secret\n")
+        other = folder / ".other.csv.abc123.tmp"
+        other.write_text("чужой файл")
+        csv_io.write(folder / "out.csv", [{"site": "a", "login": "", "password": "p", "note": ""}])
+        self.assertFalse(left.exists())
+        self.assertTrue(other.exists())  # черновики других файлов не трогаем
+        self.assertEqual(sorted(p.name for p in folder.iterdir()), [".other.csv.abc123.tmp", "out.csv"])
+
+    def test_export_does_not_make_spreadsheet_formulas(self):
+        folder = Path(tempfile.mkdtemp())
+        entries = [{"site": '=HYPERLINK("http://evil","x")', "login": "+cmd|' /C calc'!A0", "password": "-Pass=1",
+                    "note": "@SUM(1)", "url": ""},
+                   {"site": "'quoted", "login": "a-b", "password": "p", "note": "", "url": ""}]
+        path = folder / "out.csv"
+        csv_io.write(path, entries)
+        import csv
+        with open(path, encoding="utf-8", newline="") as file:
+            rows = list(csv.reader(file))[1:]
+        self.assertEqual(rows[0][0], '\'=HYPERLINK("http://evil","x")')
+        self.assertEqual(rows[0][2], "'+cmd|' /C calc'!A0")
+        self.assertEqual(rows[0][4], "'@SUM(1)")
+        self.assertEqual(rows[0][3], "-Pass=1")  # пароль — как есть, иначе он не подойдёт
+        self.assertEqual(rows[1][0], "'quoted")   # обычный апостроф не трогаем
+        back = csv_io.read(path)
+        self.assertEqual([(e["site"], e["login"], e["password"], e["note"]) for e in back],
+                         [(e["site"], e["login"], e["password"], e["note"]) for e in entries])
+
 class ImportWhenCreating(unittest.TestCase):
     """Кнопка импорта в окне создания: CSV выбран до того, как хранилище появилось."""
 

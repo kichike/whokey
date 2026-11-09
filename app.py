@@ -78,6 +78,24 @@ from gui import i18n, prefs
 APP_NAME = "EduPasswords"
 
 
+def keep_settings_private(settings):
+    """Linux: файл настроек (где лежит хранилище, счётчик его версий) по умолчанию читают
+    все пользователи компьютера — папку настроек закрываем от них. На Mac и Windows папка
+    настроек и так только своя."""
+    if not sys.platform.startswith("linux"):
+        return
+    try:
+        folder = Path(settings.fileName()).parent
+        folder.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if not folder.is_symlink() and folder.stat().st_uid == os.getuid():
+            os.chmod(folder, 0o700)
+        for item in folder.iterdir():
+            if item.is_file() and not item.is_symlink() and item.stat().st_uid == os.getuid():
+                os.chmod(item, 0o600)
+    except OSError:
+        pass  # не вышло — настройки всё равно не секрет, работать это не мешает
+
+
 def default_vault_path():
     folder = Path(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation))
     return folder / "vault.dat"
@@ -89,6 +107,7 @@ class Controller:
     def __init__(self):
         # настройки (язык, последний файл) — не секрет, пароли сюда не попадают
         self.settings = QSettings(APP_NAME, APP_NAME)
+        keep_settings_private(self.settings)
         self.clipboard = SecureClipboard()  # буфер обмена через Qt (у консольной версии — clipboard.py)
         self.state = {}
         self.window = None
@@ -155,6 +174,7 @@ class Controller:
         rolled_back = self._remember_generation(vault)
         window = self._new_main(vault)
         self.bridge = BridgeServer(vault, window, self.settings)
+        self.bridge.window_opened.connect(self.autolock.touch)
         self.bridge.start()
         self.autolock.start()
         if rolled_back is not None:

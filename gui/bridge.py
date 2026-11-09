@@ -29,7 +29,7 @@ import socket
 import time
 import weakref
 
-from PySide6.QtCore import QObject, QTimer
+from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtNetwork import QLocalServer
 from PySide6.QtWidgets import QDialog
 
@@ -56,6 +56,9 @@ def _fingerprint(key):
 
 
 class BridgeServer(QObject):
+    # окно WhoKey открыто по нажатию человека в расширении — это действие, а не бездействие
+    window_opened = Signal()
+
     def __init__(self, vault, window, settings):
         # без родителя: окно пересоздаётся (смена языка), а сервер должен жить дальше —
         # будь он «ребёнком» окна, Qt удалил бы его вместе со старым окном
@@ -299,6 +302,9 @@ class BridgeServer(QObject):
                 except SaveError:
                     pass
             return
+        # человек только что нажал в расширении: без этого автоблокировка по бездействию,
+        # отсчитанная, пока он был в браузере, закрыла бы новое окно через секунду
+        self.window_opened.emit()
         window.showNormal()
         window.raise_()
         window.activateWindow()

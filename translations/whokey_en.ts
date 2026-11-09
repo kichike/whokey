@@ -260,6 +260,10 @@ After saving, the old password cannot be recovered.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Font licenses</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Free and open source (MIT license).</source>
         <translation type="unfinished"></translation>
     </message>

@@ -124,9 +124,12 @@ class Requests(unittest.TestCase):
     def test_show_opens_new_entry_with_the_site(self):
         added = []
         self.server.window.add = lambda url="", **_: added.append(url)
+        opened = []
+        self.server.window_opened.connect(lambda: opened.append(1))
         self.assertEqual(self.ask(type="show", url="https://www.github.com/login"), {"status": "ok"})
         QCoreApplication.processEvents()  # окно открывается после ответа
         self.assertEqual(added, ["github.com"])
+        self.assertEqual(opened, [1])  # таймер бездействия узнаёт, что человек что-то делает
         self.assertEqual(self.ask(type="show", url="http://github.com")["status"], "bad_page")
         self.assertEqual(self.server.handle({"type": "show", "url": "https://github.com"})["status"], "pair_required")
 
@@ -532,6 +535,12 @@ class Autolock(unittest.TestCase):
         lock._check()
         self.assertEqual(events, ["idle"])
         prefs.set_value("idle_lock_minutes", 0)  # «не блокировать»
+        lock._check()
+        self.assertEqual(events, ["idle"])
+        # окно из расширения открыто по нажатию человека: отсчёт бездействия начинается заново
+        prefs.set_value("idle_lock_minutes", 1)
+        lock._last_input = time.monotonic() - 61
+        lock.touch()
         lock._check()
         self.assertEqual(events, ["idle"])
 

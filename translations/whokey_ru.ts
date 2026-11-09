@@ -272,6 +272,10 @@ After saving, the old password cannot be recovered.</source>
         <translation>Исходный код и обновления:</translation>
     </message>
     <message>
+        <source>Font licenses</source>
+        <translation>Лицензии шрифта</translation>
+    </message>
+    <message>
         <source>Free and open source (MIT license).</source>
         <translation>Бесплатная программа с открытым кодом (лицензия MIT).</translation>
     </message>

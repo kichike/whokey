@@ -71,6 +71,17 @@ class Addresses(unittest.TestCase):
             self.assertTrue(P.socket_address().startswith("/run/user/1000/"))
             self.assertNotEqual(P.socket_address(), P.instance_address())
 
+    def test_without_runtime_folder_the_socket_is_in_a_private_temp_folder(self):
+        import bridge_protocol as P
+        temp = tempfile.mkdtemp()
+        env = {k: v for k, v in os.environ.items() if k != "XDG_RUNTIME_DIR"}
+        with mock.patch.object(P, "app_data_dir", lambda: Path("/x" * 60)), \
+                mock.patch.dict(os.environ, env, clear=True), mock.patch.object(P.tempfile, "gettempdir", lambda: temp):
+            address = P.socket_address()
+        folder = Path(address).parent
+        self.assertEqual(folder, Path(temp) / f"whokey-{os.getuid()}")
+        self.assertEqual(folder.stat().st_mode & 0o777, 0o700)
+
     def test_config_folder_and_temporary_paths(self):
         import bridge_protocol as P
         config = Path(tempfile.mkdtemp())
@@ -82,6 +93,21 @@ class Addresses(unittest.TestCase):
         self.assertFalse((config / "google-chrome").exists())  # браузера нет — его папку не создаём
         target = config / "chromium" / "NativeMessagingHosts" / f"{P.HOST_NAME}.json"
         self.assertIn("/home/x/.local/opt/WhoKey/WhoKey", target.read_text())
+
+
+@unittest.skipUnless(LINUX, "только Linux")
+class PrivateSettings(unittest.TestCase):
+    def test_settings_folder_is_closed_to_other_users(self):
+        import app
+        folder = Path(tempfile.mkdtemp()) / "EduPasswords"
+        folder.mkdir(mode=0o755)
+        (folder / "EduPasswords.conf").write_text("[General]\nvault_path=/home/x/vault.dat\n")
+        os.chmod(folder / "EduPasswords.conf", 0o644)
+        settings = mock.Mock()
+        settings.fileName.return_value = str(folder / "EduPasswords.conf")
+        app.keep_settings_private(settings)
+        self.assertEqual(folder.stat().st_mode & 0o777, 0o700)
+        self.assertEqual((folder / "EduPasswords.conf").stat().st_mode & 0o777, 0o600)
 
 
 @unittest.skipUnless(LINUX, "только Linux")

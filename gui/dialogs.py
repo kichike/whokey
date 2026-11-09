@@ -409,7 +409,13 @@ class AboutDialog(QDialog):
         links.setTextFormat(Qt.RichText)
         links.setOpenExternalLinks(True)
         links.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        license_ = theme.role(QLabel(tr("Free and open source (MIT license).")), "muted")
+        # лицензия шрифта (Meslo и значки Font Awesome) обязана быть доступна человеку — открывается здесь
+        fonts = tr("Font licenses")
+        license_ = theme.role(QLabel(tr("Free and open source (MIT license).") + f' <a {link} href="#fonts">{fonts}</a>'), "muted")
+        license_.setTextFormat(Qt.RichText)
+        license_.setWordWrap(True)
+        license_.setTextInteractionFlags(Qt.LinksAccessibleByMouse | Qt.LinksAccessibleByKeyboard)
+        license_.linkActivated.connect(lambda _: FontLicenseDialog(self).exec())
         close = QDialogButtonBox(QDialogButtonBox.Close)
         close.button(QDialogButtonBox.Close).setText(tr("Close"))
         close.rejected.connect(self.reject)
@@ -430,6 +436,30 @@ class AboutDialog(QDialog):
         column.addWidget(close)
         what.setMinimumWidth(380)
         what.setMinimumHeight(what.heightForWidth(380))
+
+
+class FontLicenseDialog(QDialog):
+    """Полный текст лицензий шрифта окон: Meslo (Apache 2.0) и значки Font Awesome (SIL OFL 1.1)."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle(tr("Font licenses"))
+        text = QPlainTextEdit()
+        text.setReadOnly(True)
+        # тексты лицензий свёрстаны строками до 80 знаков — окно такой ширины, без переносов
+        text.setLineWrapMode(QPlainTextEdit.NoWrap)
+        columns = text.fontMetrics().horizontalAdvance("M" * 82)
+        self.resize(columns + text.verticalScrollBar().sizeHint().width() + 60, 560)
+        try:
+            text.setPlainText((theme.FONT_FILE.parent / "LICENSE.txt").read_text(encoding="utf-8"))
+        except OSError:
+            text.setPlainText("https://www.apache.org/licenses/LICENSE-2.0\nhttps://openfontlicense.org")
+        close = QDialogButtonBox(QDialogButtonBox.Close)
+        close.button(QDialogButtonBox.Close).setText(tr("Close"))
+        close.rejected.connect(self.reject)
+        column = QVBoxLayout(self)
+        column.addWidget(text, 1)
+        column.addWidget(close)
 
 
 README_URL = "https://github.com/kichike/whokey#browser-extension"

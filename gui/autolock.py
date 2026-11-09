@@ -209,6 +209,10 @@ class AutoLock(QObject):
     def stop(self):
         self._timer.stop()
 
+    def touch(self):
+        """Человек что-то сделал вне окон WhoKey, но для WhoKey (нажал в расширении)."""
+        self._last_input = time.monotonic()
+
     def _check(self):
         wall, mono = time.time(), monotonic()
         slept = (wall - self._clocks[0]) - (mono - self._clocks[1]) > SLEEP_GAP

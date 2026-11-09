@@ -11,7 +11,9 @@ CSV — обычный текст: пароли в нём НЕ зашифров�
 
 import csv
 import os
+import stat
 import tempfile
+from glob import escape as glob_escape
 from pathlib import Path
 
 import sites
@@ -30,6 +32,20 @@ COLUMNS = {
     "note": ["note", "notes", "comments"],
 }
 EXPORT_HEADER = ["name", "url", "username", "password", "note"]
+
+
+# Excel, Numbers и LibreOffice считают ячейку с такого знака формулой. Название, адрес, логин и
+# заметку при экспорте защищаем апострофом спереди (так советует OWASP), при импорте его снимаем.
+# Пароль не трогаем: другой менеджер паролей получил бы неверный пароль
+FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _safe_cell(text):
+    return "'" + text if text.startswith(FORMULA_START) else text
+
+
+def _unsafe_cell(text):
+    return text[1:] if text.startswith("'") and text[1:].startswith(FORMULA_START) else text
 
 
 class CsvError(Exception):
@@ -80,7 +96,7 @@ def read(path):
 
     entries = []
     for row in rows[1:]:
-        value = {field: (row[number].strip() if number < len(row) else "")
+        value = {field: _unsafe_cell(row[number].strip() if number < len(row) else "")
                  for field, number in columns.items()}
         password = row[columns["password"]] if columns["password"] < len(row) else ""
         if not password:
@@ -108,18 +124,32 @@ def new_only(entries, existing):
     return result
 
 
+def _remove_leftovers(path):
+    """Черновики прошлых экспортов в этот же файл: если компьютер выключился посреди записи,
+    рядом остался скрытый «.имя.xxxx.tmp» с паролями. Удаляем только свои обычные файлы."""
+    for old in path.parent.glob("." + glob_escape(path.name) + ".*.tmp"):
+        try:
+            info = os.lstat(old)
+            if stat.S_ISREG(info.st_mode) and (not hasattr(os, "getuid") or info.st_uid == os.getuid()):
+                os.unlink(old)
+        except OSError:
+            pass
+
+
 def write(path, entries):
     """Сохраняет записи в CSV. Файл доступен только владельцу (на Mac и Linux — права 600)."""
     # Новый файл с правами 600 и подмена в конце: пароли ни на миг не лежат в файле, открытом всем,
     # а на месте выбранного файла ссылка или канал не уведут их в другое место и не повесят программу.
     path = Path(path)
+    _remove_leftovers(path)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix="." + path.name + ".", suffix=".tmp")
     try:
         with open(fd, "w", encoding="utf-8", newline="") as file:
             out = csv.writer(file)
             out.writerow(EXPORT_HEADER)
             for entry in entries:
-                out.writerow([entry["site"], entry.get("url", ""), entry["login"], entry["password"], entry["note"]])
+                out.writerow([_safe_cell(entry["site"]), _safe_cell(entry.get("url", "")), _safe_cell(entry["login"]),
+                              entry["password"], _safe_cell(entry["note"])])
         os.replace(tmp, path)
     except BaseException:
         try:

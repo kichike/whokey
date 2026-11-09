@@ -64,7 +64,7 @@ Website: [kichike.github.io/whokey](https://kichike.github.io/whokey/). Download
 
 ### Browser extension
 
-Fills the login and password on a website with one click or **⌘⇧L** (**Ctrl+Shift+L** on Windows and Linux). Works in Chrome, Chromium, Edge, Brave, Vivaldi and Yandex Browser on macOS, Windows and Linux, plus Arc and Helium on macOS. On Linux, browsers from Flatpak and Snap can't start the bridge.
+Fills the login and password on a website with one click or **⌘⇧L** (**Ctrl+Shift+L** on Windows and Linux). Works in Chrome, Chromium, Edge, Brave, Vivaldi and Yandex Browser on macOS, Windows and Linux, plus Helium on macOS and Linux and Arc on macOS (version 127 or newer). On Linux, browsers from Flatpak and Snap can't start the bridge.
 
 1. Install WhoKey and open it once — it registers itself in your browsers.
 2. Download **WhoKey-extension.zip** from [Releases](../../releases) and unzip it (or use the `extension` folder of this repository).
@@ -152,7 +152,7 @@ WhoKey хранит логины и пароли в одном зашифров�
 
 ### Расширение для браузера
 
-Заполняет логин и пароль на сайте одним нажатием или **⌘⇧L** (на Windows и Linux — **Ctrl+Shift+L**). Работает в Chrome, Chromium, Edge, Brave, Vivaldi и Яндекс Браузере на macOS, Windows и Linux, а на macOS ещё в Arc и Helium. На Linux браузеры из Flatpak и Snap запустить мост не могут.
+Заполняет логин и пароль на сайте одним нажатием или **⌘⇧L** (на Windows и Linux — **Ctrl+Shift+L**). Работает в Chrome, Chromium, Edge, Brave, Vivaldi и Яндекс Браузере на macOS, Windows и Linux, а ещё в Helium на macOS и Linux и в Arc на macOS (версии 127 и новее). На Linux браузеры из Flatpak и Snap запустить мост не могут.
 
 1. Установите WhoKey и откройте его хотя бы раз — он сам пропишется в браузерах.
 2. Скачайте **WhoKey-extension.zip** в разделе [Releases](../../releases) и распакуйте (или возьмите папку `extension` из этого репозитория).

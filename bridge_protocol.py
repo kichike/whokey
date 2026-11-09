@@ -89,7 +89,29 @@ def _unix_socket(name):
     # личная временная папка (на Mac у каждого пользователя своя, на Linux это
     # XDG_RUNTIME_DIR, права 700), а не общий /tmp, где другой пользователь мог бы занять имя первым
     folder = (LINUX and os.environ.get("XDG_RUNTIME_DIR")) or tempfile.gettempdir()
+    if LINUX and not os.environ.get("XDG_RUNTIME_DIR"):
+        folder = _private_temp_folder(folder)
     return os.path.join(folder, f"whokey-{name}-{os.getuid()}.sock")
+
+
+def _private_temp_folder(temp):
+    """Linux без XDG_RUNTIME_DIR: /tmp общий для всех, поэтому сокет — в своей папке с правами 700.
+    Папку с этим именем занял кто-то другой — сокет не открыть (расширение не подключится),
+    но и чужой программе в нашу папку не попасть."""
+    folder = os.path.join(temp, f"whokey-{os.getuid()}")
+    try:
+        os.mkdir(folder, 0o700)
+    except FileExistsError:
+        pass
+    except OSError:
+        return folder
+    try:
+        info = os.lstat(folder)
+        if stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid() and info.st_mode & 0o077:
+            os.chmod(folder, 0o700)  # своя, но открытая (umask) — закрываем
+    except OSError:
+        pass
+    return folder
 
 
 # --- кто на другом конце сокета ---
