@@ -18,8 +18,6 @@ from generator import MAX_LENGTH, MIN_LENGTH, entropy_bits, estimate_bits, gener
 from gui import prefs, theme
 from gui.i18n import tr
 
-# Цвета шкалы надёжности — «светофор» из оформления: хорошо / так себе / плохо
-GOOD, WARNING, BAD = theme.OK, theme.WARN, theme.BAD
 
 
 
@@ -191,13 +189,14 @@ class PasswordField(QWidget):
 
 def verdict(bits):
     """Оценка словами и цвет для шкалы."""
+    # «светофор» из оформления — берём при каждом вызове: у светлой темы свои, более тёмные цвета
     if bits >= 100:
-        return tr("very strong"), GOOD
+        return tr("very strong"), theme.OK
     if bits >= 70:
-        return tr("strong"), GOOD
+        return tr("strong"), theme.OK
     if bits >= 45:
-        return tr("medium"), WARNING
-    return tr("weak"), BAD
+        return tr("medium"), theme.WARN
+    return tr("weak"), theme.BAD
 
 
 class RoundedRowDelegate(QStyledItemDelegate):
@@ -233,8 +232,9 @@ class RoundedRowDelegate(QStyledItemDelegate):
             width = option.widget.viewport().width() if option.widget else option.rect.right()
             fill = QLinearGradient(0, 0, width, 0)
             start, end = QColor(theme.ACC), QColor(theme.MAGENTA)
-            start.setAlpha(120)
-            end.setAlpha(110)
+            # на светлом — сплошной перелив: полупрозрачный на белом бледнеет, и белый текст не читается
+            start.setAlpha(255 if theme.LIGHT else 120)
+            end.setAlpha(255 if theme.LIGHT else 110)
             fill.setColorAt(0, start)
             fill.setColorAt(1, end)
             self._plate(painter, option, fill)
@@ -244,8 +244,8 @@ class RoundedRowDelegate(QStyledItemDelegate):
             self._selected = True  # для initStyleOption: текст выделенной строки — белый
         elif index.row() % 2:
             # после сортировки номер строки — её место на экране, так что полосы не скачут
-            stripe = QColor(theme.WHITE)
-            stripe.setAlpha(self.STRIPE_ALPHA)
+            stripe = QColor(theme.SHADOW if theme.LIGHT else theme.WHITE)
+            stripe.setAlpha(10 if theme.LIGHT else self.STRIPE_ALPHA)
             self._plate(painter, option, stripe)
         super().paint(painter, option, index)
         self._selected = False
@@ -256,7 +256,7 @@ class RoundedRowDelegate(QStyledItemDelegate):
         super().initStyleOption(option, index)
         if self._selected:
             # серые колонки (заметка, дата) на светлой плашке читались бы плохо
-            option.palette.setColor(QPalette.Text, QColor(theme.WHITE))
+            option.palette.setColor(QPalette.Text, QColor(theme.ON_ACCENT))
 
 
 class ClickableLabel(QLabel):
@@ -347,15 +347,16 @@ class _DrainingBar(QWidget):
         p.setRenderHint(QPainter.Antialiasing)
         p.setPen(Qt.NoPen)
         r = self.height() / 2
-        track = QColor(theme.WHITE)
-        track.setAlpha(22)
+        track = QColor(theme.SHADOW if theme.LIGHT else theme.WHITE)
+        track.setAlpha(26 if theme.LIGHT else 22)
         p.setBrush(track)
         p.drawRoundedRect(QRectF(self.rect()), r, r)
         fill = QRectF(0, 0, self.width() * self.fraction, self.height())
         if fill.width() > 0:
             gradient = QLinearGradient(0, 0, self.width(), 0)
-            gradient.setColorAt(0, QColor(theme.ACC_DEEP))
-            gradient.setColorAt(1, QColor(theme.NEON))
+            # на светлом ACC_DEEP → NEON резковат — там перелив ключа ACC → MAGENTA
+            gradient.setColorAt(0, QColor(theme.ACC if theme.LIGHT else theme.ACC_DEEP))
+            gradient.setColorAt(1, QColor(theme.MAGENTA if theme.LIGHT else theme.NEON))
             p.setBrush(gradient)
             p.drawRoundedRect(fill, r, r)
 
@@ -439,6 +440,8 @@ class StrengthBar(QWidget):
         words, color = verdict(bits)
         self.bar.setValue(min(int(bits), 128))
         # сама полоска оформлена в theme.py, здесь только цвет заполнения
+        if theme.LIGHT:  # сплошной тёмно-зелёный на перламутре тяжеловат — мягкий перелив того же цвета
+            color = f"qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {theme.solid(color, 170, theme.WHITE)}, stop:1 {color})"
         self.bar.setStyleSheet(f"QProgressBar::chunk {{ background: {color}; }}")
         self.label.setText(tr("≈{bits:.0f} bits — {verdict}").format(bits=bits, verdict=words))
 

@@ -12,7 +12,7 @@ input[type=checkbox] { accent-color: var(--acc); width: 16px; height: 16px; }
 ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 li { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 button {
-  padding: 4px 10px; border-radius: 8px; border: 1px solid #3a3242; cursor: pointer;
-  background: rgba(255, 255, 255, 0.08); color: var(--text); font: inherit; font-size: 12px;
+  padding: 4px 10px; border-radius: 8px; border: 1px solid var(--button-rim); cursor: pointer;
+  background: var(--soft-strong); color: var(--text); font: inherit; font-size: 12px;
 }
 button:hover { border-color: var(--acc); }

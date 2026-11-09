@@ -224,6 +224,22 @@ After saving, the old password cannot be recovered.</source>
         <translation>Настройки</translation>
     </message>
     <message>
+        <source>As in the system</source>
+        <translation>Как в системе</translation>
+    </message>
+    <message>
+        <source>Dark</source>
+        <translation>Тёмная</translation>
+    </message>
+    <message>
+        <source>Light</source>
+        <translation>Светлая</translation>
+    </message>
+    <message>
+        <source>Theme:</source>
+        <translation>Тема:</translation>
+    </message>
+    <message>
         <source>Clear copied password after:</source>
         <translation>Стирать скопированный пароль через:</translation>
     </message>

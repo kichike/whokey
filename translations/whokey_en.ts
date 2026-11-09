@@ -212,6 +212,22 @@ After saving, the old password cannot be recovered.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>As in the system</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Dark</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Light</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Theme:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Clear copied password after:</source>
         <translation type="unfinished"></translation>
     </message>

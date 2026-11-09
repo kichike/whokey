@@ -19,29 +19,82 @@
   --backdrop: radial-gradient(140% 120% at 50% -30%, #3a1a9a 0%, #2a0f5a 30%, #120a30 60%, var(--bg) 100%);
   --title: linear-gradient(90deg, #c9b8ff, var(--neon));
   --avatar: linear-gradient(160deg, #e6dcff, #c38cf2);
+  --avatar-ink: #1a1036;
+  --avatar-rim: transparent;
+  --hover: rgba(168, 144, 240, 0.16);
+  --chip-bg: rgba(168, 144, 240, 0.12);
+  --chip-rim: rgba(168, 144, 240, 0.45);
+  --dash: rgba(240, 92, 240, 0.45);
+  --dash-hover: rgba(240, 92, 240, 0.12);
+  --press: rgba(240, 92, 240, 0.22);
+  --press-rim: rgba(240, 92, 240, 0.55);
+  --press-glow: rgba(240, 92, 240, 0.45);
+  --key-glow: rgba(240, 92, 240, 0.55);
+  --code-glow: rgba(240, 92, 240, 0.6);
+  --soft: rgba(255, 255, 255, 0.05);
+  --soft-strong: rgba(255, 255, 255, 0.08);
+  --button-rim: #3a3242;
+  color-scheme: dark;
+}
+/* светлая тема «Перламутр» — как в WhoKey; окошко следует теме браузера и системы */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f3f2fb;
+    --surface: #faf9ff;
+    --text: #1b1846;
+    --muted: #4f4b7c;
+    --faint: #6a6694;
+    --acc: #6a4bdc;
+    --acc-light: #4b2fb5;
+    --magenta: #b739c4;
+    --neon: #b02ab8;
+    --rim: #d4cfea;
+    --bad: #c0263b;
+    --backdrop: radial-gradient(120% 90% at 8% -10%, rgba(195, 176, 255, 0.55), transparent 60%),
+                radial-gradient(90% 80% at 95% -5%, rgba(255, 179, 230, 0.45), transparent 60%),
+                radial-gradient(90% 90% at 100% 100%, rgba(159, 210, 255, 0.35), transparent 60%), var(--bg);
+    --title: linear-gradient(90deg, #6a4bdc, var(--neon));
+    --avatar: linear-gradient(160deg, #ece6ff, #f7d2f3);
+    --avatar-ink: #3a2696;
+    --avatar-rim: #c9b6f5;
+    --hover: rgba(106, 75, 220, 0.10);
+    --chip-bg: rgba(106, 75, 220, 0.08);
+    --chip-rim: rgba(106, 75, 220, 0.35);
+    --dash: rgba(176, 42, 184, 0.45);
+    --dash-hover: rgba(176, 42, 184, 0.08);
+    --press: rgba(106, 75, 220, 0.16);
+    --press-rim: rgba(106, 75, 220, 0.45);
+    --press-glow: rgba(240, 139, 216, 0.35);
+    --key-glow: rgba(240, 139, 216, 0.35);
+    --code-glow: rgba(240, 139, 216, 0.45);
+    --soft: rgba(58, 47, 138, 0.05);
+    --soft-strong: #ffffff;
+    --button-rim: #d4cfea;
+    color-scheme: light;
+  }
 }
 html { background: var(--bg); }
 .brand { display: flex; align-items: center; gap: 8px; }
-.brand img { height: 26px; image-rendering: pixelated; filter: drop-shadow(0 0 6px rgba(240, 92, 240, 0.55)); }
+.brand img { height: 26px; image-rendering: pixelated; filter: drop-shadow(0 0 6px var(--key-glow)); }
 .brand b {
   font-size: 17px; font-weight: 800;
   background: var(--title); -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .avatar {
   flex: none; width: 30px; height: 30px; border-radius: 8px;
-  display: grid; place-items: center; font-weight: 800; color: #1a1036;
-  background: var(--avatar);
+  display: grid; place-items: center; font-weight: 800; color: var(--avatar-ink);
+  background: var(--avatar); box-shadow: inset 0 0 0 1px var(--avatar-rim);
 }
 .keycap {
   display: inline-block; min-width: 20px; padding: 0 5px; border-radius: 6px; text-align: center;
-  border: 1px solid var(--rim); background: rgba(255, 255, 255, 0.05); color: var(--muted); font-size: 11px;
+  border: 1px solid var(--rim); background: var(--soft); color: var(--muted); font-size: 11px;
 }
 
 /* нажатие видно: кнопка чуть сжимается и подсвечивается неоном */
 button { transition: transform 0.08s ease, background-color 0.08s ease, box-shadow 0.12s ease; }
 button:active:not(:disabled) {
   transform: scale(0.97);
-  background: rgba(240, 92, 240, 0.22);
-  box-shadow: 0 0 0 1px rgba(240, 92, 240, 0.55), 0 0 14px rgba(240, 92, 240, 0.45);
+  background: var(--press);
+  box-shadow: 0 0 0 1px var(--press-rim), 0 0 14px var(--press-glow);
 }
 @media (prefers-reduced-motion: reduce) { button { transition: none; } button:active:not(:disabled) { transform: none; } }

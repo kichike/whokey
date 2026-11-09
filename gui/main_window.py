@@ -393,7 +393,7 @@ class MainWindow(QMainWindow):
 
     def _monogram(self, name):
         letter = (name.strip() or "?")[0].upper()
-        key = (letter, theme.egg)  # у пасхалки свои цвета
+        key = (letter, theme.egg, theme.LIGHT)  # у пасхалки и светлой темы свои цвета
         if key not in self._monograms:
             MainWindow._monograms[key] = QIcon(theme.monogram(letter, 24))
         return self._monograms[key]

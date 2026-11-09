@@ -327,6 +327,14 @@ class SettingsDialog(QDialog):
         language.currentIndexChanged.connect(lambda i: self._choose_language(language.itemData(i)))
         form.addRow(tr("Language:"), language)
 
+        look = theme.rounded_popup(QComboBox())
+        for mode, name in zip(theme.THEMES, (tr("As in the system"), tr("Dark"), tr("Light"))):
+            look.addItem(name, mode)
+        look.setCurrentIndex(list(theme.THEMES).index(prefs.theme_mode()))
+        look.view().setMinimumWidth(look.view().sizeHintForColumn(0) + 48)
+        look.currentIndexChanged.connect(lambda i: theme.set_theme(look.itemData(i)))
+        form.addRow(tr("Theme:"), look)
+
         seconds = lambda n: self.tr("%n s", "", n)  # noqa: E731 — «15 с» / «15 s»
         minutes = lambda n: self.tr("%n min", "", n)  # noqa: E731
         form.addRow(tr("Clear copied password after:"),
@@ -402,7 +410,8 @@ class AboutDialog(QDialog):
         title = theme.neon_title(theme.role(QLabel(tr("WhoKey")), "title"))
         version = theme.role(QLabel(tr("Version {version}").format(version=VERSION)), "muted")
         icon = QLabel()
-        picture = QPixmap(str(theme.ICON_FILE)).scaled(72 * 3, 72 * 3, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        # на светлой теме — перламутровая плитка: чёрная иконка там смотрелась бы дырой
+        picture = QPixmap(str(theme.ABOUT_FILE)).scaled(72 * 3, 72 * 3, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         picture.setDevicePixelRatio(3)
         icon.setPixmap(picture)
         what = QLabel(tr("Password manager: everything is stored encrypted on your computer, nothing is sent to the internet."))

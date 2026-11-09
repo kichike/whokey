@@ -209,3 +209,60 @@ class SystemGlass(unittest.TestCase):
         self.assertEqual(clicks, [1])
         self.errors.assert_not_called()
         dialog.close()
+
+
+class Themes(unittest.TestCase):
+    """Светлая тема «Перламутр»: переключается на лету, пасхалка остаётся тёмной, всё рисуется без ошибок."""
+
+    def setUp(self):
+        patcher = mock.patch("traceback.print_exc")
+        self.errors = patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(theme.set_theme, "dark")
+
+    def test_default_follows_the_system(self):
+        self.assertEqual(prefs.theme_mode(), "system")
+        prefs.set_value("theme", "purple")  # испорченная настройка — не повод падать
+        self.assertEqual(prefs.theme_mode(), "system")
+
+    def test_switching_recolors_everything_open(self):
+        from PySide6.QtWidgets import QFrame, QLabel
+        card = theme.neon_card(QFrame())
+        theme.role(card, "card")
+        title = theme.neon_title(theme.role(QLabel("WhoKey"), "title"))
+        primary = theme.kind(QPushButton("Сохранить"), "primary")
+        dialog = make_dialog(card, title, primary)
+        dark_bg = theme.BG
+        theme.set_theme("light")
+        self.assertTrue(theme.LIGHT)
+        self.assertEqual(prefs.theme_mode(), "light")
+        self.assertNotEqual(theme.BG, dark_bg)
+        self.assertIn("_light.svg", theme.CHECK_FILE)
+        self.assertIn(theme.BG, APP.styleSheet() + theme.STYLE)
+        self.assertEqual(title.graphicsEffect().color().name(), theme.IRIS_2)  # розовый ореол вместо неона
+        self.assertLess(primary.graphicsEffect().color().alpha(), 140)          # свечение мягче
+        self.assertFalse(dialog.grab().isNull())
+        theme.set_theme("dark")
+        self.assertFalse(theme.LIGHT)
+        self.assertEqual(theme.BG, dark_bg)
+        self.assertEqual(primary.graphicsEffect().color().alpha(), 140)
+        self.errors.assert_not_called()
+        dialog.close()
+
+    def test_easter_egg_stays_dark_and_comes_back_to_light(self):
+        theme.set_theme("light")
+        theme.set_egg(True)
+        self.addCleanup(theme.set_egg, False)
+        self.assertFalse(theme.LIGHT)
+        self.assertEqual(theme.BG, theme._EGG_COLORS["BG"])
+        theme.set_egg(False)
+        self.assertTrue(theme.LIGHT)
+        self.assertEqual(theme.BG, theme._LIGHT_COLORS["BG"])
+
+    def test_light_pictures_exist(self):
+        for name in ("CHECK_FILE", "ARROW_FILE", "ARROW_UP_FILE", "EYE_FILE", "EYE_OFF_FILE", "KEY_FILE", "ABOUT_FILE"):
+            self.assertTrue(Path(theme._LIGHT_FILES[name]).is_file(), name)
+        theme.set_theme("light")
+        self.assertFalse(theme.logo_pixmap(36).isNull())
+        self.assertFalse(theme.badge("?").isNull())
+        self.assertFalse(theme.monogram("W").isNull())
