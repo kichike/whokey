@@ -16,6 +16,7 @@ import os
 import ipaddress
 import socket
 import ssl
+import sys
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit
 
@@ -84,7 +85,26 @@ class _PinnedHTTPS(http.client.HTTPSConnection):
         self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
 
 
-_CONTEXT = ssl.create_default_context()
+# Сборку для Linux делают на Ubuntu, и встроенный OpenSSL ищет сертификаты по её путям. На Arch (Omarchy),
+# Fedora, openSUSE они лежат в других местах — без этого любой https молча не проходил бы проверку.
+_LINUX_CA_FILES = ("/etc/ssl/certs/ca-certificates.crt", "/etc/pki/tls/certs/ca-bundle.crt",
+                   "/etc/ssl/ca-bundle.pem", "/etc/ssl/cert.pem")
+
+
+def _context():
+    context = ssl.create_default_context()
+    if sys.platform.startswith("linux"):
+        for path in _LINUX_CA_FILES:
+            if os.path.isfile(path):
+                try:
+                    context.load_verify_locations(cafile=path)
+                    break
+                except (ssl.SSLError, OSError):
+                    continue
+    return context
+
+
+_CONTEXT = _context()
 
 
 def _get(url, limit):
