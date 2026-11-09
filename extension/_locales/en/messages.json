@@ -20,9 +20,6 @@
   "add_entry": {
     "message": "Add to WhoKey"
   },
-  "menu_not_ready": {
-    "message": "The menu isn't ready or something covers it. Click again."
-  },
   "filling": {
     "message": "Filling…"
   },
@@ -58,9 +55,6 @@
   },
   "not_found": {
     "message": "Entry not found — it may have just changed. Open the popup again."
-  },
-  "menu_not_found": {
-    "message": "Entry not found — it may have just changed. Choose the account again."
   },
   "error": {
     "message": "Something went wrong. Try again."
@@ -112,9 +106,6 @@
   },
   "options_show_again": {
     "message": "Show again"
-  },
-  "options_link": {
-    "message": "Extension settings"
   },
   "generated_not_filled": {
     "message": "The page changed, so the password was not filled in. It is in the open WhoKey window — copy it from there."

@@ -30,7 +30,17 @@ button:hover, button:focus-visible { outline: none; background: rgba(168, 144, 2
 .login, .site { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .login { font-weight: 700; }
 .site { color: var(--muted); font-size: 12px; }
-#add { justify-content: center; font-weight: 700; color: var(--neon); border: 1px dashed rgba(240, 92, 240, 0.45); }
+.wide { justify-content: center; font-weight: 700; color: var(--neon); border: 1px dashed rgba(240, 92, 240, 0.45); }
+/* «Сгенерировать» — под списком, в пунктирной рамке: отдельное действие, а не ещё один аккаунт */
+#generate { margin-top: 8px; }
+#generate:hover, #generate:focus-visible { background: rgba(240, 92, 240, 0.12); }
+.link { justify-content: center; margin-top: 4px; padding: 6px; color: var(--faint); font-size: 11px; }
+.link:hover, .link:focus-visible { color: var(--muted); }
+/* значок сайта вместо буквы: тёмное лого — на белой плашке, светлое (белый кот GitHub) — на тёмной */
+.avatar.icon { padding: 4px; }
+.avatar.dark { background: #fff; }
+.avatar.light { background: #2c2536; }
+.avatar img { width: 22px; height: 22px; display: block; }
 footer {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   margin-top: 10px; padding: 9px 4px 0; border-top: 1px solid var(--rim);

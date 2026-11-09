@@ -96,7 +96,7 @@ async function api(message) {
 // Эта функция выполняется ВНУТРИ страницы. Она ничего не знает о WhoKey —
 // только получает логин и пароль и находит поля. Вставляет «волной»: буквы
 // бегут по очереди (см. type ниже), стиль полей страницы не меняется.
-async function fillInPage(expectedOrigin, login, password, auto) {
+async function fillInPage(expectedOrigin, login, password, auto, useTarget) {
   // Заполняем сами после ожидания WhoKey, а окно браузера сейчас закрыто окном
   // WhoKey (человек только что вводил мастер-пароль). Такая страница для браузера
   // «скрыта», и проверка видимости ниже не нашла бы ни одного поля. Ждём, пока
@@ -139,10 +139,11 @@ async function fillInPage(expectedOrigin, login, password, auto) {
     // «изменено» — один раз, когда значение готово, а не на каждую букву
     if (done) el.dispatchEvent(new Event("change", { bubbles: true }));
   };
-  // Поле, у которого человек нажал на значок WhoKey (inline.js). Эта функция работает в том
-  // же изолированном от сайта мире расширения, что и inline.js, поэтому видит его отметку,
-  // а сайт — нет. Ключ — символ: элементом страницы с таким id его не подменить
-  const marked = globalThis[Symbol.for("whokey.target")];
+  // Поле, у которого человек нажал на значок WhoKey (inline.js), — только если окошко открыто
+  // этим нажатием. Эта функция работает в том же изолированном от сайта мире расширения, что и
+  // inline.js, поэтому видит его отметку, а сайт — нет. Ключ — символ: элементом страницы с
+  // таким id его не подменить
+  const marked = useTarget ? globalThis[Symbol.for("whokey.target")] : null;
   const target = marked instanceof HTMLInputElement ? marked : null;
   // поле могло оказаться ниже экрана — прокрутим к нему, прежде чем проверять видимость
   const focus = target && target.isConnected ? target : document.querySelector("input[type=password]");
@@ -197,14 +198,14 @@ async function fillInPage(expectedOrigin, login, password, auto) {
   return { ok: true, partial: !passwordField };
 }
 
-async function fill(tabId, url, index, login, auto = false) {
+async function fill(tabId, url, index, login, auto = false, useTarget = false) {
   const reply = await api({ type: "fill", url, index, login });
   if (reply.status !== "ok") return reply;
   try {
     const [result] = await chrome.scripting.executeScript({
       target: { tabId },
       func: fillInPage,
-      args: [new URL(url).origin, reply.login, reply.password, auto],
+      args: [new URL(url).origin, reply.login, reply.password, auto, useTarget === true],
     });
     const r = result && result.result;
     if (!r) return { status: "no_field" };
@@ -214,19 +215,18 @@ async function fill(tabId, url, index, login, auto = false) {
   }
 }
 
-// --- запросы от всплывающего окошка и меню на странице ---
+// --- запросы от всплывающего окошка ---
 
-async function open(tabId, url, fromMenu = false) {
+async function open(tabId, url, fromIcon = false) {
   if (pending.length) reset(); // прошлое нажатие ещё ждёт — начинаем заново
   const reply = await api({ type: "logins", url });
   if (reply.status === "cancelled") return reply; // это прошлое нажатие — его окошко уже закрыто
   if (reply.status !== "ok") return reply;
   const items = reply.items;
   chrome.action.setBadgeText({ tabId, text: "" });
-  // из меню на странице — никогда сами: человек выберет аккаунт в меню, оно остаётся открытым
-  if (reply.waited && items.length === 1 && !fromMenu) {
+  if (reply.waited && items.length === 1) {
     // ждали, пока откроется WhoKey (окошко за это время закрылось) — заполняем сами
-    const result = await fill(tabId, url, items[0].index, items[0].login, true);
+    const result = await fill(tabId, url, items[0].index, items[0].login, true, fromIcon);
     return { ...result, items };
   }
   if (reply.waited && items.length > 1) {
@@ -237,32 +237,26 @@ async function open(tabId, url, fromMenu = false) {
   return { status: "ok", items };
 }
 
-// --- меню под полем пароля (inline.js рисует значок, menu.html — само меню) ---
+// --- значок в поле (inline.js) открывает окошко на панели браузера ---
 
-// Меню встроено в страницу по «одноразовому» адресу (use_dynamic_url в manifest.json):
-// он меняется в каждом сеансе браузера, так что сайт не может встроить меню сам.
-// Поэтому узнаём меню не по полному адресу, а так: это страница нашего расширения
-// (sender.id проверен выше) с путём /menu.html
-function isMenu(url) {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "chrome-extension:" && parsed.pathname === "/menu.html";
-  } catch (e) {
-    return false;
-  }
-}
-
-// Меню можно открыть только сразу после настоящего нажатия на значок WhoKey в поле.
-// Без этого любой сайт (или реклама на нём) мог бы встроить невидимое меню и без
-// единого нажатия открывать WhoKey, просить мастер-пароль и запускать сопряжение.
-// Значок (inline.js, сама страница — кадр 0) сообщает о нажатии; разрешение одноразовое
-// и живёт 3 секунды.
+// Раньше аккаунт выбирали в меню, встроенном в страницу. Сайт мог подделать такое меню или
+// спрятать его под своей кнопкой (проверки видимости обходились точным расчётом кадров).
+// Окошко на панели — часть самого браузера: страница не может ни нарисовать поверх него,
+// ни нажать в нём. Значок только сообщает «человек нажал на меня у такого поля».
+//
+// Окошко узнаёт о нажатии из этой отметки: она одноразовая и живёт 3 секунды. Только с ней
+// окошко заполняет поле, у которого нажали, и предлагает сгенерировать пароль
 const ARM_MS = 3000;
-const armed = new Map(); // вкладка -> до какого момента можно открыть меню
+const armed = new Map(); // вкладка -> { until, newPassword }
 
-function arm(sender, newPassword) {
-  if (sender.frameId !== 0 || sender.url.startsWith("chrome-extension://")) return;
+async function iconClick(sender, newPassword) {
+  if (sender.frameId !== 0) return;
   armed.set(sender.tab.id, { until: Date.now() + ARM_MS, newPassword: newPassword === true });
+  try {
+    await chrome.action.openPopup({ windowId: sender.tab.windowId });
+  } catch (e) {
+    armed.delete(sender.tab.id); // окно браузера не в фокусе — окошко не открылось
+  }
 }
 
 function takeArm(tabId) {
@@ -286,7 +280,9 @@ async function hideOnSite(tabId, url) {
   const { inlineOff = [] } = await chrome.storage.local.get("inlineOff");
   const host = new URL(url).hostname;
   if (!inlineOff.includes(host)) await chrome.storage.local.set({ inlineOff: [...inlineOff, host].sort() });
-  await menuCommand(tabId, "inline_off");
+  try {
+    await chrome.tabs.sendMessage(tabId, { kind: "inline_off" }, { frameId: 0 });
+  } catch (e) { /* страницу уже закрыли или перезагрузили */ }
 }
 
 // Эта функция выполняется ВНУТРИ страницы: находит поля нового пароля той формы, у которой
@@ -347,103 +343,43 @@ async function generate(tabId, url) {
   if (!form.ok) return { status: form.reason };
   const reply = await api({ type: "generate", url, login: form.login });
   if (reply.status !== "ok") return reply;
-  await menuCommand(tabId, "menu_hide");
   const result = await inPage(tabId, url, reply.password);
-  if (!result.ok) {
-    // в WhoKey пароль уже есть (окно новой записи открыто) — его можно скопировать оттуда
-    await menuCommand(tabId, "menu_unhide");
-    return { status: "generated_not_filled" };
-  }
-  await closeMenu(tabId);
-  return { status: "generated" };
-}
-
-// Команда меню на вкладке: menu_close — закрыть, menu_hide / menu_unhide — спрятать и
-// показать снова. Ждём ответа: прежде чем заполнять, меню должно исчезнуть — иначе
-// проверка «поле видно человеку» в fillInPage решила бы, что поле чем-то закрыто
-async function menuCommand(tabId, kind) {
-  try {
-    await chrome.tabs.sendMessage(tabId, { kind }, { frameId: 0 });
-  } catch (e) { /* страницу уже закрыли или перезагрузили */ }
-}
-const closeMenu = (tabId) => menuCommand(tabId, "menu_close");
-
-function fromMenu(message, sender, sendResponse) {
-  // вкладку и адрес страницы сообщает сам браузер (sender), а не страница:
-  // сайт не может попросить пароль «от имени» другого сайта
-  const tabId = sender.tab.id;
-  const url = sender.tab.url;
-  if (message.kind === "menu_open") {
-    const ticket = takeArm(tabId);
-    if (!ticket) {
-      sendResponse({ status: "error" }); // меню не после нажатия на значок — не открываем
-      return false;
-    }
-    const page = new URL(url);
-    // адрес страницы целиком — только для значка сайта: браузер помнит значки по страницам.
-    // Меню — страница самого расширения, сайт его не прочитает
-    open(tabId, url, true).then((reply) => sendResponse({
-      ...reply, host: page.hostname, page: page.origin + page.pathname, newPassword: ticket.newPassword }));
-    return true;
-  }
-  if (message.kind === "menu_generate") {
-    generate(tabId, url).then(sendResponse);
-    return true;
-  }
-  if (message.kind === "menu_hide_site") {
-    hideOnSite(tabId, url).then(() => sendResponse({ status: "ok" }));
-    return true;
-  }
-  if (message.kind === "menu_fill") {
-    // на время вставки меню прячем; получилось — закрываем, нет — показываем снова
-    // с объяснением, и аккаунт можно выбрать ещё раз
-    menuCommand(tabId, "menu_hide")
-      .then(() => fill(tabId, url, message.index, message.login))
-      .then(async (reply) => {
-        const done = reply.status === "filled" || reply.status === "filled_login";
-        if (!done) await menuCommand(tabId, "menu_unhide");
-        sendResponse(reply);
-      });
-    return true;
-  }
-  if (message.kind === "menu_show") {
-    api({ type: "show", url }).then((reply) => {
-      if (reply.status === "ok") closeMenu(tabId);
-      sendResponse(reply);
-    });
-    return true;
-  }
-  if (message.kind === "menu_size" || message.kind === "menu_close") {
-    chrome.tabs.sendMessage(tabId, message, { frameId: 0 }).catch(() => {});
-  }
-  return false;
+  // не вписалось — в WhoKey пароль уже есть (окно новой записи открыто), его можно скопировать оттуда
+  return { status: result.ok ? "generated" : "generated_not_filled" };
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id) return false; // только от своих страниц
   if (sender.tab) {
-    if (!sender.url) return false;
     // значок на странице (inline.js) сообщает только «человек нажал на меня»
-    // и спрашивает, показываться ли на этом сайте
-    if (message.kind === "menu_armed") {
-      arm(sender, message.newPassword);
-      return false;
-    }
-    if (message.kind === "inline_state" && sender.frameId === 0 && !isMenu(sender.url)) {
+    // и спрашивает, показываться ли на этом сайте. Больше вкладка ничего попросить не может
+    if (sender.frameId !== 0 || !sender.url || sender.url.startsWith("chrome-extension://")) return false;
+    if (message.kind === "icon_click") iconClick(sender, message.newPassword);
+    if (message.kind === "inline_state") {
       inlineAllowed(sender.tab.url).then((show) => sendResponse({ show }));
       return true;
     }
-    // всё остальное с вкладки — только от меню (menu.html внутри страницы)
-    if (!isMenu(sender.url)) return false;
-    return fromMenu(message, sender, sendResponse);
+    return false;
   }
   // дальше — всплывающее окошко с панели браузера (у него нет вкладки)
   if (message.kind === "open") {
-    open(message.tabId, message.url).then(sendResponse);
+    // окошко открыто нажатием на значок в поле — заполнять то поле, а на форме нового
+    // пароля предложить сгенерировать его
+    const ticket = takeArm(message.tabId);
+    open(message.tabId, message.url, ticket !== null).then((reply) => sendResponse({
+      ...reply, fromIcon: ticket !== null, newPassword: ticket !== null && ticket.newPassword }));
     return true; // ответ придёт позже
   }
   if (message.kind === "fill") {
-    fill(message.tabId, message.url, message.index, message.login).then(sendResponse);
+    fill(message.tabId, message.url, message.index, message.login, false, message.useTarget === true).then(sendResponse);
+    return true;
+  }
+  if (message.kind === "generate") {
+    generate(message.tabId, message.url).then(sendResponse);
+    return true;
+  }
+  if (message.kind === "hide_site") {
+    hideOnSite(message.tabId, message.url).then(() => sendResponse({ status: "ok" }));
     return true;
   }
   if (message.kind === "show") {

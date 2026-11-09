@@ -31,6 +31,8 @@ const TEXTS = {
   ambiguous: ["ambiguous", "bad"],
   window_busy: ["window_busy", "bad"],
   cancelled: ["connecting", ""],
+  generated: ["generated", "good"],
+  generated_not_filled: ["generated_not_filled", "bad"],
 };
 
 // Горячая клавиша окошка так, как её показывает сам браузер на этой системе
@@ -47,13 +49,74 @@ async function loadShortcut() {
   return os === "mac" ? "⌘⇧L" : "Ctrl+Shift+L";
 }
 
+// Значок сайта — из хранилища значков самого браузера (разрешение "favicon"): без запросов
+// в интернет, никакой сервер не узнаёт, на какие сайты вы заходите. Если браузер значка
+// не знает, он отдаёт стандартный «глобус» — тогда лучше оставить первую букву названия.
+const favicon = (page) => new Promise((resolve) => {
+  const img = new Image(32, 32);
+  img.alt = "";
+  img.onload = () => resolve(img);
+  img.onerror = () => resolve(null);
+  img.src = chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(page)}&size=32`);
+});
+
+function pixels(img) {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 32;
+  const context = canvas.getContext("2d");
+  context.drawImage(img, 0, 0, 32, 32);
+  return context.getImageData(0, 0, 32, 32).data;
+}
+
+// Светлый значок (белый кот GitHub в тёмной теме) на белой плашке не виден —
+// для него плашка тёмная. Светлый — если средняя яркость видимых точек высокая
+function isLight(img) {
+  const data = pixels(img);
+  let sum = 0, count = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 128) continue; // прозрачные точки не считаем
+    sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    count++;
+  }
+  return count > 0 && sum / count > 170;
+}
+
+let iconPromise = null; // один значок на всё окошко: все аккаунты в нём — с одного сайта
+
+function loadSiteIcon(url) {
+  iconPromise = iconPromise || (async () => {
+    // глобус — то, что браузер отдаёт для сайта, где никто не бывал (.invalid не существует)
+    const globe = await favicon("https://whokey.invalid/");
+    const isGlobe = (img) => !img || (globe && pixels(img).join(",") === pixels(globe).join(","));
+    // адрес страницы без параметров — браузер помнит значки по страницам; потом главная сайта
+    const page = new URL(url);
+    for (const address of [page.origin + page.pathname, page.origin + "/"]) {
+      const icon = await favicon(address);
+      if (!isGlobe(icon)) return { src: icon.src, light: isLight(icon) };
+    }
+    return null;
+  })().catch(() => null);
+  return iconPromise;
+}
+
+async function siteIcon(avatar, url) {
+  const icon = await loadSiteIcon(url);
+  if (!icon) return;
+  const img = new Image(32, 32);
+  img.alt = "";
+  img.src = icon.src;
+  avatar.textContent = "";
+  avatar.classList.add("icon", icon.light ? "light" : "dark");
+  avatar.append(img);
+}
+
 function showResult(reply, host) {
   const [key, kind] = TEXTS[reply.status] || ["error", "bad"];
   status(msg(key, key === "ambiguous" ? shortcut : host), kind);
   if (reply.status === "filled" || reply.status === "filled_login") setTimeout(() => window.close(), 700);
 }
 
-function showItems(tab, url, host, items) {
+function showItems(tab, url, host, items, fromIcon) {
   const list = $("items");
   list.textContent = "";
   if (!items.length) {
@@ -74,8 +137,9 @@ function showItems(tab, url, host, items) {
   items.forEach((item, n) => {
     const button = document.createElement("button");
     const avatar = document.createElement("span");
-    avatar.className = "avatar";                 // буква-кружок, как в меню под полем и в окне WhoKey
+    avatar.className = "avatar";                 // буква-кружок, как в окне WhoKey; потом — значок сайта
     avatar.textContent = (item.site || "?").trim().charAt(0).toUpperCase();
+    siteIcon(avatar, url);
     const text = document.createElement("span");
     text.className = "text";
     const login = document.createElement("span");
@@ -95,7 +159,13 @@ function showItems(tab, url, host, items) {
     button.addEventListener("click", async () => {
       list.querySelectorAll("button").forEach((b) => (b.disabled = true));
       status(msg("filling"));
-      showResult(await chrome.runtime.sendMessage({ kind: "fill", tabId: tab.id, url, index: item.index, login: item.login }), host);
+      // открыли нажатием на значок в поле — заполняется форма того поля
+      const reply = await chrome.runtime.sendMessage({
+        kind: "fill", tabId: tab.id, url, index: item.index, login: item.login, useTarget: fromIcon });
+      showResult(reply, host);
+      if (reply.status !== "filled" && reply.status !== "filled_login") {
+        list.querySelectorAll("button").forEach((b) => (b.disabled = false)); // можно выбрать ещё раз
+      }
     });
     const li = document.createElement("li");
     li.append(button);
@@ -113,7 +183,34 @@ function showItems(tab, url, host, items) {
       return;
     }
     const n = Number(event.key);
-    if (n >= 1 && n <= items.length) buttons[n - 1].click();
+    if (n >= 1 && n <= Math.min(items.length, 9)) buttons[n - 1].click();
+  });
+}
+
+// форма регистрации или смены пароля (окошко открыто значком в поле нового пароля):
+// новый пароль генерирует WhoKey, расширение вписывает его в форму, а WhoKey сразу
+// открывает новую запись — пароль не потеряется
+function showGenerate(tab, url, host) {
+  const button = $("generate");
+  button.textContent = msg("generate_password");
+  button.hidden = false;
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    status(msg("filling"));
+    const reply = await chrome.runtime.sendMessage({ kind: "generate", tabId: tab.id, url });
+    button.disabled = false;
+    showResult(reply, host);
+  });
+}
+
+// «Не показывать на этом сайте» — значок в полях пропадает сразу; вернуть — в настройках
+function showHideSite(tab, url) {
+  const button = $("hide_site");
+  button.textContent = msg("hide_on_site");
+  button.hidden = false;
+  button.addEventListener("click", async () => {
+    await chrome.runtime.sendMessage({ kind: "hide_site", tabId: tab.id, url });
+    window.close();
   });
 }
 
@@ -151,8 +248,11 @@ async function main() {
     }
   });
   const reply = await chrome.runtime.sendMessage({ kind: "open", tabId: tab.id, url });
-  if (reply.status === "ok") showItems(tab, url, host, reply.items);
-  else showResult(reply, host);
+  if (reply.status !== "ok") return showResult(reply, host);
+  // кнопки — до списка: список ставит фокус на первый аккаунт, а без аккаунтов — на «Добавить»
+  if (reply.newPassword) showGenerate(tab, url, host);
+  if (reply.fromIcon) showHideSite(tab, url);
+  showItems(tab, url, host, reply.items, reply.fromIcon === true);
 }
 
 main();
