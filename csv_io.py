@@ -35,17 +35,20 @@ EXPORT_HEADER = ["name", "url", "username", "password", "note"]
 
 
 # Excel, Numbers и LibreOffice считают ячейку с такого знака формулой. Название, адрес, логин и
-# заметку при экспорте защищаем апострофом спереди (так советует OWASP), при импорте его снимаем.
+# заметку при экспорте защищаем апострофом спереди (так советует OWASP), при импорте его снимаем
+# (заголовок у нас как у Chrome, поэтому снимаем в любом CSV: значение, которое само начиналось
+# с «'=», потеряет апостроф — такое почти не встречается).
 # Пароль не трогаем: другой менеджер паролей получил бы неверный пароль
 FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
 
 
 def _safe_cell(text):
-    return "'" + text if text.startswith(FORMULA_START) else text
+    # таблица не обращает внимания на пробелы и переносы перед «=» — смотрим после них
+    return "'" + text if text.lstrip(" \t\r\n").startswith(FORMULA_START) else text
 
 
 def _unsafe_cell(text):
-    return text[1:] if text.startswith("'") and text[1:].startswith(FORMULA_START) else text
+    return text[1:] if text.startswith("'") and text[1:].lstrip(" \t\r\n").startswith(FORMULA_START) else text
 
 
 class CsvError(Exception):

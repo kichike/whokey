@@ -4,6 +4,13 @@
 const $ = (id) => document.getElementById(id);
 const msg = (key, ...subs) => chrome.i18n.getMessage(key, subs) || key;
 
+// Окошко, открытое значком в поле, появляется по нажатию на странице: сайт мог подставить значок
+// под нажатие, которое человек делал для чего-то другого, или ждать, что он печатает цифры.
+// Поэтому первые полсекунды окошко не принимает ни нажатий, ни клавиш, а первый аккаунт не
+// выбирается сам: случайный Enter или цифра ничего не заполнят
+const OPENED_AT = performance.now();
+const settled = () => performance.now() - OPENED_AT > 500;
+
 function status(text, kind = "") {
   $("status").textContent = text;
   $("status").className = kind;
@@ -157,6 +164,7 @@ function showItems(tab, url, host, items, fromIcon) {
       button.append(num);
     }
     button.addEventListener("click", async () => {
+      if (!settled()) return;
       list.querySelectorAll("button").forEach((b) => (b.disabled = true));
       status(msg("filling"));
       // открыли нажатием на значок в поле — заполняется форма того поля
@@ -171,8 +179,12 @@ function showItems(tab, url, host, items, fromIcon) {
     li.append(button);
     list.append(li);
   });
-  list.querySelector("button").focus(); // Enter — первый аккаунт
+  if (!fromIcon) list.querySelector("button").focus(); // открыли сами с панели: Enter — первый аккаунт
   document.addEventListener("keydown", (event) => {
+    if (!settled()) {
+      event.preventDefault();
+      return;
+    }
     const buttons = [...list.querySelectorAll("button")];
     // ↑ ↓ — по списку аккаунтов (по кругу), цифры 1–9 — сразу нужный
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -195,6 +207,7 @@ function showGenerate(tab, url, host) {
   button.textContent = msg("generate_password");
   button.hidden = false;
   button.addEventListener("click", async () => {
+    if (!settled()) return;
     button.disabled = true;
     status(msg("filling"));
     const reply = await chrome.runtime.sendMessage({ kind: "generate", tabId: tab.id, url });
@@ -209,6 +222,7 @@ function showHideSite(tab, url) {
   button.textContent = msg("hide_on_site");
   button.hidden = false;
   button.addEventListener("click", async () => {
+    if (!settled()) return;
     await chrome.runtime.sendMessage({ kind: "hide_site", tabId: tab.id, url });
     window.close();
   });

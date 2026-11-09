@@ -22,6 +22,7 @@
 """
 
 import base64
+import errno
 import hashlib
 import hmac
 import json
@@ -309,12 +310,14 @@ def _sync_folder(folder):
         os.close(fd)
 
 
-def _write_file(path, text):
+def _write_file(path, text, new=False):
     """Безопасная запись: временный файл -> подмена.
 
     Если программа упадёт посреди записи, старый файл останется целым.
     Временный файл создаётся через mkstemp: всегда НОВЫЙ, со случайным именем,
     с правами «только владелец» (0600) и без перехода по символическим ссылкам.
+    new — файла ещё не должно быть (новое хранилище): если его успела создать другая
+    программа, пока человек придумывал пароль, FileExistsError, а чужой файл цел.
     """
     folder = path.parent
     fd, tmp = tempfile.mkstemp(dir=folder, prefix="." + path.name + ".", suffix=".tmp")
@@ -323,7 +326,10 @@ def _write_file(path, text):
             f.write(text)
             f.flush()
             _full_sync(f.fileno())
-        os.replace(tmp, path)
+        if new:
+            _place_new(tmp, path)
+        else:
+            os.replace(tmp, path)
     except BaseException:
         try:
             os.unlink(tmp)
@@ -331,6 +337,24 @@ def _write_file(path, text):
             pass
         raise
     _sync_folder(folder)
+
+
+def _place_new(tmp, path):
+    """Кладёт готовый файл на место, только если там ничего нет (без окна между проверкой и записью)."""
+    if sys.platform == "win32":
+        os.rename(tmp, path)  # на Windows rename не заменяет существующий файл
+        return
+    try:
+        os.link(tmp, path)  # жёсткая ссылка не создаётся поверх существующего файла
+    except FileExistsError:
+        raise
+    except OSError:
+        # флешка (FAT, exFAT) и некоторые сетевые диски не умеют жёстких ссылок
+        if os.path.lexists(path):
+            raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), str(path))
+        os.replace(tmp, path)
+        return
+    os.unlink(tmp)
 
 
 class Vault:
@@ -372,7 +396,7 @@ class Vault:
                 backup.rename(vault.old_backup)
             except OSError as error:
                 raise SaveError(error.strerror or str(error))
-        vault.save()
+        vault._write(vault.entries, vault._key, vault._salt, vault._params, new=True)
         vault.fresh = True
         return vault
 
@@ -447,7 +471,7 @@ class Vault:
 
     # --- сохранение ---
 
-    def _write(self, entries, key, salt, params, bridge_keys=None, access_log=None):
+    def _write(self, entries, key, salt, params, bridge_keys=None, access_log=None, new=False):
         """Шифрует записи и сохраняет файл + резервную копию. SaveError — если не вышло."""
         generation = self.generation + 1
         content = {"entries": entries,
@@ -474,7 +498,7 @@ class Vault:
             # такой файл _read_header не откроет: и хранилище, и копия были бы потеряны (ревью 1.6.2)
             raise VaultTooLarge("the vault would be larger than 10 MB")
         try:
-            _write_file(self.path, text)
+            _write_file(self.path, text, new=new)
         except OSError as error:
             raise SaveError(error.strerror or str(error))
         self.generation = generation

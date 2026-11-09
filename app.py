@@ -158,6 +158,8 @@ class Controller:
         window.restart.connect(self.show_login)
         window.opened.connect(self.show_main)
         self._replace_window(window)
+        # на экране создания могут ждать пароли из CSV — их тоже убираем при блокировке экрана
+        self.autolock.start()
 
     def show_main(self, vault):
         if isinstance(self.window, MainWindow):
@@ -217,6 +219,9 @@ class Controller:
     def lock(self, reason="system"):
         """Блокировка: закрыть хранилище и вернуть окно входа.
         reason — "system" (экран, сон), "idle" (бездействие) или "manual" (кнопка, ⌘L)."""
+        if isinstance(self.window, LoginWindow):
+            self.window.forget_import()  # хранилище ещё не открыто, но пароли из CSV уже в памяти
+            return
         if not isinstance(self.window, MainWindow):
             return
         self.autolock.stop()

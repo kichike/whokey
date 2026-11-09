@@ -247,11 +247,20 @@ async function open(tabId, url, fromIcon = false) {
 // Окошко узнаёт о нажатии из этой отметки: она одноразовая и живёт 3 секунды. Только с ней
 // окошко заполняет поле, у которого нажали, и предлагает сгенерировать пароль
 const ARM_MS = 3000;
-const armed = new Map(); // вкладка -> { until, newPassword }
+const armed = new Map(); // вкладка -> { until, newPassword, origin }
+
+// сайт страницы — чтобы отметка не перешла на другую страницу, если вкладка сразу ушла дальше
+function originOf(url) {
+  try {
+    return new URL(url).origin;
+  } catch (e) {
+    return null;
+  }
+}
 
 async function iconClick(sender, newPassword) {
   if (sender.frameId !== 0) return;
-  armed.set(sender.tab.id, { until: Date.now() + ARM_MS, newPassword: newPassword === true });
+  armed.set(sender.tab.id, { until: Date.now() + ARM_MS, newPassword: newPassword === true, origin: originOf(sender.url) });
   try {
     await chrome.action.openPopup({ windowId: sender.tab.windowId });
   } catch (e) {
@@ -259,10 +268,11 @@ async function iconClick(sender, newPassword) {
   }
 }
 
-function takeArm(tabId) {
+function takeArm(tabId, url) {
   const record = armed.get(tabId);
   armed.delete(tabId);
-  return record !== undefined && Date.now() <= record.until ? record : null;
+  if (record === undefined || Date.now() > record.until) return null;
+  return record.origin !== null && record.origin === originOf(url) ? record : null;
 }
 
 // --- где показывать значок (настройки расширения, options.html) ---
@@ -365,7 +375,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.kind === "open") {
     // окошко открыто нажатием на значок в поле — заполнять то поле, а на форме нового
     // пароля предложить сгенерировать его
-    const ticket = takeArm(message.tabId);
+    const ticket = takeArm(message.tabId, message.url);
     open(message.tabId, message.url, ticket !== null).then((reply) => sendResponse({
       ...reply, fromIcon: ticket !== null, newPassword: ticket !== null && ticket.newPassword }));
     return true; // ответ придёт позже

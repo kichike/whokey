@@ -123,6 +123,11 @@ class Export(unittest.TestCase):
         back = csv_io.read(path)
         self.assertEqual([(e["site"], e["login"], e["password"], e["note"]) for e in back],
                          [(e["site"], e["login"], e["password"], e["note"]) for e in entries])
+        # пробел или перенос перед «=» таблицу не останавливает
+        csv_io.write(path, [{"site": " =1+1", "login": "\n@x", "password": "p", "note": "", "url": ""}])
+        with open(path, encoding="utf-8", newline="") as file:
+            row = list(csv.reader(file))[1]
+        self.assertEqual((row[0], row[2]), ("' =1+1", "'\n@x"))
 
 class ImportWhenCreating(unittest.TestCase):
     """Кнопка импорта в окне создания: CSV выбран до того, как хранилище появилось."""
@@ -203,6 +208,18 @@ class ImportWhenCreating(unittest.TestCase):
         self.assertEqual(Vault.open(self.path, PASSWORD).entries, [])
         self.assertEqual(self.infos, [])
 
+    def test_screen_lock_drops_the_waiting_passwords(self):
+        """Ревью 1.8.0: пока экран заблокирован, пароли из CSV не ждут в окне создания."""
+        window = self.window()
+        window._toggle_import()
+        self.assertIsNotNone(window._import)
+        window.forget_import()
+        self.assertIsNone(window._import)
+        self.assertTrue(window.import_note.isHidden())
+        self.assertFalse(window.notice.isHidden())
+        self.create(window)
+        self.assertEqual(Vault.open(self.path, PASSWORD).entries, [])
+
     def test_bad_file_is_reported_and_not_kept(self):
         self.csv.write_text("name,password\n", encoding="utf-8")  # столбцы есть, паролей нет
         window = self.window()
@@ -263,6 +280,15 @@ class ImportWhenCreating(unittest.TestCase):
         again = self.window(state)
         self.assertIn("cancelled", again.notice.text())
         self.assertIsNone(again._import)
+
+    def test_vault_appearing_at_the_last_moment_is_not_overwritten(self):
+        """Ревью 1.8.0: файл появился между проверкой «его нет» и записью — он остаётся целым."""
+        Vault.create(self.path, PASSWORD)
+        before = self.path.read_bytes()
+        with self.assertRaises(SaveError):
+            Vault.create(self.path, "другой-пароль-123")
+        self.assertEqual(self.path.read_bytes(), before)
+        self.assertEqual([p.name for p in self.path.parent.iterdir() if p.name.endswith(".tmp")], [])
 
     def test_too_big_import_keeps_the_new_vault_openable(self):
         window = self.window()

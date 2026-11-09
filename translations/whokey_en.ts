@@ -378,6 +378,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>The CSV import was cancelled because the screen was locked or WhoKey was idle. Choose the file again.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Don&apos;t import</source>
         <translation type="unfinished"></translation>
     </message>

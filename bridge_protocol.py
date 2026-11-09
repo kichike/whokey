@@ -96,22 +96,28 @@ def _unix_socket(name):
 
 def _private_temp_folder(temp):
     """Linux без XDG_RUNTIME_DIR: /tmp общий для всех, поэтому сокет — в своей папке с правами 700.
-    Папку с этим именем занял кто-то другой — сокет не открыть (расширение не подключится),
-    но и чужой программе в нашу папку не попасть."""
-    folder = os.path.join(temp, f"whokey-{os.getuid()}")
-    try:
-        os.mkdir(folder, 0o700)
-    except FileExistsError:
-        pass
-    except OSError:
-        return folder
-    try:
-        info = os.lstat(folder)
-        if stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid() and info.st_mode & 0o077:
-            os.chmod(folder, 0o700)  # своя, но открытая (umask) — закрываем
-    except OSError:
-        pass
-    return folder
+    Если имя заранее занял другой пользователь (своей папкой или ссылкой), берём следующее:
+    сокет в чужой папке её хозяин мог бы удалить. Имена одни и те же у WhoKey и у моста —
+    оба приходят к одной папке. Пароли и так не перехватить: обе стороны проверяют собеседника."""
+    uid = os.getuid()
+    for attempt in range(10):
+        folder = os.path.join(temp, f"whokey-{uid}" + (f"-{attempt}" if attempt else ""))
+        try:
+            os.mkdir(folder, 0o700)
+        except FileExistsError:
+            pass
+        except OSError:
+            continue
+        try:
+            info = os.lstat(folder)
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid != uid:
+                continue  # чужая папка или ссылка
+            if info.st_mode & 0o077:
+                os.chmod(folder, 0o700)  # своя, но открытая (umask) — закрываем
+            return folder
+        except OSError:
+            continue
+    return os.path.join(temp, f"whokey-{uid}")  # все имена заняты: сокет не откроется, расширение не подключится
 
 
 # --- кто на другом конце сокета ---

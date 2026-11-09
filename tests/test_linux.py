@@ -82,6 +82,13 @@ class Addresses(unittest.TestCase):
         self.assertEqual(folder, Path(temp) / f"whokey-{os.getuid()}")
         self.assertEqual(folder.stat().st_mode & 0o777, 0o700)
 
+    def test_taken_temp_folder_name_is_skipped(self):
+        import bridge_protocol as P
+        temp = tempfile.mkdtemp()
+        elsewhere = tempfile.mkdtemp()
+        os.symlink(elsewhere, os.path.join(temp, f"whokey-{os.getuid()}"))  # имя занято ссылкой
+        self.assertEqual(P._private_temp_folder(temp), os.path.join(temp, f"whokey-{os.getuid()}-1"))
+
     def test_config_folder_and_temporary_paths(self):
         import bridge_protocol as P
         config = Path(tempfile.mkdtemp())

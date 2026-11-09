@@ -392,6 +392,10 @@ Restore from it? If you create a new vault, the old backup will be kept under an
         <translation>Создать хранилище</translation>
     </message>
     <message>
+        <source>The CSV import was cancelled because the screen was locked or WhoKey was idle. Choose the file again.</source>
+        <translation>Импорт CSV отменён: экран заблокировали или WhoKey долго не трогали. Выберите файл ещё раз.</translation>
+    </message>
+    <message>
         <source>Don&apos;t import</source>
         <translation>Не импортировать</translation>
     </message>

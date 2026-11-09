@@ -263,6 +263,16 @@ class LoginWindow(QWidget):
             self._import = (Path(chosen[0]).name, csv_io.new_only(chosen[1], []))
         self._show_import()
 
+    def forget_import(self):
+        """Экран заблокировали или WhoKey долго не трогали: пароли из CSV, ждущие нового
+        хранилища, не держим в памяти — файл можно выбрать снова."""
+        if not self._import:
+            return
+        self._import = None
+        self._show_import()
+        self.notice.setText(tr("The CSV import was cancelled because the screen was locked or WhoKey was idle. Choose the file again."))
+        self.notice.setVisible(True)
+
     def _show_import(self):
         self.import_button.setText(tr("Don't import") if self._import else tr("Import from CSV…"))
         self.import_note.setVisible(bool(self._import))
@@ -354,6 +364,12 @@ class LoginWindow(QWidget):
             return
         self._restore(backup)
 
+    def _file_appeared(self):
+        self.state["notice"] = tr("This vault file appeared while the window was open — open it with its master password.")
+        if self._import:
+            self.state["import"] = self._import  # новое окно скажет, что импорт отменён
+        self.restart.emit(self.path)
+
     def on_create(self):
         password = self.master.text()
         # порядок проверок: длина → совпадение → слабость (о слабости спрашиваем последней)
@@ -375,14 +391,14 @@ class LoginWindow(QWidget):
         if self.path.exists():
             # пока окно было открыто, файл появился (например, его создала консольная
             # версия) — не затираем его новым пустым хранилищем, а предлагаем открыть
-            self.state["notice"] = tr("This vault file appeared while the window was open — open it with its master password.")
-            if self._import:
-                self.state["import"] = self._import  # новое окно скажет, что импорт отменён
-            self.restart.emit(self.path)
+            self._file_appeared()
             return
         try:
             vault = Vault.create(self.path, password)
         except (SaveError, OSError) as error:
+            if self.path.exists():
+                self._file_appeared()  # появился в последний миг, пока шифровали: чужой файл цел
+                return
             show_error(self, tr("⚠ Could not save: {error}. The change was not applied, the file on disk is untouched.").format(error=error))
             return
         # «Хранилище создано» отдельным окном не сообщаем — и так видно; окно — только если есть что важное
