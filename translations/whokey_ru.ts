@@ -248,6 +248,14 @@ After saving, the old password cannot be recovered.</source>
         <translation>Touch ID:</translation>
     </message>
     <message>
+        <source>See the desktop through WhoKey (after restart)</source>
+        <translation>Видеть рабочий стол сквозь WhoKey (после перезапуска)</translation>
+    </message>
+    <message>
+        <source>Transparent background:</source>
+        <translation>Прозрачный фон:</translation>
+    </message>
+    <message>
         <source>Master password:</source>
         <translation>Мастер-пароль:</translation>
     </message>

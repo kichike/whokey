@@ -7,6 +7,8 @@
 кромкой сверху — сквозь них видно зарево фона. Настоящее Liquid Glass (с
 размытием и преломлением того, что под ним) macOS рисует только для своих
 родных элементов, в Qt его нет — поэтому стекло нарисовано прозрачностью.
+На macOS под окном лежит настоящее размытие рабочего стола (gui/sysglass.py, SYSTEM),
+а нарисованная «сцена» под кнопками и панелями не нужна: сквозь них видно его.
 """
 
 import html
@@ -17,9 +19,13 @@ from pathlib import Path
 from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QRectF, Qt, QTimer
 from PySide6.QtGui import (QColor, QCursor, QFont, QFontDatabase, QGradient, QIcon, QLinearGradient, QPainter, QPainterPath,
                            QPalette, QPen, QPixmap, QRadialGradient)
-from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QDialog, QFrame, QGraphicsDropShadowEffect, QLabel, QLineEdit,
-                               QMainWindow, QPushButton, QToolButton, QWidget)
+from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QDialog, QFileDialog, QFrame, QGraphicsDropShadowEffect, QLabel,
+                               QLineEdit, QMainWindow, QPushButton, QToolButton, QWidget)
 from shiboken6 import isValid  # жив ли ещё объект Qt за питоновской обёрткой
+
+from gui import prefs, sysglass
+
+SYSTEM = False  # системное стекло macOS под окнами (включает apply)
 
 # лицензия Apache 2.0 — fonts/LICENSE.txt; обычное начертание и жирное (для кнопок и заголовков)
 FONT_FILE = Path(__file__).parent / "fonts" / "MesloLGSNerdFont-Regular.ttf"
@@ -131,6 +137,9 @@ def _derive_colors():
     RIM_ACC = solid(ACC_LIGHT, 150)
     RIM_CARD = solid(MAGENTA, 130)  # рамка больших панелей — в цвет фуксии
     HOLLOW = rgba("#000000", 95) # «углубление» поля ввода
+    if SYSTEM:  # под стеклом рабочий стол любого цвета: непрозрачная смесь видна серой полосой
+        RIM = rgba(ACC_LIGHT, 70)
+        HOLLOW = rgba("#05040f", 120)
 
 
 _derive_colors()
@@ -266,7 +275,11 @@ QScrollBar:vertical {{ background: transparent; width: 10px; margin: 4px 2px; }}
 QScrollBar::handle:vertical {{ background: {rgba(WHITE, 50)}; min-height: 24px; border-radius: 3px; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
-"""
+""" + (f"""
+/* системное стекло: на светлом размытом рабочем столе бледные подписи пропадали */
+QHeaderView::section {{ color: {ACC_LIGHT}; }}
+QLabel[role="faint"] {{ color: {MUTED}; }}
+""" if SYSTEM else "")
 
 
 STYLE = _style()
@@ -274,6 +287,10 @@ STYLE = _style()
 
 def apply(app):
     """Включает оформление для всего приложения."""
+    global SYSTEM, STYLE
+    SYSTEM = sysglass.available() and prefs.system_glass()  # без экрана macOS настройки не читаем
+    _derive_colors()
+    STYLE = _style()
     QFontDatabase.addApplicationFont(str(FONT_BOLD_FILE))
     families = QFontDatabase.applicationFontFamilies(QFontDatabase.addApplicationFont(str(FONT_FILE)))
     font = QFont(families[0] if families else FONT_FAMILY)
@@ -514,6 +531,15 @@ class _FocusGlow(QObject):
 
     def _handle(self, obj, event):
         kind = event.type()
+        if SYSTEM and kind in (QEvent.Polish, QEvent.Show) and sysglass.is_window(obj) \
+                and not isinstance(obj, QFileDialog):  # окно выбора файла — системное, у него своё оформление
+            if kind == QEvent.Polish:
+                sysglass.prepare(obj)
+            else:
+                sysglass.prepare(obj)
+                sysglass.attach(obj)
+                if isinstance(obj, QDialog):
+                    QTimer.singleShot(0, lambda: sysglass.fit_height(obj) if isValid(obj) else None)
         if kind == QEvent.HoverMove and _is_glass_button(obj):
             obj.update()  # пятно света идёт за курсором
         if kind in (QEvent.Move, QEvent.Resize, QEvent.Show, QEvent.Hide) \
@@ -784,18 +810,20 @@ def _draw_glass(painter, widget, rect, radius, tint, dark, sheen, rim_top, rim_b
     """Один кусок стекла. tint — оттенок (цвет или перелив), dark — затемнение основы
     (чтобы текст читался на ярком пятне),
     sheen — сила блика, rim_* — яркость кромки вверху и внизу, spot — пятно света под курсором."""
-    window = widget.window()
-    small = _scene(window.width(), window.height())[1]
     path = QPainterPath()
     path.addRoundedRect(rect, radius, radius)
     painter.save()
     painter.setClipPath(path)
     # 1. то, что под стеклом: размыто и чуть увеличено, как через линзу
-    corner = widget.mapTo(window, QPoint(0, 0))
-    width, height = rect.width() * _LENS, rect.height() * _LENS
-    source = QRectF(corner.x() + rect.center().x() - width / 2, corner.y() + rect.center().y() - height / 2, width, height)
-    scale_x, scale_y = small.width() / max(window.width(), 1), small.height() / max(window.height(), 1)
-    painter.drawPixmap(rect, small, QRectF(source.x() * scale_x, source.y() * scale_y, width * scale_x, height * scale_y))
+    #    (при системном стекле под ним уже настоящее размытие — рисовать нечего)
+    if not SYSTEM:
+        window = widget.window()
+        small = _scene(window.width(), window.height())[1]
+        corner = widget.mapTo(window, QPoint(0, 0))
+        width, height = rect.width() * _LENS, rect.height() * _LENS
+        source = QRectF(corner.x() + rect.center().x() - width / 2, corner.y() + rect.center().y() - height / 2, width, height)
+        scale_x, scale_y = small.width() / max(window.width(), 1), small.height() / max(window.height(), 1)
+        painter.drawPixmap(rect, small, QRectF(source.x() * scale_x, source.y() * scale_y, width * scale_x, height * scale_y))
     painter.fillPath(path, _with_alpha(BG, dark))
     # 2. оттенок стекла
     painter.fillPath(path, tint)
@@ -889,21 +917,64 @@ def _paint_card(card):
     painter = QPainter(card)
     try:
         painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        rect = QRectF(card.rect())
+        if SYSTEM:
+            # сквозь панель видно размытый рабочий стол; кромка — неон от лаванды к фуксии
+            _draw_glass(painter, card, rect, CARD_RADIUS, _with_alpha(WHITE, 6), dark=70, sheen=20, rim_top=120, rim_bottom=60)
+            neon = QLinearGradient(rect.topLeft(), rect.bottomRight())
+            neon.setColorAt(0, _with_alpha(ACC, 200))
+            neon.setColorAt(1, _with_alpha(MAGENTA, 200))
+            painter.setPen(QPen(neon, 1.2))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(rect.adjusted(0.6, 0.6, -0.6, -0.6), CARD_RADIUS, CARD_RADIUS)
+            return
         # большая панель темнее кнопок: на ней читают таблицу
-        _draw_glass(painter, card, QRectF(card.rect()), CARD_RADIUS, _with_alpha(WHITE, 8), dark=135, sheen=22, rim_top=150, rim_bottom=90)
+        _draw_glass(painter, card, rect, CARD_RADIUS, _with_alpha(WHITE, 8), dark=135, sheen=22, rim_top=150, rim_bottom=90)
         painter.setPen(QPen(QColor(RIM_CARD), 1))
         painter.setBrush(Qt.NoBrush)
-        painter.drawRoundedRect(QRectF(card.rect()).adjusted(0.5, 0.5, -0.5, -0.5), CARD_RADIUS, CARD_RADIUS)
+        painter.drawRoundedRect(rect.adjusted(0.5, 0.5, -0.5, -0.5), CARD_RADIUS, CARD_RADIUS)
     finally:
         painter.end()
 
 
 def _paint_window(window):
+    if SYSTEM and window.isWindow():
+        _paint_wash(window)
+        return
     painter = QPainter(window)
     try:
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
         sharp = _scene(window.width(), window.height())[0]
         painter.drawPixmap(window.rect(), sharp, sharp.rect())
+    finally:
+        painter.end()
+
+
+def _paint_wash(window):
+    """Фон окна поверх системного стекла: индиго-вуаль сверху вниз и те же неоновые пятна, что в _scene,
+    но полупрозрачные — окно светится лавандой и фуксией, а цвета рабочего стола проступают."""
+    painter = QPainter(window)
+    try:
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setCompositionMode(QPainter.CompositionMode_Source)
+        painter.fillRect(window.rect(), Qt.transparent)
+        painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+        width, height = window.width(), window.height()
+        wash = QLinearGradient(0, 0, 0, height)
+        wash.setColorAt(0, _with_alpha(GLOW_2, 100))
+        wash.setColorAt(0.5, _with_alpha(GLOW_3, 132))
+        wash.setColorAt(1, _with_alpha(BG, 165))
+        painter.fillRect(window.rect(), wash)
+        painter.setPen(Qt.NoPen)
+        reach = max(width, height)
+        for x, y, radius, color, alpha in _lights():
+            center = QPointF(x * width, y * height)
+            light = QRadialGradient(center, radius * reach)
+            light.setColorAt(0, _with_alpha(color, min(255, int(alpha * 1.15))))
+            light.setColorAt(0.55, _with_alpha(color, int(alpha * 0.4)))
+            light.setColorAt(1, QColor(0, 0, 0, 0))
+            painter.setBrush(light)
+            painter.drawEllipse(center, radius * reach, radius * reach)
     finally:
         painter.end()
 

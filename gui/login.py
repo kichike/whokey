@@ -132,7 +132,8 @@ class LoginWindow(QWidget):
         return handled
 
     def _fit_height(self, width):
-        height = self.layout().totalHeightForWidth(width)
+        # contentsMargins().top() — полоса заголовка над содержимым при системном стекле macOS (иначе 0)
+        height = self.layout().totalHeightForWidth(width) + self.contentsMargins().top()
         if sys.platform.startswith("linux"):
             # окно постоянного размера тайловые менеджеры (Hyprland, Sway, i3) не растягивают на весь экран
             self.setFixedSize(LOGIN_WIDTH, self.layout().totalHeightForWidth(LOGIN_WIDTH))

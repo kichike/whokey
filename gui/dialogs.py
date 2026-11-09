@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog,
 
 import sites
 from generator import weakness_reasons
-from gui import i18n, prefs, theme, touchid
+from gui import i18n, prefs, sysglass, theme, touchid
 from gui.dates import full_date, shown_date
 from gui.widgets import ClipboardCountdown, GeneratorPanel, PasswordField, StrengthBar, ask_yes, save_problem, show_error, weakness_text
 from gui.i18n import tr
@@ -343,6 +343,12 @@ class SettingsDialog(QDialog):
             self.touch_id.setChecked(touchid.is_enabled(vault.path))
             self.touch_id.toggled.connect(self._touch_id_toggled)
             form.addRow(tr("Touch ID:"), self.touch_id)
+
+        if sysglass.available():
+            glass = QCheckBox(tr("See the desktop through WhoKey (after restart)"))
+            glass.setChecked(prefs.system_glass())
+            glass.toggled.connect(lambda on: prefs.set_value("system_glass", on))
+            form.addRow(tr("Transparent background:"), glass)
 
         change = QPushButton(tr("Change master password"))
         change.clicked.connect(self._change_master)

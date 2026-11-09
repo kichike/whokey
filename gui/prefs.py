@@ -48,6 +48,11 @@ def idle_lock_minutes():
     return _number("idle_lock_minutes", IDLE_CHOICES)
 
 
+def system_glass():
+    """Прозрачный фон окон на macOS (системное стекло, gui/sysglass.py). По умолчанию включён."""
+    return _store().value("prefs/system_glass", True) not in (False, "false")
+
+
 def set_value(name, value):
     _store().setValue("prefs/" + name, value)
 

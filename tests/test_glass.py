@@ -142,3 +142,48 @@ class IconButton(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SystemGlass(unittest.TestCase):
+    """Системное стекло macOS (gui/sysglass.py): без настоящего экрана выключено, а рисование поверх него не падает."""
+
+    def setUp(self):
+        patcher = mock.patch("traceback.print_exc")
+        self.errors = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_off_without_a_real_screen(self):
+        from gui import sysglass
+        self.assertFalse(sysglass.available())  # offscreen: родных окон нет
+        self.assertFalse(theme.SYSTEM)
+
+    def test_preference_defaults_to_on_and_can_be_turned_off(self):
+        self.assertTrue(prefs.system_glass())
+        prefs.set_value("system_glass", False)
+        self.addCleanup(prefs.set_value, "system_glass", True)
+        self.assertFalse(prefs.system_glass())
+
+    def test_painting_over_system_glass(self):
+        from PySide6.QtWidgets import QFrame
+        card = QFrame()
+        theme.role(card, "card")
+        primary = QPushButton("Сохранить")
+        theme.kind(primary, "primary")
+        with mock.patch.object(theme, "SYSTEM", True), \
+                mock.patch.object(theme, "_scene", side_effect=AssertionError("сцена под стеклом не нужна")):
+            dialog = make_dialog(card, primary, QPushButton("Отмена"))
+            image = dialog.grab().toImage()
+        self.assertFalse(image.isNull())
+        self.errors.assert_not_called()
+        dialog.close()
+
+    def test_small_margins_are_not_trimmed(self):
+        from gui import sysglass
+        dialog = QDialog()
+        column = QVBoxLayout(dialog)
+        column.setContentsMargins(11, 11, 11, 11)
+        sysglass._trim_top(dialog)
+        self.assertEqual(column.contentsMargins().top(), 11)
+        column.setContentsMargins(24, 20, 24, 20)  # как у главного окна и окна входа
+        sysglass._trim_top(dialog)
+        self.assertEqual(column.contentsMargins().top(), 8)

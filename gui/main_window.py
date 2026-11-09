@@ -110,6 +110,9 @@ class MainWindow(QMainWindow):
         self.countdown.finished.connect(self.hint.show)
         self.entries_count = theme.role(QLabel(), "muted")
         self.statusBar().addPermanentWidget(self.entries_count)
+        if theme.SYSTEM:  # точки уголка-растяжки торчали бы из скруглённого угла стекла
+            self.statusBar().setSizeGripEnabled(False)
+            self.entries_count.setContentsMargins(0, 0, 14, 4)
 
         # горячие клавиши (Qt сам заменяет Ctrl на ⌘ на Mac) — те же, что показаны в меню
         QShortcut(QKeySequence.New, self, self.add)

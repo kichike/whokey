@@ -236,6 +236,14 @@ After saving, the old password cannot be recovered.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>See the desktop through WhoKey (after restart)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Transparent background:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Master password:</source>
         <translation type="unfinished"></translation>
     </message>
