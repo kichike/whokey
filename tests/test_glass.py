@@ -22,6 +22,7 @@ from gui import prefs, theme  # noqa: E402
 prefs.use_file(Path(tempfile.mkdtemp()) / "p.ini")  # до apply: тема не должна браться из настоящих настроек
 theme.apply(APP)
 theme.set_theme("dark")  # проверки ниже рассчитаны на тёмную тему, какая бы ни стояла в системе
+prefs._store().remove("prefs/theme")  # а в настройках — как у нового человека: «как в системе»
 
 
 def make_dialog(*buttons):
@@ -222,6 +223,7 @@ class Themes(unittest.TestCase):
         self.addCleanup(theme.set_theme, "dark")
 
     def test_default_follows_the_system(self):
+        prefs._store().remove("prefs/theme")
         self.assertEqual(prefs.theme_mode(), "system")
         prefs.set_value("theme", "purple")  # испорченная настройка — не повод падать
         self.assertEqual(prefs.theme_mode(), "system")
@@ -265,15 +267,17 @@ class Themes(unittest.TestCase):
         self.errors.assert_not_called()
         dialog.close()
 
-    def test_easter_egg_stays_dark_and_comes_back_to_light(self):
+    def test_cat_mode_has_its_own_light_palette(self):
+        from gui import cat
         theme.set_theme("light")
         theme.set_egg(True)
         self.addCleanup(theme.set_egg, False)
-        self.assertFalse(theme.LIGHT)
-        self.assertEqual(theme.BG, theme._EGG_COLORS["BG"])
+        self.assertTrue(theme.LIGHT)  # котик не выключает светлую тему
+        self.assertEqual(theme.BG, cat.LIGHT_COLORS["BG"])
+        theme.set_theme("dark")
+        self.assertEqual(theme.BG, cat.DARK_COLORS["BG"])
         theme.set_egg(False)
-        self.assertTrue(theme.LIGHT)
-        self.assertEqual(theme.BG, theme._LIGHT_COLORS["BG"])
+        self.assertEqual(theme.BG, theme._DARK_COLORS["BG"])
 
     def test_every_picture_goes_into_the_builds(self):
         root = Path(theme.__file__).resolve().parent.parent

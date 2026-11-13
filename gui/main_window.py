@@ -17,9 +17,10 @@ import sites
 from gui import prefs, theme
 from gui.dates import full_date, shown_date
 from gui.dialogs import AboutDialog, ChangeMasterDialog, EntryDialog, ExportDialog, ExtensionDialog, GeneratorDialog, SettingsDialog
-from gui.widgets import ClickableLabel, ClipboardCountdown, RoundedRowDelegate, WaveReveal, ask_yes, choose_csv, save_problem, show_error, show_info
+from gui.widgets import ClickableLabel, ClipboardCountdown, RoundedRowDelegate, ask_yes, choose_csv, save_problem, show_error, show_info
 from gui.i18n import tr
-from gui.sound import play_fart
+from gui.sound import play_purr
+from gui import cat
 from vault import SaveError
 from version import GITHUB_URL
 
@@ -344,7 +345,8 @@ class MainWindow(QMainWindow):
             return None
         return self.table.item(rows[0].row(), 0).data(Qt.UserRole)
 
-    # --- пасхалка: три нажатия на ключ — волна, коричневый фон, жёлтый неон и какашка; одно на какашку — обратно ---
+    # --- пасхалка «😺 котик» (gui/cat.py): три нажатия на ключ — мурлыканье, открывается кошачий зрачок,
+    #     чёрный кот вместо ключа и кошачья палитра; одно нажатие на кота — обратно ---
 
     locking = False  # окно уже закрывается из-за блокировки (см. Controller.lock)
     lock_state = None  # общие данные окон: сообщение для окна входа
@@ -360,20 +362,20 @@ class MainWindow(QMainWindow):
         if theme.egg or self._logo_clicks >= 3:
             self._logo_clicks = 0
             if not theme.egg:
-                play_fart()  # только на третье нажатие; обратно — тихо
+                play_purr()  # только на третье нажатие; обратно — тихо
             self._toggle_egg()
 
     _last_logo_click = 0.0
 
     def _toggle_egg(self):
-        before = self.grab()  # снимок старых цветов: волна стирает его сверху вниз
+        before = self.grab()  # снимок старых цветов: зрачок открывает новые из середины
         theme.set_egg(not theme.egg)
         self._recolor()
-        self._wave = WaveReveal(self, before)
+        self._wave = cat.Reveal(self, before)
         self._wave.done.connect(self._wave_finished)
 
     def _end_wave(self):
-        """Волна рисует снимок окна: пароль спрятали — на снимке его тоже быть не должно."""
+        """Переход рисует снимок окна: пароль спрятали — на снимке его тоже быть не должно."""
         if self._wave is not None:
             self._wave.animation.setCurrentTime(self._wave.DURATION)
 
@@ -384,10 +386,16 @@ class MainWindow(QMainWindow):
         """То, что нарисовано заранее и само не перекрасится."""
         self.logo.setPixmap(theme.logo_pixmap(36))
         self.big_logo.setPixmap(theme.logo_pixmap(96))
+        cat.decorate(self)  # кот выглядывает снизу — или прячется
         self.search_action.setIcon(theme.glyph_icon("search", theme.FAINT, 13))
         self.nothing_icon.setPixmap(theme.glyph_pixmap("search", theme.FAINT, 44, 56))
         self.extension_link.setText(self._extension_link())
         self.refresh(select=self.selected_index())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if theme.egg:
+            cat.decorate(self)  # кот остаётся у нижнего края
 
     _monograms = {}  # буква -> значок: рисуем каждую букву один раз
 

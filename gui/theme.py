@@ -71,16 +71,6 @@ GLOW_1, GLOW_2, GLOW_3 = "#3a1a9a", "#2a0f5a", "#120a30"  # зарево све�
 TITLE_START = "#c9b8ff"  # начало перелива в заголовке
 LETTER_TOP, LETTER_BOTTOM, LETTER_INK = "#e6dcff", "#c38cf2", "#1a1036"  # кружки-буквы записей
 
-# Пасхалка: три нажатия на ключ в главном окне (см. MainWindow._logo_clicked).
-# Коричневый фон, жёлтый неон и оранжевый оттенок вместо фуксии. Только на время сеанса.
-_EGG_COLORS = {
-    "BG": "#140a03", "SURF": "#1e1006", "WELL": "#120903", "LINE": "#33200f", "LINE2": "#4a2f16",
-    "TEXT": "#fff6d6", "MUTED": "#c9b27a", "FAINT": "#8f7a4c",
-    "ACC": "#ffe600", "ACC_DEEP": "#a86a00", "ACC_LIGHT": "#fff59a", "ACC_FILL": "#4a3800",
-    "MAGENTA": "#ff9a00", "NEON": "#ffea00", "RAISED": "#2a1809", "TIP": "#24140a", "TIP_RIM": "#5a3c1c",
-    "GLOW_1": "#6b3a12", "GLOW_2": "#4a2509", "GLOW_3": "#241206", "TITLE_START": "#fff59a",
-    "LETTER_TOP": "#fff3a0", "LETTER_BOTTOM": "#ffb52e", "LETTER_INK": "#2a1605",
-}
 
 # Цвета только для рисования (не для QSS): тень и глубина, перелив кромки стекла, пятна света сцены,
 # текст на акцентном переливе. В тёмной теме тень — чёрная, кромка — белая.
@@ -89,7 +79,10 @@ IRIS_1 = IRIS_2 = IRIS_3 = "#ffffff"
 LAVENDER, PINK, SKY = "#c3b0ff", "#ffb3e6", "#9fd2ff"
 ON_ACCENT = "#ffffff"
 _EXTRA = ["OK", "WARN", "BAD", "BAD_INK", "SHADOW", "IRIS_1", "IRIS_2", "IRIS_3", "LAVENDER", "PINK", "SKY", "ON_ACCENT"]
-_DARK_COLORS = {name: globals()[name] for name in list(_EGG_COLORS) + _EXTRA}
+_BASE = ["BG", "SURF", "WELL", "LINE", "LINE2", "TEXT", "MUTED", "FAINT", "ACC", "ACC_DEEP", "ACC_LIGHT", "ACC_FILL",
+         "MAGENTA", "NEON", "RAISED", "TIP", "TIP_RIM", "GLOW_1", "GLOW_2", "GLOW_3", "TITLE_START",
+         "LETTER_TOP", "LETTER_BOTTOM", "LETTER_INK"]
+_DARK_COLORS = {name: globals()[name] for name in _BASE + _EXTRA}
 
 # Светлая тема «Перламутр»: холодный белый с перламутровым отливом, пастельный свет по углам
 # (лаванда, розовый, немного голубого), прозрачное матовое стекло с переливчатой кромкой.
@@ -120,7 +113,7 @@ _LIGHT_FILES = {"CHECK_FILE": (_ASSETS / "check_light.svg").as_posix(), "ARROW_F
                 "EYE_OFF_FILE": str(_ASSETS / "eye_off_light.svg"), "KEY_FILE": _ASSETS / "key_light.png",
                 "ABOUT_FILE": _ASSETS / "about_light.png"}
 
-LIGHT = False        # сейчас светлая тема (пасхалка всегда тёмная)
+LIGHT = False        # сейчас светлая тема
 _want_light = False  # светлую выбрал человек или система
 
 
@@ -445,12 +438,13 @@ def _wants_light(app, mode):
 
 
 def _set_palette():
-    """Цвета, картинки и оформление по выбранной теме (пасхалка — всегда своя тёмная палитра)."""
+    """Цвета, картинки и оформление по выбранной теме (у котика-пасхалки — свои тёмная и светлая палитры)."""
     global LIGHT, STYLE
-    LIGHT = _want_light and not egg
+    LIGHT = _want_light
     globals().update(_LIGHT_COLORS if LIGHT else _DARK_COLORS)
     if egg:
-        globals().update(_EGG_COLORS)
+        from gui import cat  # здесь, а не наверху: cat сам рисует через theme
+        globals().update(cat.LIGHT_COLORS if LIGHT else cat.DARK_COLORS)
     globals().update(_LIGHT_FILES if LIGHT else _DARK_FILES)
     _derive_colors()
     STYLE = _style()
@@ -483,7 +477,7 @@ def set_theme(mode):
     global _want_light
     prefs.set_value("theme", mode)
     _want_light = _wants_light(QApplication.instance(), mode)
-    if (_want_light and not egg) != LIGHT:
+    if _want_light != LIGHT:
         _set_palette()
         _refresh_app()
 
@@ -508,64 +502,6 @@ def set_egg(on):
     egg = on
     _set_palette()
     _refresh_app()
-
-
-def _has_color(pixmap):
-    """Есть ли на картинке цвет. Без цветного шрифта вместо эмодзи рисуется чёрный значок или пустой квадрат."""
-    image = pixmap.toImage()
-    step = max(1, image.width() // 40)
-    for y in range(0, image.height(), step):
-        for x in range(0, image.width(), step):
-            color = image.pixelColor(x, y)
-            if color.alpha() > 128 and color.hsvSaturation() > 80:
-                return True
-    return False
-
-
-def _drawn_poop(height):
-    """Какашка своими силами — если в системе нет цветного шрифта эмодзи."""
-    pixmap = QPixmap(height * _SCALE, height * _SCALE)
-    pixmap.setDevicePixelRatio(_SCALE)
-    pixmap.fill(Qt.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.Antialiasing)
-    painter.setPen(Qt.NoPen)
-    h = height
-    fill = QLinearGradient(0, 0, 0, h)
-    fill.setColorAt(0, QColor("#a8703a"))
-    fill.setColorAt(1, QColor("#6b4120"))
-    painter.setBrush(fill)
-    painter.drawEllipse(QRectF(h * 0.40, h * 0.04, h * 0.22, h * 0.22))  # кончик
-    painter.drawRoundedRect(QRectF(h * 0.28, h * 0.17, h * 0.44, h * 0.24), h * 0.12, h * 0.12)
-    painter.drawRoundedRect(QRectF(h * 0.16, h * 0.36, h * 0.68, h * 0.28), h * 0.14, h * 0.14)
-    painter.drawRoundedRect(QRectF(h * 0.04, h * 0.60, h * 0.92, h * 0.34), h * 0.17, h * 0.17)
-    painter.setBrush(QColor(WHITE))
-    for x in (0.31, 0.53):
-        painter.drawEllipse(QRectF(h * x, h * 0.40, h * 0.16, h * 0.18))
-    painter.setBrush(QColor("#1c1008"))
-    for x in (0.36, 0.58):
-        painter.drawEllipse(QRectF(h * x, h * 0.45, h * 0.07, h * 0.08))
-    painter.setPen(QPen(QColor("#1c1008"), max(1.0, h * 0.04), Qt.SolidLine, Qt.RoundCap))
-    painter.setBrush(Qt.NoBrush)
-    painter.drawArc(QRectF(h * 0.32, h * 0.60, h * 0.36, h * 0.20), 200 * 16, 140 * 16)  # улыбка
-    painter.end()
-    return pixmap
-
-
-def _poop_pixmap(height):
-    """Эмодзи вместо ключа. Цветной шрифт эмодзи есть почти в каждой системе, картинка в программу не встроена."""
-    side = height * _SCALE
-    pixmap = QPixmap(side, side)
-    pixmap.setDevicePixelRatio(_SCALE)
-    pixmap.fill(Qt.transparent)
-    painter = QPainter(pixmap)
-    font = QFont()
-    font.setFamilies(["Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"])
-    font.setPixelSize(int(height * 0.85))
-    painter.setFont(font)
-    painter.drawText(QRectF(0, 0, height, height), Qt.AlignCenter, "\U0001F4A9")
-    painter.end()
-    return pixmap if _has_color(pixmap) else _drawn_poop(height)
 
 
 _LIGHT_GLOW = 0.42  # неон на светлом «грязнится» — там то же свечение, но мягче
@@ -950,7 +886,8 @@ def glyph_icon(name, color=None, px=14):
 def logo_pixmap(height):
     """Пиксельный неоновый ключ с логотипа высотой height точек."""
     if egg:
-        return _poop_pixmap(height)
+        from gui import cat
+        return cat.logo(height)
     source = QPixmap(str(KEY_FILE))
     if source.isNull():
         return QPixmap()
@@ -961,6 +898,9 @@ def logo_pixmap(height):
 
 def monogram(text, size=24):
     """Кружок-буква записи (скруглённый квадрат), как в меню расширения: «G» для github.com."""
+    if egg:
+        from gui import cat
+        return cat.monogram(text, size)
     pixmap = QPixmap(size * _SCALE, size * _SCALE)
     pixmap.setDevicePixelRatio(_SCALE)
     pixmap.fill(Qt.transparent)
@@ -1206,7 +1146,7 @@ def _paint_button(button):
         look = button.property("kind")
         tint, ink = _with_alpha(WHITE, 42 if hover else 26), QColor(TEXT)
         if look == "primary":  # главная кнопка переливается как ключ: лавандовый сверху, фуксия снизу
-            tint, ink = QLinearGradient(rect.topLeft(), rect.bottomLeft()), QColor(LETTER_INK if egg else WHITE)
+            tint, ink = QLinearGradient(rect.topLeft(), rect.bottomLeft()), QColor(ON_ACCENT)
             strength = 230 if pressed else 205 if hover else 175
             tint.setColorAt(0, _with_alpha(ACC, strength))
             tint.setColorAt(1, _with_alpha(MAGENTA, strength))

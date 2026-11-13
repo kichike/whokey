@@ -36,7 +36,7 @@ PyInstaller.__main__.run([
     *data(ASSETS / "key.png", "gui/assets"),
     *data(ASSETS / "key_light.png", "gui/assets"),  # то же для светлой темы
     *data(ASSETS / "about_light.png", "gui/assets"),
-    *data(ASSETS / "fart.wav", "gui/assets"),
+    *data(ASSETS / "purr.wav", "gui/assets"),
     *[arg for qm in sorted((HERE / "translations").glob("*.qm")) for arg in data(qm, "translations")],
     "--paths", str(HERE),
     "--exclude-module", "tkinter", "--exclude-module", "matplotlib",

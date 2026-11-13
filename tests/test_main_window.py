@@ -17,7 +17,7 @@ APP = QApplication.instance() or QApplication([])
 
 import gui.dialogs as D  # noqa: E402
 import gui.main_window as MW  # noqa: E402
-from gui import prefs, sound, theme  # noqa: E402
+from gui import cat, prefs, sound, theme  # noqa: E402
 from vault import Vault, VaultTooLarge  # noqa: E402
 
 
@@ -93,8 +93,8 @@ class EasterEgg(unittest.TestCase):
         self.window.show()
         self.usual = (theme.BG, theme.ACC, theme.STYLE)
         self.sounds = []  # настоящий звук в тестах не играем
-        self.addCleanup(setattr, MW, "play_fart", MW.play_fart)
-        MW.play_fart = lambda: self.sounds.append(1)
+        self.addCleanup(setattr, MW, "play_purr", MW.play_purr)
+        MW.play_purr = lambda: self.sounds.append(1)
         self.addCleanup(theme.set_egg, False)
 
     def finish_wave(self):
@@ -111,10 +111,11 @@ class EasterEgg(unittest.TestCase):
         self.window._logo_clicked()
         self.assertTrue(theme.egg)
         self.assertEqual(len(self.sounds), 1)  # звук — на третье нажатие
-        self.assertEqual((theme.BG, theme.ACC), ("#140a03", "#ffe600"))
-        self.assertIn("255, 230, 0", theme.GLASS_ACC)  # производные цвета тоже новые
-        self.assertIn("#140a03", APP.styleSheet())
-        self.window._logo_clicked()  # пока идёт волна, нажатия не считаются
+        self.assertEqual((theme.BG, theme.ACC), (cat.DARK_COLORS["BG"], cat.DARK_COLORS["ACC"]))
+        self.assertIn("198, 220, 74", theme.GLASS_ACC)  # производные цвета тоже новые
+        self.assertIn(cat.DARK_COLORS["BG"], APP.styleSheet())
+        self.assertTrue(self.window._peeking_cat.isVisible())  # кот выглядывает снизу
+        self.window._logo_clicked()  # пока идёт переход, нажатия не считаются
         self.assertTrue(theme.egg)
         self.finish_wave()
         self.window._logo_clicked()
@@ -122,15 +123,16 @@ class EasterEgg(unittest.TestCase):
         self.assertEqual(len(self.sounds), 1)  # обратно — без звука
         self.finish_wave()
         self.assertEqual((theme.BG, theme.ACC, theme.STYLE), self.usual)
+        self.assertFalse(self.window._peeking_cat.isVisible())
 
     def test_sound_file_is_valid_and_player_is_safe(self):
         import wave
-        with wave.open(str(sound.FART_FILE)) as audio:
+        with wave.open(str(sound.PURR_FILE)) as audio:
             self.assertGreater(audio.getnframes() / audio.getframerate(), 0.3)
-        real = sound.FART_FILE
-        sound.FART_FILE = Path(tempfile.mkdtemp()) / "нет такого.wav"
-        self.addCleanup(setattr, sound, "FART_FILE", real)
-        sound.play_fart()  # файла нет — тишина, а не ошибка
+        real = sound.PURR_FILE
+        sound.PURR_FILE = Path(tempfile.mkdtemp()) / "нет такого.wav"
+        self.addCleanup(setattr, sound, "PURR_FILE", real)
+        sound.play_purr()  # файла нет — тишина, а не ошибка
 
     def test_hidden_password_does_not_stay_on_the_snapshot(self):
         self.window.refresh(select=0)
@@ -155,13 +157,25 @@ class EasterEgg(unittest.TestCase):
         self.assertEqual(add.graphicsEffect().color().name(), usual_glow)
         self.assertEqual(self.window._monogram("github").pixmap(24).toImage(), letter)
 
-    def test_poop_is_always_a_colored_picture(self):
-        """На сборке для Windows без цветного шрифта вместо эмодзи вышел пустой квадрат."""
-        self.assertTrue(theme._has_color(theme._drawn_poop(36)))
-        self.assertTrue(theme._has_color(theme._poop_pixmap(36)))
-        tofu = theme.QPixmap(36, 36)
-        tofu.fill(theme.QColor("#000000"))
-        self.assertFalse(theme._has_color(tofu))
+    def test_cat_is_drawn_in_both_themes(self):
+        self.window._toggle_egg()
+        self.finish_wave()
+        for mode in ("dark", "light"):
+            theme.set_theme(mode)
+            self.assertEqual(theme.LIGHT, mode == "light")  # котик бывает и светлым
+            self.assertEqual(theme.BG, (cat.LIGHT_COLORS if theme.LIGHT else cat.DARK_COLORS)["BG"])
+            logo = theme.logo_pixmap(36).toImage()
+            eye = logo.pixelColor(int(logo.width() * 0.385), int(logo.height() * 0.555))  # радужка рядом со зрачком
+            self.assertGreater(eye.green(), 180)  # горящий жёлто-зелёный глаз
+            self.assertFalse(self.window.grab().isNull())
+        theme.set_theme("dark")
+
+    def test_cat_stays_at_the_bottom_when_resized(self):
+        self.window._toggle_egg()
+        self.finish_wave()
+        self.window.resize(self.window.width() + 120, self.window.height() + 80)
+        cat_widget = self.window._peeking_cat
+        self.assertEqual(cat_widget.geometry().bottom(), self.window.height() - 1)
 
     def test_slow_clicks_do_not_count(self):
         for _ in range(3):
