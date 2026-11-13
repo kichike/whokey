@@ -72,3 +72,5 @@ Name: "{autodesktop}\WhoKey"; Filename: "{app}\WhoKey.exe"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\WhoKey.exe"; Description: "{cm:LaunchProgram,WhoKey}"; Flags: nowait postinstall skipifsilent
+; обновление по кнопке в WhoKey (gui/updater.py) ставит без окон — и программа запускается сама
+Filename: "{app}\WhoKey.exe"; Flags: nowait; Check: WizardSilent

@@ -272,8 +272,24 @@ After saving, the old password cannot be recovered.</source>
         <translation>Прозрачный фон:</translation>
     </message>
     <message>
+        <source>Check for a new version once a day</source>
+        <translation>Проверять новую версию раз в день</translation>
+    </message>
+    <message>
+        <source>Updates:</source>
+        <translation>Обновления:</translation>
+    </message>
+    <message>
         <source>Master password:</source>
         <translation>Мастер-пароль:</translation>
+    </message>
+    <message>
+        <source>Check for updates</source>
+        <translation>Проверить обновления</translation>
+    </message>
+    <message>
+        <source>Updates by button work in the installed app.</source>
+        <translation>Обновление по кнопке работает в установленной программе.</translation>
     </message>
     <message>
         <source>About WhoKey</source>
@@ -302,6 +318,22 @@ After saving, the old password cannot be recovered.</source>
     <message>
         <source>Free and open source (MIT license).</source>
         <translation>Бесплатная программа с открытым кодом (лицензия MIT).</translation>
+    </message>
+    <message>
+        <source>Checking…</source>
+        <translation>Проверяю…</translation>
+    </message>
+    <message>
+        <source>WhoKey {version} is out. Press &quot;Update to {version}&quot; at the top of the main window.</source>
+        <translation>Вышла WhoKey {version}. Нажмите «Обновить до {version}» вверху главного окна.</translation>
+    </message>
+    <message>
+        <source>You have the latest version.</source>
+        <translation>У вас последняя версия.</translation>
+    </message>
+    <message>
+        <source>Could not check for updates. Check the internet connection.</source>
+        <translation>Не удалось проверить обновления. Проверьте подключение к интернету.</translation>
     </message>
     <message>
         <source>Passwords sent to the browser (newest first):</source>
@@ -646,6 +678,34 @@ It is encrypted with the same master password. To open it, choose it with the &q
 Она зашифрована тем же мастер-паролем. Чтобы открыть её, выберите файл кнопкой «Другой файл…» в окне WhoKey.</translation>
     </message>
     <message>
+        <source>Update to {version}</source>
+        <translation>Обновить до {version}</translation>
+    </message>
+    <message>
+        <source>Download WhoKey {version}, check its signature and restart. The vault is locked; your passwords stay where they are.</source>
+        <translation>Скачать WhoKey {version}, проверить подпись и перезапустить. Хранилище заблокируется, пароли останутся на месте.</translation>
+    </message>
+    <message>
+        <source>Downloading…</source>
+        <translation>Скачиваю…</translation>
+    </message>
+    <message>
+        <source>Downloading… {percent}%</source>
+        <translation>Скачиваю… {percent}%</translation>
+    </message>
+    <message>
+        <source>Restart to update</source>
+        <translation>Перезапустить и обновить</translation>
+    </message>
+    <message>
+        <source>WhoKey {version} is downloaded and checked. Press to restart into it.</source>
+        <translation>WhoKey {version} скачана и проверена. Нажмите, чтобы перезапуститься в неё.</translation>
+    </message>
+    <message>
+        <source>Installing…</source>
+        <translation>Устанавливаю…</translation>
+    </message>
+    <message>
         <source>There are no entries to export yet.</source>
         <translation>Пока нечего экспортировать — записей нет.</translation>
     </message>
@@ -844,6 +904,30 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
     <message>
         <source>yesterday</source>
         <translation>вчера</translation>
+    </message>
+    <message>
+        <source>Could not install the update ({step}).</source>
+        <translation>Не удалось установить обновление ({step}).</translation>
+    </message>
+    <message>
+        <source>WhoKey is not running from an installed app.</source>
+        <translation>WhoKey запущен не из установленной программы.</translation>
+    </message>
+    <message>
+        <source>This copy of WhoKey has no permanent signature, so an update can&apos;t be checked. Install it from GitHub by hand.</source>
+        <translation>У этой копии WhoKey нет постоянной подписи, поэтому обновление не проверить. Установите его с GitHub вручную.</translation>
+    </message>
+    <message>
+        <source>The downloaded update is damaged.</source>
+        <translation>Скачанное обновление повреждено.</translation>
+    </message>
+    <message>
+        <source>The update is not signed by the WhoKey author. It was not installed.</source>
+        <translation>Обновление не подписано автором WhoKey. Оно не установлено.</translation>
+    </message>
+    <message>
+        <source>Could not download the update. Check the internet connection.</source>
+        <translation>Не удалось скачать обновление. Проверьте подключение к интернету.</translation>
     </message>
 </context>
 <context>

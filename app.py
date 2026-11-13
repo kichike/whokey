@@ -73,7 +73,7 @@ from gui.i18n import LANGUAGES, set_language, tr
 from gui.widgets import show_error
 from gui.login import LoginWindow
 from gui.main_window import MainWindow
-from gui import i18n, prefs
+from gui import i18n, prefs, updater
 
 APP_NAME = "EduPasswords"
 
@@ -124,6 +124,21 @@ class Controller:
         system_lang = "ru" if QLocale.system().name().startswith("ru") else "en"
         lang = self.settings.value("language", system_lang)
         set_language(lang if lang in dict(LANGUAGES) else system_lang)
+
+        # обновления по кнопке: проверка раз в сутки (если включена), найденная версия —
+        # кнопкой «Обновить до …» в главном окне, без отдельного окна
+        self.updater = None
+        self.pending_update = None  # (установщик, версия): скачан и проверен, ждёт удобного момента
+        if updater.supported():
+            self.updater = updater.Updater()
+            self.updater.found.connect(self._offer_update)
+            self.updater.progress.connect(lambda percent: self._on_main("update_progress", percent))
+            self.updater.failed.connect(lambda message: self._on_main("update_failed", message))
+            self.updater.ready.connect(self.install_update)
+            self.update_timer = QTimer()
+            self.update_timer.timeout.connect(self.updater.check_due)
+            self.update_timer.start(3600 * 1000)  # раз в час: не пора ли (сама проверка — раз в сутки)
+            QTimer.singleShot(10 * 1000, self.updater.check_due)  # не в первые секунды запуска
 
         path = default_vault_path()
         saved = self.settings.value("vault_path")
@@ -197,6 +212,13 @@ class Controller:
         window = MainWindow(vault, self.clipboard)
         window.language_changed.connect(lambda code: self.change_language(vault, code))
         window.lock_requested.connect(lambda: self.lock("manual"))
+        window.updater = self.updater
+        if self.updater is not None:
+            window.update_requested.connect(self._update_clicked)
+            if self.pending_update:  # скачали, пока хранилище было заблокировано
+                window.offer_restart(self.pending_update[1])
+            elif self.updater.version:  # новую версию нашли раньше (до блокировки или смены языка)
+                window.offer_update(self.updater.version)
         self._replace_window(window)
         return window
 
@@ -210,6 +232,43 @@ class Controller:
         # язык меняли в «Настройках» — они открываются снова, уже на новом языке,
         # а не закрываются посреди работы
         QTimer.singleShot(0, window.open_settings)
+
+    def _on_main(self, method, *args):
+        """Сообщить главному окну о ходе обновления — если оно сейчас открыто."""
+        if isinstance(self.window, MainWindow):
+            getattr(self.window, method)(*args)
+
+    def _offer_update(self, version):
+        self._on_main("offer_update", version)
+
+    def _update_clicked(self):
+        if self.pending_update:
+            self.install_update(*self.pending_update)
+        else:
+            self.updater.download()
+
+    def install_update(self, package, version):
+        """Установщик скачан и проверен: закрыть хранилище, запустить установку и выйти.
+        Помощник дождётся выхода, поставит новую версию и запустит её.
+        Если хранилище заблокировано или открыто окно (запись с правками) — ничего не закрываем,
+        кнопка становится «Перезапустить и обновить», и человек нажмёт её сам."""
+        self.pending_update = (package, version)
+        busy = any(isinstance(widget, QDialog) and widget.isVisible() for widget in QApplication.topLevelWidgets())
+        if not isinstance(self.window, MainWindow) or busy:
+            self._on_main("offer_restart", version)
+            return
+        self.window.update_installing()
+        QApplication.processEvents()
+        try:
+            self.updater.install(package, version, os.getpid())
+        except updater.UpdateError as error:
+            self.pending_update = None
+            self.window.update_failed(str(error))
+            return
+        self.autolock.stop()
+        self.stop_bridge()
+        self.clipboard.clear_now()
+        QApplication.quit()
 
     def stop_bridge(self):
         if self.bridge is not None:

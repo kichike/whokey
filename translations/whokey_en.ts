@@ -260,7 +260,23 @@ After saving, the old password cannot be recovered.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Check for a new version once a day</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Updates:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Master password:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Check for updates</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Updates by button work in the installed app.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -289,6 +305,22 @@ After saving, the old password cannot be recovered.</source>
     </message>
     <message>
         <source>Free and open source (MIT license).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Checking…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>WhoKey {version} is out. Press &quot;Update to {version}&quot; at the top of the main window.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>You have the latest version.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not check for updates. Check the internet connection.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -700,6 +732,34 @@ Add your first entry or move your passwords from a browser.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Update to {version}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Download WhoKey {version}, check its signature and restart. The vault is locked; your passwords stay where they are.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Downloading…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Downloading… {percent}%</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Restart to update</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>WhoKey {version} is downloaded and checked. Press to restart into it.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Installing…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>The CSV file is not encrypted — delete it as soon as you no longer need it (and empty the Trash).</source>
         <translation type="unfinished"></translation>
     </message>
@@ -822,6 +882,30 @@ It will no longer receive passwords. To connect it again, WhoKey will ask for pe
     </message>
     <message>
         <source>yesterday</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not install the update ({step}).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>WhoKey is not running from an installed app.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>This copy of WhoKey has no permanent signature, so an update can&apos;t be checked. Install it from GitHub by hand.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The downloaded update is damaged.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The update is not signed by the WhoKey author. It was not installed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not download the update. Check the internet connection.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog,
 import sites
 from generator import weakness_reasons
 from gui import i18n, prefs, sysglass, theme, touchid
+from gui.updater import supported as updates_supported
 from gui.dates import full_date, shown_date
 from gui.widgets import ClipboardCountdown, GeneratorPanel, PasswordField, StrengthBar, ask_yes, save_problem, show_error, weakness_text
 from gui.i18n import tr
@@ -357,6 +358,11 @@ class SettingsDialog(QDialog):
             glass.setChecked(prefs.system_glass())
             glass.toggled.connect(lambda on: prefs.set_value("system_glass", on))
             form.addRow(tr("Transparent background:"), glass)
+        if updates_supported():
+            check = QCheckBox(tr("Check for a new version once a day"))
+            check.setChecked(prefs.update_check())
+            check.toggled.connect(lambda on: prefs.set_value("update_check", on))
+            form.addRow(tr("Updates:"), check)
 
         change = QPushButton(tr("Change master password"))
         change.clicked.connect(self._change_master)
@@ -404,7 +410,7 @@ class SettingsDialog(QDialog):
 class AboutDialog(QDialog):
     """О программе: версия, автор и ссылка на GitHub."""
 
-    def __init__(self, parent):
+    def __init__(self, parent, updater=None):
         super().__init__(parent)
         self.setWindowTitle(tr("About WhoKey"))
         title = theme.neon_title(theme.role(QLabel(tr("WhoKey")), "title"))
@@ -434,6 +440,22 @@ class AboutDialog(QDialog):
         close = QDialogButtonBox(QDialogButtonBox.Close)
         close.button(QDialogButtonBox.Close).setText(tr("Close"))
         close.rejected.connect(self.reject)
+        # обновления: проверить вручную; найденная версия ставится кнопкой в главном окне
+        self.update_status = theme.role(QLabel(), "muted")
+        self.update_status.setWordWrap(True)
+        updates = QHBoxLayout()
+        updates.addWidget(self.update_status, 1)
+        self.check_button = None
+        if updater is not None:
+            self.check_button = QPushButton(tr("Check for updates"))
+            self.check_button.clicked.connect(lambda: self._check(updater))
+            updates.addWidget(self.check_button)
+            updater.checked.connect(self._checked)
+            self._updater = updater
+            if updater.version:
+                self._checked("found")
+        else:
+            self.update_status.setText(tr("Updates by button work in the installed app."))
         column = QVBoxLayout(self)
         column.setSpacing(10)
         head = QHBoxLayout()
@@ -448,9 +470,33 @@ class AboutDialog(QDialog):
         column.addLayout(head)
         for widget in (what, links, license_):
             column.addWidget(widget)
+        column.addLayout(updates)
         column.addWidget(close)
         what.setMinimumWidth(380)
         what.setMinimumHeight(what.heightForWidth(380))
+
+    def _check(self, updater):
+        self.check_button.setEnabled(False)
+        self.update_status.setText(tr("Checking…"))
+        updater.check()
+        if not updater.busy:  # проверка уже шла или сразу закончилась
+            self.check_button.setEnabled(True)
+
+    def _checked(self, result):
+        if self.check_button is not None:
+            self.check_button.setEnabled(True)
+        if result == "found":
+            text = tr("WhoKey {version} is out. Press \"Update to {version}\" at the top of the main window.").format(version=self._updater.version)
+        elif result == "latest":
+            text = tr("You have the latest version.")
+        else:
+            text = tr("Could not check for updates. Check the internet connection.")
+        self.update_status.setText(text)
+
+    def done(self, result):
+        if self.check_button is not None:  # окно закрыто — проверка ему больше не отвечает
+            self._updater.checked.disconnect(self._checked)
+        super().done(result)
 
 
 class FontLicenseDialog(QDialog):

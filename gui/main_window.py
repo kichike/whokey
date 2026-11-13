@@ -77,6 +77,8 @@ EGG_CLICK_GAP = 1.5  # секунд между нажатиями на ключ,
 class MainWindow(QMainWindow):
     language_changed = Signal(str)  # выбран другой язык в настройках — app.py пересоздаст окно
     lock_requested = Signal()       # «Заблокировать» (⌘L / Ctrl+L) — app.py вернёт окно входа
+    update_requested = Signal()     # нажата «Обновить до …» — app.py скачает и поставит (gui/updater.py)
+    updater = None                  # проверка обновлений (app.Controller); для «О программе»
 
     def __init__(self, vault, clipboard):
         super().__init__()
@@ -193,6 +195,11 @@ class MainWindow(QMainWindow):
         vault_file.setToolTip(theme.plain_tip(str(self.vault.path)))
         row.addWidget(vault_file, 0, Qt.AlignVCenter)
         row.addStretch()
+        # новая версия: кнопка появляется сама, без отдельного окна (gui/updater.py)
+        self.update_button = theme.kind(QPushButton(), "primary")
+        self.update_button.clicked.connect(self._update_clicked)
+        self.update_button.hide()
+        row.addWidget(self.update_button)
         glyph = theme.GLYPHS
         for text, tip, handler in [(glyph["magic"] + "  " + tr("Generator"), "", self.open_generator),
                                    (glyph["puzzle"] + "  " + tr("Extension"), "", self.extension),
@@ -629,8 +636,44 @@ class MainWindow(QMainWindow):
         show_info(self, tr("Save encrypted copy"),
                   tr("The copy is saved: {name}\n\nIt is encrypted with the same master password. To open it, choose it with the \"Other file…\" button in the WhoKey window.").format(name=target.name))
 
+    # --- обновление по кнопке ---
+
+    def offer_update(self, version):
+        """Найдена новая версия: кнопка «Обновить до …» вверху окна."""
+        self._update_version = version
+        self.update_button.setText("↓  " + tr("Update to {version}").format(version=version))
+        self.update_button.setToolTip(theme.plain_tip(tr("Download WhoKey {version}, check its signature and restart. The vault is locked; your passwords stay where they are.").format(version=version)))
+        self.update_button.setEnabled(True)
+        self.update_button.show()
+
+    def _update_clicked(self):
+        self.update_button.setEnabled(False)
+        self.update_button.setText("↓  " + tr("Downloading…"))
+        self.update_requested.emit()
+
+    def update_progress(self, percent):
+        self.update_button.setText("↓  " + tr("Downloading… {percent}%").format(percent=percent))
+
+    def offer_restart(self, version):
+        """Новая версия скачана и проверена, но сейчас открыто окно — ставим, когда человек нажмёт."""
+        self._update_version = version
+        self.update_button.setText("↻  " + tr("Restart to update"))
+        self.update_button.setToolTip(theme.plain_tip(tr("WhoKey {version} is downloaded and checked. Press to restart into it.").format(version=version)))
+        self.update_button.setEnabled(True)
+        self.update_button.show()
+
+    def update_installing(self):
+        self.update_button.setText(tr("Installing…"))
+
+    def update_failed(self, message):
+        """Не скачалось или не прошло проверку: кнопка снова доступна, причина — в строке состояния."""
+        self.offer_update(self._update_version)
+        self.statusBar().showMessage("⚠ " + message, 15000)
+
+    _update_version = ""
+
     def about(self):
-        AboutDialog(self).exec()
+        AboutDialog(self, self.updater).exec()
 
     def export_csv(self):
         """Все пароли в CSV-файл — после мастер-пароля и предупреждения, что файл не зашифрован."""

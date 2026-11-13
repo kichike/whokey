@@ -59,6 +59,16 @@ def theme_mode():
     return mode if mode in ("system", "dark", "light") else "system"
 
 
+def update_check():
+    """Тихо проверять обновления раз в сутки (gui/updater.py). По умолчанию включено."""
+    return _store().value("prefs/update_check", True) not in (False, "false")
+
+
+def last_update_check():
+    """Когда последний раз спрашивали GitHub о новой версии (секунды с 1970), 0 — никогда."""
+    return _store().value("prefs/last_update_check", 0)
+
+
 def set_value(name, value):
     _store().setValue("prefs/" + name, value)
 
