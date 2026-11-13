@@ -297,7 +297,8 @@ class Download(unittest.TestCase):
         self.assertTrue(ready, self.events)
         path = Path(ready[0][1])
         self.assertEqual(path.read_bytes(), self.package)
-        self.assertEqual(oct(Path(updater.work).stat().st_mode & 0o777), oct(0o700))  # только для владельца
+        if sys.platform != "win32":  # на Windows временная папка и так у каждого пользователя своя
+            self.assertEqual(oct(Path(updater.work).stat().st_mode & 0o777), oct(0o700))  # только для владельца
 
     def test_same_version_is_not_offered(self):
         updater = self.start(tag="v" + U.VERSION)
