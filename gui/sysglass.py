@@ -1,5 +1,6 @@
 """Системное стекло macOS: под окном лежит настоящее размытие рабочего стола (NSVisualEffectView),
-а WhoKey рисует поверх него полупрозрачную индиго-вуаль и неоновые пятна (theme._paint_window).
+а WhoKey рисует поверх него полупрозрачную вуаль и пятна света (theme._paint_wash):
+в тёмной теме — индиго и неон, в светлой — перламутр и пастель.
 
 Только macOS и только через PyObjC. Если чего-то нет (другая система, нет PyObjC, в настройках
 доступности включено «Уменьшить прозрачность» или человек выключил прозрачный фон в «Настройках»),
@@ -48,8 +49,9 @@ def prepare(window):
     window.setAttribute(Qt.WA_TranslucentBackground, True)
 
 
-def attach(window):
-    """При показе окна: прозрачная полоса заголовка, материал под содержимым. Повторно — ничего не делает."""
+def attach(window, light=False):
+    """При показе окна: прозрачная полоса заголовка, материал под содержимым. Повторно — ничего не делает.
+    light — светлая тема: светлый материал (см. set_light)."""
     from PySide6.QtGui import QGuiApplication
     if QGuiApplication.platformName() != "cocoa":  # winId() здесь не NSView — PyObjC упал бы
         return
@@ -74,10 +76,9 @@ def attach(window):
     content = ns_window.contentView()
     frame_view = content.superview()
     fx = AppKit.NSVisualEffectView.alloc().initWithFrame_(frame_view.bounds())
-    fx.setMaterial_(AppKit.NSVisualEffectMaterialHUDWindow)  # пропускает цвета рабочего стола, текст читается
     fx.setBlendingMode_(AppKit.NSVisualEffectBlendingModeBehindWindow)
     fx.setState_(AppKit.NSVisualEffectStateActive)
-    fx.setAppearance_(AppKit.NSAppearance.appearanceNamed_(AppKit.NSAppearanceNameDarkAqua))
+    _look(fx, light)
     fx.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
     fx.setWantsLayer_(True)
     fx.layer().setCornerRadius_(CORNER)
@@ -89,6 +90,30 @@ def attach(window):
 
     if first:
         _trim_top(window)
+
+
+def _look(fx, light):
+    """Тёмная тема — тёмный материал HUD: пропускает цвета рабочего стола, текст читается.
+    Светлая — светлая матовая изморозь (материал всплывающих окон в светлом оформлении)."""
+    import AppKit
+    fx.setMaterial_(AppKit.NSVisualEffectMaterialPopover if light else AppKit.NSVisualEffectMaterialHUDWindow)
+    fx.setAppearance_(AppKit.NSAppearance.appearanceNamed_(
+        AppKit.NSAppearanceNameAqua if light else AppKit.NSAppearanceNameDarkAqua))
+
+
+def set_light(window, light):
+    """Смена темы на лету: перекрашивает материал под уже открытым окном."""
+    from PySide6.QtGui import QGuiApplication
+    if QGuiApplication.platformName() != "cocoa" or window.property(_DONE) is None:
+        return
+    import AppKit
+    import objc
+    ns_window = objc.objc_object(c_void_p=int(window.winId())).window()
+    if ns_window is None:
+        return
+    for view in ns_window.contentView().superview().subviews():
+        if view.isKindOfClass_(AppKit.NSVisualEffectView):
+            _look(view, light)
 
 
 def _trim_top(window):

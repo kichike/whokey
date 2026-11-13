@@ -249,6 +249,21 @@ class Themes(unittest.TestCase):
         self.errors.assert_not_called()
         dialog.close()
 
+    def test_light_theme_is_see_through_too(self):
+        from PySide6.QtWidgets import QFrame
+        card = theme.role(QFrame(), "card")
+        theme.set_theme("light")
+        with mock.patch.object(theme, "SYSTEM", True), \
+                mock.patch.object(theme, "_scene", side_effect=AssertionError("сцена под стеклом не нужна")):
+            dialog = make_dialog(card, theme.kind(QPushButton("Сохранить"), "primary"))
+            dialog.resize(300, 200)
+            image = dialog.grab().toImage()
+        corner = image.pixelColor(image.width() // 2, image.height() - 3)
+        self.assertLess(corner.alpha(), 255)  # сквозь окно виден рабочий стол
+        self.assertGreater(corner.lightness(), 200)  # и оно светлое
+        self.errors.assert_not_called()
+        dialog.close()
+
     def test_easter_egg_stays_dark_and_comes_back_to_light(self):
         theme.set_theme("light")
         theme.set_egg(True)

@@ -470,6 +470,8 @@ def _refresh_app():
         elif isinstance(widget, Halo):
             widget.recolor()
     for window in app.topLevelWidgets():
+        if SYSTEM:
+            sysglass.set_light(window, LIGHT)  # материал под окном — под стать теме
         recolor = getattr(window, "_recolor", None)
         if callable(recolor):
             recolor()  # логотип, значки, буквы-кружки (MainWindow._recolor)
@@ -716,7 +718,7 @@ class _FocusGlow(QObject):
                 sysglass.prepare(obj)
             else:
                 sysglass.prepare(obj)
-                sysglass.attach(obj)
+                sysglass.attach(obj, LIGHT)
                 if isinstance(obj, QDialog):
                     QTimer.singleShot(0, lambda: sysglass.fit_height(obj) if isValid(obj) else None)
         if kind == QEvent.HoverMove and _is_glass_button(obj):
@@ -1079,8 +1081,8 @@ def _glass_radius(button):
 
 
 def _see_through():
-    """Под окном настоящее размытие рабочего стола (системное стекло macOS, только в тёмной теме)."""
-    return SYSTEM and not LIGHT
+    """Под окном настоящее размытие рабочего стола (системное стекло macOS)."""
+    return SYSTEM
 
 
 def _draw_glass(painter, widget, rect, radius, tint, dark, sheen, rim_top, rim_bottom, spot=None,
@@ -1144,13 +1146,14 @@ def _draw_pearl_glass(painter, widget, rect, radius, tint, frost, sheen, rim_top
     path.addRoundedRect(rect, radius, radius)
     painter.save()
     painter.setClipPath(path)
-    window = widget.window()
-    small = _scene(window.width(), window.height())[1]
-    corner = widget.mapTo(window, QPoint(0, 0))
-    width, height = rect.width() * _LENS, rect.height() * _LENS
-    source = QRectF(corner.x() + rect.center().x() - width / 2, corner.y() + rect.center().y() - height / 2, width, height)
-    scale_x, scale_y = small.width() / max(window.width(), 1), small.height() / max(window.height(), 1)
-    painter.drawPixmap(rect, small, QRectF(source.x() * scale_x, source.y() * scale_y, width * scale_x, height * scale_y))
+    if not _see_through():  # при системном стекле под ним уже настоящее размытие
+        window = widget.window()
+        small = _scene(window.width(), window.height())[1]
+        corner = widget.mapTo(window, QPoint(0, 0))
+        width, height = rect.width() * _LENS, rect.height() * _LENS
+        source = QRectF(corner.x() + rect.center().x() - width / 2, corner.y() + rect.center().y() - height / 2, width, height)
+        scale_x, scale_y = small.width() / max(window.width(), 1), small.height() / max(window.height(), 1)
+        painter.drawPixmap(rect, small, QRectF(source.x() * scale_x, source.y() * scale_y, width * scale_x, height * scale_y))
     painter.fillPath(path, _with_alpha(WHITE, frost))
     painter.fillPath(path, tint)
     gloss = QLinearGradient(rect.topLeft(), QPointF(rect.x(), rect.y() + rect.height() * 0.55))
@@ -1307,24 +1310,15 @@ def _paint_window(window):
     try:
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
         sharp = _scene(window.width(), window.height())[0]
-        if SYSTEM and window.isWindow():
-            # окно прозрачное (системное стекло), а светлая тема рисует сплошной фон:
-            # углы скругляем сами, как у окна macOS, и стираем то, что было нарисовано раньше
-            painter.setRenderHint(QPainter.Antialiasing)
-            painter.setCompositionMode(QPainter.CompositionMode_Source)
-            painter.fillRect(window.rect(), Qt.transparent)
-            painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
-            corners = QPainterPath()
-            corners.addRoundedRect(QRectF(window.rect()), sysglass.CORNER, sysglass.CORNER)
-            painter.setClipPath(corners)
         painter.drawPixmap(window.rect(), sharp, sharp.rect())
     finally:
         painter.end()
 
 
 def _paint_wash(window):
-    """Фон окна поверх системного стекла: индиго-вуаль сверху вниз и те же неоновые пятна, что в _scene,
-    но полупрозрачные — окно светится лавандой и фуксией, а цвета рабочего стола проступают."""
+    """Фон окна поверх системного стекла: вуаль сверху вниз и те же пятна света, что в _scene,
+    но полупрозрачные — цвета рабочего стола проступают. В тёмной теме — индиго-вуаль и неон
+    лавандой и фуксией, в светлой — перламутровая дымка и пастель."""
     painter = QPainter(window)
     try:
         painter.setRenderHint(QPainter.Antialiasing)
@@ -1333,9 +1327,14 @@ def _paint_wash(window):
         painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
         width, height = window.width(), window.height()
         wash = QLinearGradient(0, 0, 0, height)
-        wash.setColorAt(0, _with_alpha(GLOW_2, 100))
-        wash.setColorAt(0.5, _with_alpha(GLOW_3, 132))
-        wash.setColorAt(1, _with_alpha(BG, 165))
+        if LIGHT:  # под ней светлая изморозь macOS: дымка лишь выравнивает тон, чтобы текст читался
+            wash.setColorAt(0, _with_alpha(GLOW_1, 120))
+            wash.setColorAt(0.5, _with_alpha(BG, 140))
+            wash.setColorAt(1, _with_alpha(BG, 165))
+        else:
+            wash.setColorAt(0, _with_alpha(GLOW_2, 100))
+            wash.setColorAt(0.5, _with_alpha(GLOW_3, 132))
+            wash.setColorAt(1, _with_alpha(BG, 165))
         painter.fillRect(window.rect(), wash)
         painter.setPen(Qt.NoPen)
         reach = max(width, height)
