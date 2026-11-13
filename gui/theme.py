@@ -189,6 +189,8 @@ def _derive_colors():
         HOLLOW = (f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {rgba(SHADOW, 30)}, "
                   f"stop:0.28 {rgba(WHITE, 150)}, stop:1 {rgba(WHITE, 215)})")
         HOLLOW_FLAT = rgba(SHADOW, 22)  # дорожка полоски: перелив на 8 точках смотрелся бы грязно
+        if SYSTEM:  # подложку панели Qt рисует ещё до _paint_card: плотная — и рабочий стол не проступает
+            GLASS_PANEL = glass(rgba(WHITE, 30), rgba(WHITE, 15), rgba(WHITE, 10))
     elif SYSTEM:  # под стеклом рабочий стол любого цвета: непрозрачная смесь видна серой полосой
         RIM = rgba(ACC_LIGHT, 70)
         HOLLOW = rgba("#05040f", 120)
@@ -1220,8 +1222,9 @@ def _paint_card(card):
         painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
         rect = QRectF(card.rect())
         if LIGHT:  # перламутровая панель: переливчатая кромка вместо отдельной рамки
-            _draw_glass(painter, card, rect, CARD_RADIUS, _with_alpha(WHITE, 30), dark=175, sheen=90,
-                        rim_top=230, rim_bottom=200, depth_alpha=8)
+            # при системном стекле изморозь тоньше: иначе панель почти белая и рабочий стол не проступает
+            _draw_glass(painter, card, rect, CARD_RADIUS, _with_alpha(WHITE, 30), dark=60 if _see_through() else 175,
+                        sheen=90, rim_top=230, rim_bottom=200, depth_alpha=8)
             return
         if SYSTEM:
             # сквозь панель видно размытый рабочий стол; кромка — неон от лаванды к фуксии
@@ -1268,9 +1271,9 @@ def _paint_wash(window):
         width, height = window.width(), window.height()
         wash = QLinearGradient(0, 0, 0, height)
         if LIGHT:  # под ней светлая изморозь macOS: дымка лишь выравнивает тон, чтобы текст читался
-            wash.setColorAt(0, _with_alpha(GLOW_1, 120))
-            wash.setColorAt(0.5, _with_alpha(BG, 140))
-            wash.setColorAt(1, _with_alpha(BG, 165))
+            wash.setColorAt(0, _with_alpha(GLOW_1, 70))
+            wash.setColorAt(0.5, _with_alpha(BG, 95))
+            wash.setColorAt(1, _with_alpha(BG, 120))
         else:
             wash.setColorAt(0, _with_alpha(GLOW_2, 100))
             wash.setColorAt(0.5, _with_alpha(GLOW_3, 132))

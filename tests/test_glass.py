@@ -253,17 +253,26 @@ class Themes(unittest.TestCase):
         dialog.close()
 
     def test_light_theme_is_see_through_too(self):
+        """Светлая тема при системном стекле: окно и панель таблицы полупрозрачные, а не почти белые.
+        (Раньше под панелью лежала плотная подложка из QSS, и рабочий стол не проступал.)"""
+        from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QFrame
-        card = theme.role(QFrame(), "card")
         theme.set_theme("light")
         with mock.patch.object(theme, "SYSTEM", True), \
                 mock.patch.object(theme, "_scene", side_effect=AssertionError("сцена под стеклом не нужна")):
-            dialog = make_dialog(card, theme.kind(QPushButton("Сохранить"), "primary"))
-            dialog.resize(300, 200)
+            theme._set_palette()  # подложки считаются по SYSTEM
+            theme._refresh_app()
+            self.addCleanup(theme._refresh_app)
+            self.addCleanup(theme._set_palette)
+            card = theme.role(QFrame(), "card")
+            dialog = make_dialog(card)
+            dialog.setAttribute(Qt.WA_TranslucentBackground)
+            dialog.resize(400, 300)
+            APP.processEvents()
             image = dialog.grab().toImage()
-        corner = image.pixelColor(image.width() // 2, image.height() - 3)
-        self.assertLess(corner.alpha(), 255)  # сквозь окно виден рабочий стол
-        self.assertGreater(corner.lightness(), 200)  # и оно светлое
+        middle = image.pixelColor(200, 150)  # середина панели
+        self.assertLess(middle.alpha(), 190)  # сквозь панель виден рабочий стол
+        self.assertGreater(middle.lightness(), 200)  # и она светлая
         self.errors.assert_not_called()
         dialog.close()
 
