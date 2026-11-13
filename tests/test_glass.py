@@ -19,8 +19,9 @@ APP = QApplication.instance() or QApplication([])
 
 from gui import prefs, theme  # noqa: E402
 
+prefs.use_file(Path(tempfile.mkdtemp()) / "p.ini")  # до apply: тема не должна браться из настоящих настроек
 theme.apply(APP)
-prefs.use_file(Path(tempfile.mkdtemp()) / "p.ini")
+theme.set_theme("dark")  # проверки ниже рассчитаны на тёмную тему, какая бы ни стояла в системе
 
 
 def make_dialog(*buttons):
@@ -273,6 +274,17 @@ class Themes(unittest.TestCase):
         theme.set_egg(False)
         self.assertTrue(theme.LIGHT)
         self.assertEqual(theme.BG, theme._LIGHT_COLORS["BG"])
+
+    def test_every_picture_goes_into_the_builds(self):
+        root = Path(theme.__file__).resolve().parent.parent
+        scripts = {name: (root / name).read_text(encoding="utf-8") for name in ("build_app.sh", "build_linux.py", "build_windows.py")}
+        for files in (theme._DARK_FILES, theme._LIGHT_FILES):
+            for path in files.values():
+                name = Path(path).name
+                for script, text in scripts.items():
+                    if name.endswith(".svg") and "*.svg" in text:
+                        continue  # все значки берутся одним шаблоном
+                    self.assertIn(name, text, f"{name} нет в {script}: в собранной программе картинки не будет")
 
     def test_light_pictures_exist(self):
         for name in ("CHECK_FILE", "ARROW_FILE", "ARROW_UP_FILE", "EYE_FILE", "EYE_OFF_FILE", "KEY_FILE", "ABOUT_FILE"):

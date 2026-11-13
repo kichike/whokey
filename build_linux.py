@@ -34,6 +34,8 @@ PyInstaller.__main__.run([
     *[arg for svg in sorted(ASSETS.glob("*.svg")) for arg in data(svg, "gui/assets")],
     *data(ASSETS / "icon.png", "gui/assets"),
     *data(ASSETS / "key.png", "gui/assets"),
+    *data(ASSETS / "key_light.png", "gui/assets"),  # то же для светлой темы
+    *data(ASSETS / "about_light.png", "gui/assets"),
     *data(ASSETS / "fart.wav", "gui/assets"),
     *[arg for qm in sorted((HERE / "translations").glob("*.qm")) for arg in data(qm, "translations")],
     "--paths", str(HERE),

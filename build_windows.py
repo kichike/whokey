@@ -35,6 +35,8 @@ args = [
     *[arg for svg in sorted(ASSETS.glob("*.svg")) for arg in data(svg, "gui/assets")],
     *data(ASSETS / "icon.png", "gui/assets"),
     *data(ASSETS / "key.png", "gui/assets"),  # ключ с логотипа в окнах (theme.logo_pixmap)
+    *data(ASSETS / "key_light.png", "gui/assets"),  # то же для светлой темы
+    *data(ASSETS / "about_light.png", "gui/assets"),
     *data(ASSETS / "fart.wav", "gui/assets"),  # звук пасхалки (gui/sound.py)
     *data(ASSETS / "WhoKey.ico", "gui/assets"),  # иконка окна на панели задач
     *[arg for qm in sorted((HERE / "translations").glob("*.qm")) for arg in data(qm, "translations")],
