@@ -282,9 +282,15 @@ class Themes(unittest.TestCase):
     def test_every_picture_goes_into_the_builds(self):
         root = Path(theme.__file__).resolve().parent.parent
         scripts = {name: (root / name).read_text(encoding="utf-8") for name in ("build_app.sh", "build_linux.py", "build_windows.py")}
+        # значок окна свой у каждой системы: WhoKey.ico — только у Windows, icon.png — у Mac и Linux
+        self.assertIn("WhoKey.ico", scripts["build_windows.py"])
+        for script in ("build_app.sh", "build_linux.py"):
+            self.assertIn("icon.png", scripts[script])
         for files in (theme._DARK_FILES, theme._LIGHT_FILES):
             for path in files.values():
                 name = Path(path).name
+                if path == theme.ICON_FILE:
+                    continue
                 for script, text in scripts.items():
                     if name.endswith(".svg") and "*.svg" in text:
                         continue  # все значки берутся одним шаблоном
