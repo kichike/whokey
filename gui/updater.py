@@ -250,7 +250,7 @@ def launch_installer(package, version, work, pid):
         command = ("/bin/sh", [_helper(work, MAC_SWAP), str(pid), str(staged), str(current), "/usr/bin/open"])
     elif sys.platform == "win32":
         # установщик Inno Setup без окон: сам закроет мост расширения, поставит и запустит WhoKey
-        command = (str(package), ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS"])
+        command = (str(package), ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/RELAUNCH"])
     else:
         install = extract_linux(package, Path(work) / "unpacked")
         program = Path.home() / ".local" / "opt" / "WhoKey" / "WhoKey"

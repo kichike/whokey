@@ -72,5 +72,17 @@ Name: "{autodesktop}\WhoKey"; Filename: "{app}\WhoKey.exe"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\WhoKey.exe"; Description: "{cm:LaunchProgram,WhoKey}"; Flags: nowait postinstall skipifsilent
-; обновление по кнопке в WhoKey (gui/updater.py) ставит без окон — и программа запускается сама
-Filename: "{app}\WhoKey.exe"; Flags: nowait; Check: WizardSilent
+; обновление по кнопке в WhoKey (gui/updater.py) ставит без окон с /RELAUNCH — и программа запускается сама.
+; Обычная тихая установка (например, администратором) ничего не запускает.
+Filename: "{app}\WhoKey.exe"; Flags: nowait; Check: WizardSilent and RelaunchAsked
+
+[Code]
+function RelaunchAsked: Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  for i := 1 to ParamCount do
+    if CompareText(ParamStr(i), '/RELAUNCH') = 0 then
+      Result := True;
+end;
