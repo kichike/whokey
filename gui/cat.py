@@ -233,7 +233,11 @@ class Reveal(QWidget):
         whole.addRect(QRectF(self.rect()).adjusted(-2, -2, 2, 2))
         pupil = self._pupil()
         painter.setClipPath(whole.subtracted(pupil))
+        # Снимок не кладём поверх, а ставим вместо: при системном стекле фон окна полупрозрачный,
+        # и сквозь снимок просвечивало новое окно — два логотипа и два заголовка со сдвигом.
+        painter.setCompositionMode(QPainter.CompositionMode_Source)
         painter.drawPixmap(0, 0, self.snapshot)
+        painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
         painter.setClipping(False)
         painter.setBrush(Qt.NoBrush)
         for width, alpha in ((14, 40), (7, 90), (2.5, 255)):  # светящаяся кромка зрачка

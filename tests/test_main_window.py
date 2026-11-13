@@ -177,6 +177,28 @@ class EasterEgg(unittest.TestCase):
         cat_widget = self.window._peeking_cat
         self.assertEqual(cat_widget.geometry().bottom(), self.window.height() - 1)
 
+    def test_new_window_does_not_show_through_the_old_snapshot(self):
+        """Системное стекло: фон окна полупрозрачный, и новое окно просвечивало сквозь снимок старого."""
+        from PySide6.QtGui import QColor, QPainter, QPixmap
+        from PySide6.QtWidgets import QWidget
+
+        class Translucent(QWidget):
+            def paintEvent(self, event):
+                QPainter(self).fillRect(self.rect(), QColor("#ff0000"))  # «новое окно»
+
+        window = Translucent()
+        window.setAttribute(Qt.WA_TranslucentBackground)
+        window.resize(200, 100)
+        window.show()
+        old = QPixmap(window.size())
+        old.fill(QColor(0, 0, 255, 60))  # «старое окно» — полупрозрачное
+        reveal = cat.Reveal(window, old)
+        reveal.animation.stop()
+        reveal._advance(0.1)  # зрачок ещё узкий
+        corner = window.grab().toImage().pixelColor(5, 5)
+        self.assertLess(corner.red(), 40)  # в углу — только старый снимок, без красного под ним
+        window.close()
+
     def test_slow_clicks_do_not_count(self):
         for _ in range(3):
             self.window._logo_clicked()
