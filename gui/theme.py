@@ -19,7 +19,7 @@ from pathlib import Path
 from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import (QColor, QCursor, QFont, QFontDatabase, QFontMetricsF, QGradient, QIcon, QLinearGradient, QPainter,
                            QPainterPath, QPalette, QPen, QPixmap, QRadialGradient)
-from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QDialog, QFileDialog, QFrame, QGraphicsDropShadowEffect, QLabel,
+from PySide6.QtWidgets import (QAbstractScrollArea, QAbstractSpinBox, QApplication, QDialog, QFileDialog, QFrame, QGraphicsDropShadowEffect, QLabel,
                                QLineEdit, QMainWindow, QPushButton, QStyle, QToolButton, QWidget)
 from shiboken6 import isValid  # жив ли ещё объект Qt за питоновской обёрткой
 
@@ -711,6 +711,11 @@ def _drag_window(obj, event):
         return False
     if obj is not window and type(obj) not in (QWidget, QFrame, QLabel) and obj.metaObject().className() != "QStatusBar":
         return False
+    parent = obj.parentWidget()
+    while parent is not None and parent is not window:  # область таблицы, заметки, списка — простой QWidget
+        if isinstance(parent, QAbstractScrollArea):    # (viewport), но нажатие нужно им самим
+            return False
+        parent = parent.parentWidget()
     if isinstance(obj, QLabel) and ("<a " in obj.text() or obj.textInteractionFlags() & Qt.TextSelectableByMouse):
         return False
     handle = window.windowHandle()

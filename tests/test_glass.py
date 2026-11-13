@@ -190,6 +190,27 @@ class SystemGlass(unittest.TestCase):
         sysglass._trim_top(dialog)
         self.assertEqual(column.contentsMargins().top(), 8)
 
+    def test_table_and_text_areas_are_not_drag_handles(self):
+        """Ревью 1.9.0: у таблицы и многострочного поля внутренняя область — простой QWidget,
+        и нажатие на строку таблицы тянуло окно вместо того, чтобы выбрать запись."""
+        from PySide6.QtGui import QWindow
+        from PySide6.QtWidgets import QPlainTextEdit, QTableWidget, QTableWidgetItem
+        table, note = QTableWidget(3, 1), QPlainTextEdit("заметка")
+        for row in range(3):
+            table.setItem(row, 0, QTableWidgetItem(f"запись {row}"))
+        dialog = make_dialog(table, note)
+        dialog.resize(320, 360)
+        APP.processEvents()
+        with mock.patch.object(theme, "SYSTEM", True), \
+                mock.patch.object(QWindow, "startSystemMove", return_value=True) as move:
+            row = table.visualItemRect(table.item(1, 0)).center()
+            QTest.mouseClick(table.viewport(), Qt.LeftButton, Qt.NoModifier, row)
+            QTest.mouseClick(note.viewport(), Qt.LeftButton, Qt.NoModifier, QPoint(5, 5))
+            move.assert_not_called()
+        self.assertEqual(table.currentRow(), 1)  # строка выбрана
+        self.errors.assert_not_called()
+        dialog.close()
+
     def test_window_drags_by_empty_places_only(self):
         """Полосу заголовка закрывает стекло: окно тянется за фон и подписи, но не за кнопки и ссылки."""
         from PySide6.QtGui import QWindow
