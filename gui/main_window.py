@@ -217,6 +217,7 @@ class MainWindow(QMainWindow):
         group.setFixedHeight(HEADER_HEIGHT)
         row.addWidget(group)
         lock = buttons[3]
+        lock.setObjectName("lock")  # круглая: без боковых полей обычной кнопки (theme: QPushButton#lock)
         lock.setFixedSize(HEADER_HEIGHT, HEADER_HEIGHT)
         bigger = lock.font()
         bigger.setPixelSize(16)  # значок замка в круглой кнопке крупнее надписей

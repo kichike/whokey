@@ -37,10 +37,12 @@ def available():
 
 
 def is_window(obj):
-    """Окна, которым нужно стекло: главное, вход и все диалоги (но не меню и подсказки)."""
+    """Окна, которым нужно стекло: главное, вход, все диалоги, меню правого клика и выпадающие списки
+    (их помечает theme.rounded_menu / rounded_popup свойством glassPopup). Подсказки — нет."""
     if not isinstance(obj, QWidget) or not obj.isWindow():
         return False
-    return isinstance(obj, (QMainWindow, QDialog)) or obj.property("role") == "backdrop"
+    return (isinstance(obj, (QMainWindow, QDialog)) or obj.property("role") == "backdrop"
+            or obj.property("glassPopup") is True)
 
 
 def prepare(window):
@@ -81,7 +83,7 @@ def attach(window, light=False):
     _look(fx, light)
     fx.setAutoresizingMask_(AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
     fx.setWantsLayer_(True)
-    fx.layer().setCornerRadius_(CORNER)
+    fx.layer().setCornerRadius_(float(window.property("glassRadius") or CORNER))  # у меню скругление меньше
     fx.layer().setMasksToBounds_(True)
     if fx.layer().respondsToSelector_("setCornerCurve:"):
         fx.layer().setCornerCurve_("continuous")

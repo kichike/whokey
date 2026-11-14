@@ -813,14 +813,42 @@ def _paint_liquid(obj):
     return None
 
 
+POPUP_RADIUS = 14  # скругление меню и выпадающих списков
+
+
+def _popup_style():
+    """Меню правого клика и выпадающие списки — стеклом B. На Mac под ними настоящее размытие
+    (sysglass), поэтому заливка тоньше; на Windows/Linux размытия нет — заливка плотнее, чтобы читалось."""
+    if LIGHT:
+        fill = rgba("#fbfaff", 150 if SYSTEM else 235)
+        rim, line = rgba(WHITE, 230), rgba("#3a2f8a", 30)
+        pick = f"qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {rgba(ACC, 46)}, stop:1 {rgba(MAGENTA, 38)})"
+        pick_rim, pick_ink = rgba(WHITE, 240), TEXT
+    else:
+        fill = rgba("#0b0920", 120 if SYSTEM else 232)
+        rim, line = rgba(WHITE, 46), rgba(WHITE, 26)
+        pick = f"qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {rgba(ACC, 95)}, stop:1 {rgba(MAGENTA, 80)})"
+        pick_rim, pick_ink = rgba(WHITE, 60), WHITE
+    return f"""
+QMenu, QComboBox QAbstractItemView {{
+    background: {fill}; border: 1px solid {rim}; border-radius: {POPUP_RADIUS}px; padding: 6px; }}
+QMenu::item, QComboBox QAbstractItemView::item {{
+    padding: 7px 22px 7px 14px; border-radius: 9px; border: 1px solid transparent; background: transparent; }}
+QMenu::item:selected, QComboBox QAbstractItemView::item:selected, QComboBox QAbstractItemView::item:hover {{
+    background: {pick}; border: 1px solid {pick_rim}; color: {pick_ink}; }}
+QMenu::separator {{ height: 1px; background: {line}; margin: 5px 10px; }}
+"""
+
+
 def _liquid_style():
     """Правила QSS для жидкого стекла: фон и рамки рисует стекло, Qt — только текст."""
-    return f"""
+    return _popup_style() + f"""
 QPushButton, QToolButton, QPushButton:hover, QToolButton:hover, QPushButton:pressed, QToolButton:pressed,
 QPushButton:focus, QToolButton:focus, QPushButton:disabled, QToolButton:checked,
 QPushButton[kind="primary"], QPushButton[kind="primary"]:hover, QPushButton[kind="primary"]:pressed,
 QPushButton[kind="danger"], QPushButton[kind="danger"]:pressed {{ background: transparent; border: none; }}
 QPushButton {{ padding: 8px 18px; }}
+QPushButton#lock, QPushButton#lock:pressed {{ padding: 0; }}
 QPushButton:pressed {{ padding: 8px 18px; }}
 QLineEdit, QSpinBox, QPlainTextEdit, QLineEdit:focus, QSpinBox:focus, QPlainTextEdit:focus,
 QLineEdit[invalid="true"], QPlainTextEdit[invalid="true"] {{ background: transparent; border: none; }}
@@ -1455,6 +1483,8 @@ def rounded_menu(menu):
     """Меню со скруглёнными углами: без прозрачного окна под ним углы остались бы квадратными."""
     menu.setWindowFlags(menu.windowFlags() | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
     menu.setAttribute(Qt.WA_TranslucentBackground)
+    menu.setProperty("glassPopup", True)  # стекло: на Mac под ним размытие рабочего стола (sysglass)
+    menu.setProperty("glassRadius", POPUP_RADIUS)
     return menu
 
 
@@ -1464,6 +1494,8 @@ def rounded_popup(combo):
     popup = combo.view().window()
     popup.setWindowFlags(popup.windowFlags() | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
     popup.setAttribute(Qt.WA_TranslucentBackground)
+    popup.setProperty("glassPopup", True)
+    popup.setProperty("glassRadius", POPUP_RADIUS)
     return combo
 
 
