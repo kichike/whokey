@@ -453,8 +453,7 @@ class AboutDialog(QDialog):
             close.addButton(self.check_button, QDialogButtonBox.ActionRole)
             updater.checked.connect(self._checked)
             self._updater = updater
-        else:
-            self._status(tr("Updates by button work in the installed app."))
+
         column = QVBoxLayout(self)
         column.setSpacing(10)
         head = QHBoxLayout()
@@ -473,7 +472,9 @@ class AboutDialog(QDialog):
         column.addWidget(close)
         what.setMinimumWidth(380)
         what.setMinimumHeight(what.heightForWidth(380))
-        if updater is not None and updater.version:
+        if updater is None:
+            self._status(tr("Updates by button work in the installed app."))
+        elif updater.version:
             self._checked("found")
 
     def _status(self, text):
