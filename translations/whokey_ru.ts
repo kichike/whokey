@@ -695,7 +695,7 @@ It is encrypted with the same master password. To open it, choose it with the &q
     </message>
     <message>
         <source>Restart to update</source>
-        <translation>Перезапустить и обновить</translation>
+        <translation>Перезапустить</translation>
     </message>
     <message>
         <source>WhoKey {version} is downloaded and checked. Press to restart into it.</source>

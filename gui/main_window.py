@@ -641,35 +641,50 @@ class MainWindow(QMainWindow):
     def offer_update(self, version):
         """Найдена новая версия: кнопка «Обновить до …» вверху окна."""
         self._update_version = version
-        self.update_button.setText("↓  " + tr("Update to {version}").format(version=version))
-        self.update_button.setToolTip(theme.plain_tip(tr("Download WhoKey {version}, check its signature and restart. The vault is locked; your passwords stay where they are.").format(version=version)))
-        self.update_button.setEnabled(True)
-        self.update_button.show()
+        self._set_update_button("↓  " + tr("Update to {version}").format(version=version),
+                                tr("Download WhoKey {version}, check its signature and restart. The vault is locked; your passwords stay where they are.").format(version=version))
+
+    def _set_update_button(self, text, tip=None, busy=False):
+        """Надпись кнопки обновления. Пока идёт загрузка, кнопка не жмётся, но и не сереет:
+        серая «выключенная» надпись на фиолетовом не читается. Ширина — под новую надпись сразу,
+        иначе после «Скачиваю…» длинное «Перезапустить…» обрезалось."""
+        self._update_busy = busy
+        button = self.update_button
+        button.setText(text)
+        if tip is not None:
+            button.setToolTip(theme.plain_tip(tip))
+        button.setCursor(Qt.ArrowCursor if busy else Qt.PointingHandCursor)
+        button.setMinimumWidth(button.fontMetrics().horizontalAdvance(text) + 40)
+        button.updateGeometry()
+        button.show()
+        holder = button.parentWidget()
+        if holder is not None and holder.layout() is not None:
+            holder.layout().activate()  # соседние кнопки сдвигаются сразу, а не налезают
 
     def _update_clicked(self):
-        self.update_button.setEnabled(False)
-        self.update_button.setText("↓  " + tr("Downloading…"))
+        if self._update_busy:
+            return
+        self._set_update_button("↓  " + tr("Downloading…"), busy=True)
         self.update_requested.emit()
 
     def update_progress(self, percent):
-        self.update_button.setText("↓  " + tr("Downloading… {percent}%").format(percent=percent))
+        self._set_update_button("↓  " + tr("Downloading… {percent}%").format(percent=percent), busy=True)
 
     def offer_restart(self, version):
         """Новая версия скачана и проверена, но сейчас открыто окно — ставим, когда человек нажмёт."""
         self._update_version = version
-        self.update_button.setText("↻  " + tr("Restart to update"))
-        self.update_button.setToolTip(theme.plain_tip(tr("WhoKey {version} is downloaded and checked. Press to restart into it.").format(version=version)))
-        self.update_button.setEnabled(True)
-        self.update_button.show()
+        self._set_update_button("↻  " + tr("Restart to update"),
+                                tr("WhoKey {version} is downloaded and checked. Press to restart into it.").format(version=version))
 
     def update_installing(self):
-        self.update_button.setText(tr("Installing…"))
+        self._set_update_button(tr("Installing…"), busy=True)
 
     def update_failed(self, message):
         """Не скачалось или не прошло проверку: кнопка снова доступна, причина — в строке состояния."""
         self.offer_update(self._update_version)
         self.statusBar().showMessage("⚠ " + message, 15000)
 
+    _update_busy = False
     _update_version = ""
 
     def about(self):

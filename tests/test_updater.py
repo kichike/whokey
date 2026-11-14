@@ -386,14 +386,36 @@ class Button(unittest.TestCase):
         w.update_requested.connect(lambda: asked.append(1))
         w.update_button.click()
         self.assertEqual(asked, [1])
-        self.assertFalse(w.update_button.isEnabled())  # второй раз не нажать, пока качается
         w.update_progress(42)
         self.assertIn("42", w.update_button.text())
+        w.update_button.click()
+        self.assertEqual(asked, [1])  # второй раз не нажать, пока качается
+        self.assertTrue(w.update_button.isEnabled())  # но и не сереет: серая надпись не читается
         w.update_failed("нет сети")
-        self.assertTrue(w.update_button.isEnabled())
         self.assertIn("нет сети", w.statusBar().currentMessage())
-        w.offer_restart("1.10.0")
-        self.assertTrue(w.update_button.isEnabled())
+        w.update_button.click()
+        self.assertEqual(asked, [1, 1])
+
+    def test_button_text_is_never_clipped(self):
+        """После «Скачиваю…» длинное «Перезапустить и обновить» обрезалось: кнопка не росла."""
+        from gui import i18n
+        i18n.set_language("ru")
+        try:
+            w = self.window
+            w.resize(820, 520)
+            w.show()
+            steps = [lambda: w.offer_update("1.10.0"), w._update_clicked, lambda: w.update_progress(42),
+                     lambda: w.offer_restart("1.10.0"), w.update_installing]
+            for step in steps:
+                step()
+                QApplication.processEvents()
+                b = w.update_button
+                self.assertGreaterEqual(b.width(), b.fontMetrics().horizontalAdvance(b.text()) + 30, b.text())
+                for other in b.parentWidget().findChildren(type(b)):
+                    if other is not b and other.isVisible() and other.parentWidget() is b.parentWidget():
+                        self.assertFalse(other.geometry().intersects(b.geometry()), (b.text(), other.text()))
+        finally:
+            i18n.set_language("en")
 
     def test_about_shows_the_check_result(self):
         from PySide6.QtCore import QObject, Signal
