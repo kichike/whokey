@@ -687,11 +687,11 @@ It is encrypted with the same master password. To open it, choose it with the &q
     </message>
     <message>
         <source>Downloading…</source>
-        <translation>Скачиваю…</translation>
+        <translation>Загрузка…</translation>
     </message>
     <message>
         <source>Downloading… {percent}%</source>
-        <translation>Скачиваю… {percent}%</translation>
+        <translation>Загрузка… {percent}%</translation>
     </message>
     <message>
         <source>Restart to update</source>
