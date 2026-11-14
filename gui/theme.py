@@ -227,6 +227,8 @@ def _forget_plates():
     global _PLATE_BYTES
     _PLATES.clear()
     _SHADOWS.clear()
+    global _SHADOW_BYTES
+    _SHADOW_BYTES = 0
     _LENS_SOURCES.clear()
     _STYLE_B.clear()
     _PLATE_BYTES = 0
@@ -583,10 +585,21 @@ def _shadow(width, height, radius, look, dpr):
         painter.setBrush(Qt.NoBrush)
         painter.drawPath(_rounded(shape, radius, -0.75))
     painter.end()
-    _SHADOWS[key] = shadow
-    if len(_SHADOWS) > 96:
-        _SHADOWS.popitem(last=False)
+    _remember_shadow(key, shadow)
     return shadow
+
+
+_SHADOW_BUDGET = 16 * 1024 * 1024  # тени и плашки строк: при растягивании окна копились бы новые размеры
+_SHADOW_BYTES = 0
+
+
+def _remember_shadow(key, pixmap):
+    global _SHADOW_BYTES
+    _SHADOWS[key] = pixmap
+    _SHADOW_BYTES += pixmap.width() * pixmap.height() * 4
+    while _SHADOW_BYTES > _SHADOW_BUDGET and len(_SHADOWS) > 1:
+        _, old = _SHADOWS.popitem(last=False)
+        _SHADOW_BYTES -= old.width() * old.height() * 4
 
 
 def paint_row_glass(painter, row, clip):
@@ -604,7 +617,7 @@ def paint_row_glass(painter, row, clip):
         p.setRenderHint(QPainter.Antialiasing)
         _paint_b(p, QRectF(0, 0, row.width(), row.height()), radius, style_b()["row_sel"])
         p.end()
-        _SHADOWS[key] = plate
+        _remember_shadow(key, plate)
     painter.save()
     painter.setClipRect(clip)
     painter.drawPixmap(row.topLeft(), plate)
@@ -842,19 +855,22 @@ POPUP_RADIUS = 14  # скругление меню и выпадающих сп�
 def _popup_style():
     """Меню правого клика и выпадающие списки — стеклом B. На Mac под ними настоящее размытие
     (sysglass), поэтому заливка тоньше; на Windows/Linux размытия нет — заливка плотнее, чтобы читалось."""
+    # тонкая заливка — только когда под меню действительно легло размытие macOS (glassAttached);
+    # иначе почти сплошная: сквозь меню не должен читаться текст таблицы
     if LIGHT:
-        fill = rgba(_veil_ink(True), 150 if SYSTEM else 235)
+        fill, thin = rgba(_veil_ink(True), 235), rgba(_veil_ink(True), 150)
         rim, line = rgba(WHITE, 230), rgba(SHADOW, 30)
         pick = f"qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {rgba(ACC, 46)}, stop:1 {rgba(MAGENTA, 38)})"
         pick_rim, pick_ink = rgba(WHITE, 240), TEXT
     else:
-        fill = rgba(_veil_ink(False), 120 if SYSTEM else 232)
+        fill, thin = rgba(_veil_ink(False), 232), rgba(_veil_ink(False), 120)
         rim, line = rgba(WHITE, 46), rgba(WHITE, 26)
         pick = f"qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {rgba(ACC, 95)}, stop:1 {rgba(MAGENTA, 80)})"
         pick_rim, pick_ink = rgba(WHITE, 60), WHITE
     return f"""
 QMenu, QComboBox QAbstractItemView {{
     background: {fill}; border: 1px solid {rim}; border-radius: {POPUP_RADIUS}px; padding: 6px; }}
+QMenu[glassAttached="true"], QComboBoxPrivateContainer[glassAttached="true"] QAbstractItemView {{ background: {thin}; }}
 QMenu::item, QComboBox QAbstractItemView::item {{
     padding: 7px 22px 7px 14px; border-radius: 9px; border: 1px solid transparent; background: transparent; }}
 QMenu::item:selected, QComboBox QAbstractItemView::item:selected, QComboBox QAbstractItemView::item:hover {{
@@ -990,8 +1006,8 @@ QHeaderView::section {{
     border-bottom: 1px solid {rgba(ACC, 90)};
     padding: 8px 10px; font-size: {FONT_SIZE - 1}px; font-weight: 600; }}
 
-/* меню скруглено (см. rounded_menu) и непрозрачно: размытия под ним нет,
-   и сквозь прозрачное меню читался бы текст таблицы */
+/* меню скруглено (см. rounded_menu). Почти непрозрачно, пока под ним нет размытия macOS
+   (жидкое стекло: _popup_style, glassAttached) — иначе сквозь меню читался бы текст таблицы */
 /* строка меню (на Windows — внутри окна): прозрачная, пункты — скруглённой плашкой */
 QMenuBar {{ background: transparent; }}
 QMenuBar::item {{ background: transparent; padding: 4px 10px; border-radius: 6px; }}
@@ -1397,6 +1413,9 @@ def _drag_window(obj, event):
         return False
     window = obj.window()
     if not sysglass.is_window(window) or isinstance(window, QFileDialog):
+        return False
+    if window.property("glassPopup") is True or window.windowType() == Qt.Popup:
+        # меню и выпадающие списки не тянем: нажатие на пункт меню — это выбор пункта (ревью 1.11.0)
         return False
     # нажатие, которое элемент не взял (ссылка, поле), Qt передаёт родителю — такое окно не тянет
     target = window.childAt(window.mapFromGlobal(event.globalPosition().toPoint())) or window

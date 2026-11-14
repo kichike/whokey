@@ -88,11 +88,20 @@ def attach(window, light=False):
     if fx.layer().respondsToSelector_("setCornerCurve:"):
         fx.layer().setCornerCurve_("continuous")
     frame_view.addSubview_positioned_relativeTo_(fx, AppKit.NSWindowBelow, content)
-    _clear_titlebar(ns_window)
     ns_window.invalidateShadow()
 
     if first:
         _trim_top(window)
+    try:  # последним и без падения: закрытые виды AppKit могут поменяться в будущих macOS
+        _clear_titlebar(ns_window)
+    except Exception:
+        pass
+    if window.property("glassPopup") is True and not window.property("glassAttached"):
+        # размытие под меню есть — теперь его заливку можно сделать тонкой (theme: [glassAttached="true"])
+        window.setProperty("glassAttached", True)
+        for widget in [window] + window.findChildren(QWidget):  # и список внутри выпадающего окошка
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
 
 
 def _clear_titlebar(ns_window):

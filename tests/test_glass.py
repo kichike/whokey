@@ -446,3 +446,28 @@ class LiquidGlassB(unittest.TestCase):
             self.assertFalse(dialog.grab().isNull())
         self.assertFalse(theme._PLATES)
         dialog.close()
+
+
+class PopupGlass(unittest.TestCase):
+    """Меню со стеклом: нажатие на пункт — выбор пункта, а не перетаскивание окна (ревью 1.11.0)."""
+
+    def test_menu_press_never_drags_the_window(self):
+        from PySide6.QtCore import QEvent, QPointF
+        from PySide6.QtGui import QMouseEvent
+        from PySide6.QtWidgets import QMenu
+        menu = theme.rounded_menu(QMenu())
+        menu.addAction("Копировать пароль")
+        self.assertTrue(menu.property("glassPopup"))
+        press = QMouseEvent(QEvent.MouseButtonPress, QPointF(20, 15), QPointF(20, 15), Qt.LeftButton,
+                            Qt.LeftButton, Qt.NoModifier)
+        with mock.patch.object(theme.sysglass, "is_window", return_value=True):
+            self.assertFalse(theme._drag_window(menu, press))
+
+    def test_shadow_cache_is_limited(self):
+        theme._forget_plates()
+        with mock.patch.object(theme, "_SHADOW_BUDGET", 1):
+            look = dict(shadow=10, shadow_dy=3, shadow_a=0.3, hairline=0.0)
+            for width in range(100, 110):
+                theme._shadow(width, 40, 12, look, 1.0)
+        self.assertEqual(len(theme._SHADOWS), 1)
+        theme._forget_plates()
