@@ -681,7 +681,10 @@ class MainWindow(QMainWindow):
 
     def update_failed(self, message):
         """Не скачалось или не прошло проверку: кнопка снова доступна, причина — в строке состояния."""
-        self.offer_update(self._update_version)
+        if self.updater is not None and self.updater.version is None:
+            self.update_button.hide()  # подделка или битый релиз: эту версию больше не предлагаем
+        else:
+            self.offer_update(self._update_version)
         self.statusBar().showMessage("⚠ " + message, 15000)
 
     _update_busy = False

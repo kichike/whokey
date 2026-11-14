@@ -75,6 +75,12 @@ echo "Подпись: ${SIGN/-/ad-hoc}"
 codesign -s "$SIGN" --force --deep --options runtime --entitlements "$P/WhoKey.entitlements" "$APP"
 codesign --verify --deep --strict "$APP"
 
+# Для установщика (build_dmg.sh) ставить не нужно: WHOKEY_NO_INSTALL=1
+if [ -n "$WHOKEY_NO_INSTALL" ]; then
+  echo "Готово: $APP (не установлено)"
+  exit 0
+fi
+
 # Устанавливаем в ~/Applications — личную папку программ (её видно в Launchpad)
 mkdir -p "$HOME/Applications"
 rm -rf "$INSTALL"

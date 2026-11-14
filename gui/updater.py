@@ -9,7 +9,8 @@
   • Скачанный файл ставится, только если его SHA-256 совпал с подписанным.
   • На Mac новая программа должна быть подписана тем же сертификатом, что и установленная
     (codesign), и иметь ту самую версию.
-  • Только https, только релизы этого репозитория, ограничение размера ответов.
+  • Только https, только релизы этого репозитория, ограничение размера ответов. GitHub отдаёт файлы
+    через переадресацию на свой файловый сервер; куда бы она ни вела, решает подпись, а не адрес.
   • Ничего не уходит в сеть, кроме обычного запроса к GitHub (без данных пользователя).
 
 Сеть — через QtNetwork (системные сертификаты на любой системе), окна не замирают.
@@ -158,11 +159,14 @@ while kill -0 "$1" 2>/dev/null; do
     n=$((n + 1)); [ "$n" -gt 600 ] && exit 1
     sleep 0.1
 done
+# ещё раз, прямо перед заменой: та же подпись, ничего не подменено после проверки в WhoKey
+/usr/bin/codesign --verify --deep --strict -R "=$5" "$2" >/dev/null 2>&1 || { rm -rf "$6"; "$4" "$3"; exit 1; }
 old="$3.old"
 rm -rf "$old"
 if mv "$3" "$old"; then
     if mv "$2" "$3"; then rm -rf "$old"; else mv "$old" "$3"; fi
 fi
+rm -rf "$6"
 "$4" "$3"
 """
 
@@ -174,6 +178,7 @@ while kill -0 "$1" 2>/dev/null; do
     sleep 0.1
 done
 WHOKEY_UPDATING=1 /bin/sh "$2" >/dev/null 2>&1
+rm -rf "$4"
 "$3" >/dev/null 2>&1 &
 """
 
@@ -193,7 +198,7 @@ def prepare_mac(dmg, version, work):
     mount = Path(work) / "mnt"
     mount.mkdir()
     _run(["/usr/bin/hdiutil", "attach", "-nobrowse", "-readonly", "-noautoopen", "-mountpoint", str(mount), str(dmg)])
-    staged = current.with_name(".WhoKey-update.app")
+    staged = Path(work) / "WhoKey.app"  # во временной папке только для владельца — подменить некому
     try:
         source = mount / "WhoKey.app"
         if source.is_symlink() or not source.is_dir():
@@ -211,7 +216,7 @@ def prepare_mac(dmg, version, work):
     except Exception:
         shutil.rmtree(staged, ignore_errors=True)
         raise
-    return staged, current
+    return staged, current, requirement
 
 
 def extract_linux(archive, dest):
@@ -219,21 +224,43 @@ def extract_linux(archive, dest):
     dest = Path(dest)
     with tarfile.open(archive, "r:gz") as tar:
         members = tar.getmembers()
+        links = {os.path.normpath(m.name) for m in members if m.issym()}
         for member in members:
             parts = Path(member.name).parts
             if member.name.startswith("/") or ".." in parts or not parts or parts[0] != "WhoKey":
                 raise UpdateError(tr("The downloaded update is damaged."))
             if not (member.isfile() or member.isdir() or member.issym()):
                 raise UpdateError(tr("The downloaded update is damaged."))
+            # путь через ссылку из того же архива: файл мог бы лечь мимо dest (цепочка ссылок)
+            if any(os.path.join(*parts[:i]) in links for i in range(1, len(parts))):
+                raise UpdateError(tr("The downloaded update is damaged."))
             if member.issym():  # ссылка внутри архива — только на файл внутри той же папки
                 target = os.path.normpath(os.path.join(str(dest), os.path.dirname(member.name), member.linkname))
                 if os.path.isabs(member.linkname) or not target.startswith(str(dest / "WhoKey") + os.sep):
                     raise UpdateError(tr("The downloaded update is damaged."))
-        tar.extractall(dest, members=members)
+        try:
+            tar.extractall(dest, members=members, filter="data")  # Python 3.9.17+: ещё одна проверка
+        except TypeError:
+            tar.extractall(dest, members=members)
+    root = os.path.realpath(dest / "WhoKey")
+    for member in members:
+        if not os.path.realpath(dest / os.path.dirname(member.name)).startswith(root):
+            raise UpdateError(tr("The downloaded update is damaged."))
     install = dest / "WhoKey" / "install.sh"
     if not install.is_file():
         raise UpdateError(tr("The downloaded update is damaged."))
     return install
+
+
+def _sha256(path):
+    digest = hashlib.sha256()
+    try:
+        with open(path, "rb") as source:
+            for chunk in iter(lambda: source.read(1 << 20), b""):
+                digest.update(chunk)
+    except OSError:
+        return None
+    return digest.hexdigest()
 
 
 def _helper(work, text):
@@ -245,18 +272,39 @@ def _helper(work, text):
 def launch_installer(package, version, work, pid):
     """Готовит обновление и запускает помощника, который поставит его, когда WhoKey закроется.
     После этого WhoKey должен выйти сам. Не вышло — UpdateError, и ничего не поменялось."""
-    if sys.platform == "darwin":
-        staged, current = prepare_mac(package, version, work)
-        command = ("/bin/sh", [_helper(work, MAC_SWAP), str(pid), str(staged), str(current), "/usr/bin/open"])
-    elif sys.platform == "win32":
-        # установщик Inno Setup без окон: сам закроет мост расширения, поставит и запустит WhoKey
-        command = (str(package), ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/RELAUNCH"])
-    else:
-        install = extract_linux(package, Path(work) / "unpacked")
-        program = Path.home() / ".local" / "opt" / "WhoKey" / "WhoKey"
-        command = ("/bin/sh", [_helper(work, LINUX_SWAP), str(pid), str(install), str(program)])
+    try:
+        command = _installer_command(package, version, work, pid)
+    except UpdateError:
+        raise
+    except (OSError, tarfile.TarError, ValueError, plistlib.InvalidFileException) as error:
+        raise UpdateError(tr("The downloaded update is damaged.")) from error
     if not QProcess.startDetached(*command):
         raise UpdateError(tr("Could not install the update ({step}).").format(step=Path(command[0]).name))
+
+
+def _installer_command(package, version, work, pid):
+    if sys.platform == "darwin":
+        staged, current, requirement = prepare_mac(package, version, work)
+        return ("/bin/sh", [_helper(work, MAC_SWAP), str(pid), str(staged), str(current), "/usr/bin/open",
+                            requirement, str(work)])
+    if sys.platform == "win32":
+        # установщик Inno Setup без окон: сам закроет мост расширения, поставит и запустит WhoKey
+        # (папку со скачанным установщиком уберёт следующий запуск: sweep_old)
+        return (str(package), ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/RELAUNCH"])
+    install = extract_linux(package, Path(work) / "unpacked")
+    program = Path.home() / ".local" / "opt" / "WhoKey" / "WhoKey"
+    return ("/bin/sh", [_helper(work, LINUX_SWAP), str(pid), str(install), str(program), str(work)])
+
+
+def sweep_old(prefix="whokey-update-", older=3600):
+    """Убирает старые папки скачивания (остаются после обновления на Windows или если что-то упало)."""
+    base = Path(tempfile.gettempdir())
+    for folder in base.glob(prefix + "*"):
+        try:
+            if folder.is_dir() and not folder.is_symlink() and time.time() - folder.stat().st_mtime > older:
+                shutil.rmtree(folder, ignore_errors=True)
+        except OSError:
+            pass
 
 
 # --- сеть ---
@@ -275,10 +323,12 @@ class Updater(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.net = QNetworkAccessManager(self)
+        sweep_old()
         self.version = None      # найденная новая версия
         self.urls = {}
         self.busy = False        # идёт проверка или скачивание
         self.work = None         # временная папка скачивания (только для владельца)
+        self.downloaded = None   # (путь, SHA-256) скачанного и проверенного установщика
         self._reply = None
 
     # проверка
@@ -309,6 +359,9 @@ class Updater(QObject):
             release = read_release(json.loads(body.decode("utf-8")))
         except ValueError:
             release = None
+        if self.downloaded is not None:  # уже скачано и ждёт установки — эту версию и ставим
+            self.checked.emit("found")
+            return
         if release is None or not is_newer(release[0]):
             self.checked.emit("found" if self.version else "latest")  # нет новее (или релиз без подписи)
             return
@@ -323,7 +376,10 @@ class Updater(QObject):
             return
         self.busy = True
         self._cleanup()
-        self.work = tempfile.mkdtemp(prefix="whokey-update-")  # права 700: только этот пользователь
+        try:
+            self.work = tempfile.mkdtemp(prefix="whokey-update-")  # права 700: только этот пользователь
+        except OSError:
+            return self._fail(tr("Could not download the update. Check the internet connection."))
         version, urls = self.version, dict(self.urls)
         package = asset_name()
 
@@ -332,6 +388,7 @@ class Updater(QObject):
 
         def got_signature(sums, signature):
             if not signature_ok(version, sums, signature.decode("ascii", "replace")):
+                self.version = None  # подделка: кнопку больше не предлагать, до следующей проверки
                 return self._fail(tr("The update is not signed by the WhoKey author. It was not installed."))
             want = expected_hash(sums, package)
             if want is None:
@@ -343,15 +400,22 @@ class Updater(QObject):
             self.busy = False
             if digest != want:
                 return self._fail(tr("The downloaded update is damaged."))
+            self.downloaded = (str(target), want)
             self.ready.emit(str(target), version)
 
         self._get(urls[SUMS_NAME], MAX_SMALL, got_sums)
 
     def install(self, package, version, pid):
+        # файл мог полежать до нажатия «Перезапустить» — сверяем ещё раз прямо перед установкой
+        if self.downloaded is None or self.downloaded[0] != package or _sha256(package) != self.downloaded[1]:
+            self.downloaded = None
+            self._cleanup()
+            raise UpdateError(tr("The downloaded update is damaged."))
         launch_installer(package, version, self.work, pid)
 
     def _fail(self, message):
         self.busy = False
+        self.downloaded = None
         self._cleanup()
         self.failed.emit(message)
 
@@ -373,11 +437,15 @@ class Updater(QObject):
         request.setHeader(QNetworkRequest.UserAgentHeader, "WhoKey")
         request.setRawHeader(b"Accept", b"application/vnd.github+json" if url == API_URL else b"application/octet-stream")
         request.setTransferTimeout(60000)
-        reply = self.net.get(request)
-        self._reply = reply
         state = {"size": 0, "body": bytearray(), "hash": hashlib.sha256(), "file": None, "over": False}
         if save_to is not None:
-            state["file"] = open(save_to, "wb")
+            try:
+                state["file"] = open(save_to, "wb")
+            except OSError:
+                error()
+                return
+        reply = self.net.get(request)
+        self._reply = reply
 
         def read():
             chunk = bytes(reply.readAll())

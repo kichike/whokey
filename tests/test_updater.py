@@ -150,6 +150,13 @@ class LinuxArchive(unittest.TestCase):
             with self.assertRaises(U.UpdateError, msg=str(entries)):
                 self.extract(entries)
 
+    def test_chain_of_links_cannot_lead_outside(self):
+        """Каждая ссылка по отдельности внутри папки, а вместе ведут наружу (ревью 1.10.0)."""
+        with self.assertRaises(U.UpdateError):
+            self.extract([("WhoKey/install.sh", b""), ("WhoKey/a/x", b""), ("WhoKey/d/x", b""), ("WhoKey/h/x", b""),
+                          ("WhoKey/a/b", ("link", "../d")), ("WhoKey/a/b/e", ("link", "../h")),
+                          ("WhoKey/a/b/e/z", ("link", "../../../esc")), ("WhoKey/a/b/e/z/pwn", b"evil")])
+
 
 @unittest.skipIf(sys.platform == "win32", "скрипты-помощники — для macOS и Linux")
 class Helpers(unittest.TestCase):
@@ -158,37 +165,74 @@ class Helpers(unittest.TestCase):
         process.wait()
         return str(process.pid)
 
-    def test_mac_swap_replaces_the_app_and_starts_it(self):
+    @staticmethod
+    def signed_app(path, mark):
+        """Крошечная программа с подписью «для себя» и её требование подписи (как у WhoKey.app)."""
+        (path / "Contents" / "MacOS").mkdir(parents=True)
+        (path / "Contents" / "Resources").mkdir()
+        (path / "Contents" / "Resources" / mark).write_text(mark)
+        program = path / "Contents" / "MacOS" / "WhoKey"
+        program.write_bytes(Path("/usr/bin/true").read_bytes())
+        program.chmod(0o755)
+        (path / "Contents" / "Info.plist").write_text(
+            '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>'
+            '<key>CFBundleExecutable</key><string>WhoKey</string>'
+            '<key>CFBundleIdentifier</key><string>test.whokey.swap</string></dict></plist>')
+        subprocess.run(["/usr/bin/codesign", "-s", "-", "--force", "--deep", str(path)], check=True, capture_output=True)
+        shown = subprocess.run(["/usr/bin/codesign", "-d", "-r-", str(path)], capture_output=True, text=True)
+        for line in (shown.stdout + shown.stderr).splitlines():
+            line = line.lstrip("# ")  # у подписи «для себя» строка закомментирована
+            if line.startswith("designated => "):
+                return line[len("designated => "):].strip()
+        raise AssertionError("нет требования подписи")
+
+    def swap(self, pid, tamper=False):
         folder = Path(tempfile.mkdtemp())
-        app, new = folder / "WhoKey.app", folder / ".WhoKey-update.app"
-        (app / "old").mkdir(parents=True)
-        (new / "new").mkdir(parents=True)
+        work = folder / "work"
+        work.mkdir()
+        app, new = folder / "WhoKey.app", work / "WhoKey.app"
+        self.signed_app(app, "old")
+        requirement = self.signed_app(new, "new")
+        if tamper:  # подменили после проверки в WhoKey
+            (new / "Contents" / "Resources" / "new").write_text("evil")
         marker = folder / "started"
         launcher = folder / "open.sh"
         launcher.write_text(f'#!/bin/sh\necho "$1" > "{marker}"\n')
         launcher.chmod(0o755)
         script = folder / "swap.sh"
         script.write_text(U.MAC_SWAP)
-        subprocess.run(["/bin/sh", str(script), self.finished_pid(), str(new), str(app), str(launcher)], check=True, timeout=30)
-        self.assertTrue((app / "new").is_dir())
-        self.assertFalse(new.exists())
+        result = subprocess.run(["/bin/sh", str(script), pid, str(new), str(app), str(launcher), requirement, str(work)],
+                                timeout=30)
+        return folder, app, work, marker, result.returncode
+
+    @unittest.skipUnless(sys.platform == "darwin", "codesign есть только на macOS")
+    def test_mac_swap_replaces_the_app_and_starts_it(self):
+        folder, app, work, marker, code = self.swap(self.finished_pid())
+        self.assertEqual(code, 0)
+        self.assertTrue((app / "Contents" / "Resources" / "new").is_file())
+        self.assertFalse(work.exists())  # скачанное убрано
         self.assertFalse((folder / "WhoKey.app.old").exists())
         self.assertEqual(marker.read_text().strip(), str(app))
 
+    @unittest.skipUnless(sys.platform == "darwin", "codesign есть только на macOS")
+    def test_mac_swap_refuses_an_app_changed_after_the_check(self):
+        folder, app, work, marker, code = self.swap(self.finished_pid(), tamper=True)
+        self.assertNotEqual(code, 0)
+        self.assertTrue((app / "Contents" / "Resources" / "old").is_file())  # старая на месте
+        self.assertFalse((app / "Contents" / "Resources" / "new").exists())
+        self.assertFalse(work.exists())
+        self.assertEqual(marker.read_text().strip(), str(app))  # и запускается снова
+
+    @unittest.skipUnless(sys.platform == "darwin", "codesign есть только на macOS")
     def test_mac_swap_waits_for_whokey_to_close(self):
-        folder = Path(tempfile.mkdtemp())
-        app, new = folder / "WhoKey.app", folder / ".WhoKey-update.app"
-        app.mkdir()
-        (new / "new").mkdir(parents=True)
         running = subprocess.Popen(["/bin/sleep", "1"])
         # закрывшийся процесс должен убрать его родитель (у WhoKey это система) — иначе «зомби» живёт вечно
         threading.Thread(target=running.wait, daemon=True).start()
-        script = folder / "swap.sh"
-        script.write_text(U.MAC_SWAP)
         started = time.monotonic()
-        subprocess.run(["/bin/sh", str(script), str(running.pid), str(new), str(app), "/usr/bin/true"], check=True, timeout=30)
+        folder, app, work, marker, code = self.swap(str(running.pid))
+        self.assertEqual(code, 0)
         self.assertGreater(time.monotonic() - started, 0.5)
-        self.assertTrue((app / "new").is_dir())
+        self.assertTrue((app / "Contents" / "Resources" / "new").is_file())
 
     def test_linux_swap_runs_install_then_starts_the_program(self):
         folder = Path(tempfile.mkdtemp())
@@ -200,7 +244,10 @@ class Helpers(unittest.TestCase):
         program.chmod(0o755)
         script = folder / "swap.sh"
         script.write_text(U.LINUX_SWAP)
-        subprocess.run(["/bin/sh", str(script), self.finished_pid(), str(install), str(program)], check=True, timeout=30)
+        work = folder / "work"
+        work.mkdir()
+        subprocess.run(["/bin/sh", str(script), self.finished_pid(), str(install), str(program), str(work)], check=True, timeout=30)
+        self.assertFalse(work.exists())
         for _ in range(50):  # программа запускается в фоне
             if "started" in log.read_text():
                 break
@@ -326,6 +373,41 @@ class Download(unittest.TestCase):
         self.wait({"ready", "failed"})
         failed = [e for e in self.events if e[0] == "failed"]
         self.assertTrue(failed and "signed" in failed[0][1] or "подпис" in failed[0][1], self.events)
+        self.assertIsNone(updater.version)  # подделку больше не предлагаем
+
+    def test_file_changed_after_download_is_not_installed(self):
+        updater = self.start()
+        updater.check()
+        self.wait({"found"})
+        updater.download()
+        self.wait({"ready", "failed"})
+        path = [e for e in self.events if e[0] == "ready"][0][1]
+        Path(path).write_bytes(b"evil")  # подменили, пока ждали «Перезапустить»
+        with mock.patch.object(U, "launch_installer") as launch:
+            with self.assertRaises(U.UpdateError):
+                updater.install(path, "99.0.0", os.getpid())
+            launch.assert_not_called()
+
+    def test_downloaded_update_is_kept_when_checking_again(self):
+        updater = self.start()
+        updater.check()
+        self.wait({"found"})
+        updater.download()
+        self.wait({"ready", "failed"})
+        self.events.clear()
+        updater.check()  # «Проверить обновления» в «О программе» не заменяет скачанное
+        self.wait({"checked"})
+        self.assertNotIn("found", [e[0] for e in self.events])
+        self.assertIsNotNone(updater.downloaded)
+
+    def test_old_download_folders_are_swept(self):
+        old = Path(tempfile.mkdtemp(prefix="whokey-update-"))
+        fresh = Path(tempfile.mkdtemp(prefix="whokey-update-"))
+        os.utime(old, (time.time() - 7200, time.time() - 7200))
+        U.sweep_old()
+        self.assertFalse(old.exists())
+        self.assertTrue(fresh.exists())
+        fresh.rmdir()
 
     def test_too_big_answer_is_cut_off(self):
         updater = self.start()

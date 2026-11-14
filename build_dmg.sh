@@ -17,8 +17,9 @@ VOL="WhoKey Installer"  # имя диска — так он подписан н�
 APPS_LINK="Программы"       # ярлык на /Applications внутри установщика
 VENV="$P/.venv"; [ -d "$VENV" ] || VENV="$P/../.venv"
 
-# 1. Свежая сборка .app (build_app.sh сам остановится на любой ошибке)
-./build_app.sh
+# 1. Свежая сборка .app (build_app.sh сам остановится на любой ошибке).
+#    В ~/Applications не ставим: установленный WhoKey обновится сам, кнопкой в окне
+WHOKEY_NO_INSTALL=1 ./build_app.sh
 
 # 2. Содержимое установщика: приложение, ярлык на «Программы», спрятанный фон
 rm -rf "$STAGE" "$RW"

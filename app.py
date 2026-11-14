@@ -253,12 +253,13 @@ class Controller:
         Если хранилище заблокировано или открыто окно (запись с правками) — ничего не закрываем,
         кнопка становится «Перезапустить и обновить», и человек нажмёт её сам."""
         self.pending_update = (package, version)
-        busy = any(isinstance(widget, QDialog) and widget.isVisible() for widget in QApplication.topLevelWidgets())
-        if not isinstance(self.window, MainWindow) or busy:
+        if not isinstance(self.window, MainWindow) or self._dialog_open():
             self._on_main("offer_restart", version)
             return
         self.window.update_installing()
-        QApplication.processEvents()
+        # без processEvents(): событие из очереди (двойной клик, ⌘N) открыло бы окно записи,
+        # а выход закрыл бы его вместе с правками (ревью 1.10.0)
+        self.clipboard.clear_now()  # до установщика: на Windows он может закрыть WhoKey сам
         try:
             self.updater.install(package, version, os.getpid())
         except updater.UpdateError as error:
@@ -267,8 +268,14 @@ class Controller:
             return
         self.autolock.stop()
         self.stop_bridge()
-        self.clipboard.clear_now()
         QApplication.quit()
+
+    @staticmethod
+    def _dialog_open():
+        """Открыто окно (запись, настройки, системное «Сохранить» на Mac) — сейчас не перезапускаемся."""
+        if QApplication.activeModalWidget() is not None:
+            return True
+        return any(isinstance(widget, QDialog) and widget.isVisible() for widget in QApplication.topLevelWidgets())
 
     def stop_bridge(self):
         if self.bridge is not None:
