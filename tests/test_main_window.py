@@ -146,7 +146,8 @@ class EasterEgg(unittest.TestCase):
         self.assertIsNone(self.window._wave)
 
     def test_letters_and_glow_come_back_with_usual_colors(self):
-        add = [b for b in self.window.findChildren(MW.QPushButton) if b.property("kind") == "primary"][0]
+        # у жидкого стекла кнопки не светятся — свечение осталось у заголовка
+        add = [label for label in self.window.findChildren(MW.QLabel) if label.property("role") == "title"][0]
         usual_glow = add.graphicsEffect().color().name()
         letter = self.window._monogram("github").pixmap(24).toImage()
         self.window._toggle_egg()
@@ -386,3 +387,32 @@ class GenerateInSavedEntry(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LiquidHeader(unittest.TestCase):
+    """Шапка: три действия одной стеклянной капсулой, замок отдельно; плашка с числом записей не обрезана."""
+
+    def setUp(self):
+        folder = Path(tempfile.mkdtemp())
+        prefs.use_file(folder / "p.ini")
+        self.vault = Vault.create(folder / "v.dat", "Зелёный-Кит-Летит-2026!")
+        self.window = MW.MainWindow(self.vault, Clipboard())
+
+    def test_header_group_and_round_lock(self):
+        segments = [b for b in self.window.findChildren(MW.QPushButton) if b.property("kind") == "segment"]
+        self.assertEqual(len(segments), 3)
+        self.assertEqual(len({b.parentWidget() for b in segments}), 1)
+        self.assertEqual(segments[0].parentWidget().property("role"), "group")
+        lock = [b for b in self.window.findChildren(MW.QPushButton) if b.text() == theme.GLYPHS["lock"]][0]
+        self.assertEqual(lock.width(), lock.height())
+
+    def test_entry_count_pill_fits_in_the_window(self):
+        self.window.resize(960, 600)
+        self.window.show()
+        APP.processEvents()
+        pill = self.window.entries_count
+        corner = pill.mapTo(self.window, pill.rect().bottomRight())
+        self.assertLessEqual(corner.x(), self.window.width() - 10)
+        self.assertLessEqual(corner.y(), self.window.height() - 8)
+        self.assertGreaterEqual(pill.width(), pill.sizeHint().width())
+        self.window.close()

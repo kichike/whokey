@@ -11,7 +11,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QPoint, Qt  # noqa: E402
+from PySide6.QtCore import QPoint, QRectF, Qt  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication, QDialog, QLineEdit, QPushButton, QToolButton, QVBoxLayout  # noqa: E402
 
@@ -264,12 +264,12 @@ class Themes(unittest.TestCase):
         self.assertIn("_light.svg", theme.CHECK_FILE)
         self.assertIn(theme.BG, APP.styleSheet() + theme.STYLE)
         self.assertEqual(title.graphicsEffect().color().name(), theme.IRIS_2)  # розовый ореол вместо неона
-        self.assertLess(primary.graphicsEffect().color().alpha(), 140)          # свечение мягче
+        self.assertIsNone(primary.graphicsEffect())  # у жидкого стекла неонового ореола нет
         self.assertFalse(dialog.grab().isNull())
         theme.set_theme("dark")
         self.assertFalse(theme.LIGHT)
         self.assertEqual(theme.BG, dark_bg)
-        self.assertEqual(primary.graphicsEffect().color().alpha(), 140)
+        self.assertIsNone(primary.graphicsEffect())
         self.errors.assert_not_called()
         dialog.close()
 
@@ -333,3 +333,116 @@ class Themes(unittest.TestCase):
         self.assertFalse(theme.logo_pixmap(36).isNull())
         self.assertFalse(theme.badge("?").isNull())
         self.assertFalse(theme.monogram("W").isNull())
+
+
+class LiquidGlassB(unittest.TestCase):
+    """Жидкое стекло B: таблица вида, пластины из кэша, группа кнопок, тени."""
+
+    def setUp(self):
+        patcher = mock.patch("traceback.print_exc")
+        self.errors = patcher.start()
+        self.addCleanup(patcher.stop)
+        theme._forget_plates()
+
+    def test_style_table_keeps_the_agreed_numbers(self):
+        for light in (False, True):
+            table = theme.style_b(light)
+            self.assertLessEqual(table["card"]["base_a"], 0.30)  # сквозь стекло видно фон
+            for name in ("secondary", "lock", "group"):
+                self.assertLessEqual(table[name]["base_a"], 0.30)
+            self.assertEqual((table["lock"]["edge"], table["lock"]["lens"], table["lock"]["power"], table["lock"]["zoom"]),
+                             (16, 1.45, 1.8, 1.03))
+            self.assertEqual((table["card"]["edge"], table["card"]["lens"], table["card"]["power"], table["card"]["zoom"]),
+                             (14, 0.55, 2.4, 1.00))
+        self.assertLessEqual(theme.style_b(False)["secondary"]["base_a"], 0.22)
+
+    def test_second_paint_comes_from_the_cache(self):
+        dialog = make_dialog(QPushButton("Сохранить"), QPushButton("Отмена"))
+        dialog.grab()
+        plates = len(theme._PLATES)
+        self.assertGreaterEqual(plates, 2)
+        with mock.patch.object(theme, "_paint_lens", side_effect=AssertionError("линза — только при первом рисовании")):
+            dialog.grab()
+        self.assertEqual(len(theme._PLATES), plates)
+        self.errors.assert_not_called()
+        dialog.close()
+
+    def test_lens_bends_the_background_at_the_edge(self):
+        rings = theme._lens_rings(200, 40, 20, theme.style_b()["lock"])
+        self.assertGreater(rings[0][1], rings[-2][1])  # у самого края фон поджат сильнее всего
+        self.assertEqual(rings[-1][1], 0)
+
+    def test_theme_switch_forgets_plates(self):
+        dialog = make_dialog(QPushButton("Сохранить"))
+        dialog.grab()
+        self.assertTrue(theme._PLATES)
+        theme.set_theme("light")
+        self.addCleanup(theme.set_theme, "dark")
+        self.assertFalse(theme._PLATES)
+        self.assertFalse(dialog.grab().isNull())
+        self.errors.assert_not_called()
+        dialog.close()
+
+    def test_plate_memory_is_limited(self):
+        with mock.patch.object(theme, "_PLATE_BUDGET", 1):
+            dialog = make_dialog(*[QPushButton(f"Кнопка {n}") for n in range(5)])
+            dialog.grab()
+        self.assertEqual(len(theme._PLATES), 1)
+        dialog.close()
+
+    def test_button_group_hides_separators_next_to_the_pill(self):
+        buttons = [QPushButton(name) for name in ("Генератор", "Расширение", "Настройки")]
+        group = theme.button_group(buttons)
+        dialog = make_dialog(group)
+        self.assertEqual(len({button.minimumWidth() for button in buttons}), 1)  # кнопки равной ширины
+        self.assertIsNone(theme._glass_shape(buttons[1]))  # в покое у кнопки своего стекла нет
+        buttons[1].setDown(True)
+        self.assertTrue(theme._segment_active(buttons[1]))
+        self.assertFalse(dialog.grab().isNull())
+        buttons[1].setDown(False)
+
+    def test_pill_fades_in_and_out_smoothly(self):
+        """Пилюля не появляется рывком: за PILL_MS доходит до 1, потом так же гаснет."""
+        from PySide6.QtCore import QElapsedTimer
+        buttons = [QPushButton(name) for name in ("Генератор", "Расширение", "Настройки")]
+        dialog = make_dialog(theme.button_group(buttons))
+        button = buttons[0]
+        self.assertEqual(button.focusPolicy(), Qt.TabFocus)  # щелчок фокус не забирает
+        button.clearFocus()
+        button.setDown(True)
+        self.assertEqual(theme.pill_progress(button), 0.0)  # сразу после нажатия — ещё не видна
+
+        def wait(check):
+            timer = QElapsedTimer()
+            timer.start()
+            seen = []
+            while timer.elapsed() < 2000 and not check():
+                QApplication.processEvents()
+                seen.append(getattr(button, "_pill", 0.0))
+            return seen
+        seen = wait(lambda: getattr(button, "_pill", 0.0) >= 0.999)
+        self.assertTrue(any(0.05 < value < 0.95 for value in seen), seen[:20])  # были промежуточные кадры
+        button.setDown(False)
+        theme.pill_progress(button)
+        wait(lambda: getattr(button, "_pill", 1.0) <= 0.001)
+        self.assertLessEqual(button._pill, 0.001)
+        self.errors.assert_not_called()
+        dialog.close()
+        self.errors.assert_not_called()
+        dialog.close()
+
+    def test_shadow_is_drawn_by_what_the_glass_lies_on(self):
+        button = QPushButton("Сохранить")
+        dialog = make_dialog(button)
+        self.assertIs(theme._glass_container(button), dialog)
+        with mock.patch.object(theme, "_shadow", wraps=theme._shadow) as shadow:
+            dialog.grab()
+        self.assertTrue(shadow.called)
+        dialog.close()
+
+    def test_without_liquid_the_old_look_is_drawn(self):
+        with mock.patch.object(theme, "LIQUID", False):
+            dialog = make_dialog(QPushButton("Сохранить"))
+            self.assertFalse(dialog.grab().isNull())
+        self.assertFalse(theme._PLATES)
+        dialog.close()

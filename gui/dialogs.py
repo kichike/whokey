@@ -3,7 +3,7 @@
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QWidget,
+from PySide6.QtWidgets import (QFrame, QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QWidget,
                                QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPlainTextEdit, QPushButton,
                                QTableWidget, QTableWidgetItem, QVBoxLayout)
 
@@ -466,7 +466,12 @@ class AboutDialog(QDialog):
         names.addStretch()
         head.addLayout(names, 1)
         column.addLayout(head)
-        for widget in (what, links, license_):
+        # автор и ссылки — на стеклянной карточке, как в макете жидкого стекла
+        info = theme.role(QFrame(), "card")
+        inside = QVBoxLayout(info)
+        inside.setContentsMargins(16, 12, 16, 12)
+        inside.addWidget(links)
+        for widget in (what, info, license_):
             column.addWidget(widget)
         column.addWidget(self.update_status)
         column.addWidget(close)

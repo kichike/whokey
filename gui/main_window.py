@@ -71,6 +71,7 @@ def site_link(entry):
     return None
 
 
+HEADER_HEIGHT = 40  # высота капсулы кнопок в шапке и круглого замка
 EGG_CLICK_GAP = 1.5  # секунд между нажатиями на ключ, чтобы они считались одной серией
 
 
@@ -111,11 +112,12 @@ class MainWindow(QMainWindow):
         self.hint.setContentsMargins(22, 0, 0, 4)
         self.statusBar().addWidget(self.hint)
         self.countdown.finished.connect(self.hint.show)
-        self.entries_count = theme.role(QLabel(), "muted")
+        self.entries_count = theme.role(QLabel(), "status")  # стеклянная плашка
         self.statusBar().addPermanentWidget(self.entries_count)
+        # место под плашку и её тень: внизу и справа, иначе её обрезал край окна
+        self.statusBar().setContentsMargins(0, 0, 14, 10)
         if theme.SYSTEM:  # точки уголка-растяжки торчали бы из скруглённого угла стекла
             self.statusBar().setSizeGripEnabled(False)
-            self.entries_count.setContentsMargins(0, 0, 14, 4)
 
         # горячие клавиши (Qt сам заменяет Ctrl на ⌘ на Mac) — те же, что показаны в меню
         QShortcut(QKeySequence.New, self, self.add)
@@ -201,6 +203,7 @@ class MainWindow(QMainWindow):
         self.update_button.hide()
         row.addWidget(self.update_button)
         glyph = theme.GLYPHS
+        buttons = []
         for text, tip, handler in [(glyph["magic"] + "  " + tr("Generator"), "", self.open_generator),
                                    (glyph["puzzle"] + "  " + tr("Extension"), "", self.extension),
                                    (glyph["cog"] + "  " + tr("Settings"), shortcut_text("Ctrl+,"), self.open_settings),
@@ -208,12 +211,23 @@ class MainWindow(QMainWindow):
             button = QPushButton(text)
             button.setToolTip(tip)
             button.clicked.connect(lambda checked=False, h=handler: h())
-            row.addWidget(button)
+            buttons.append(button)
+        # три действия — одной стеклянной капсулой, замок — отдельной круглой кнопкой
+        group = theme.button_group(buttons[:3])
+        group.setFixedHeight(HEADER_HEIGHT)
+        row.addWidget(group)
+        lock = buttons[3]
+        lock.setFixedSize(HEADER_HEIGHT, HEADER_HEIGHT)
+        bigger = lock.font()
+        bigger.setPixelSize(16)  # значок замка в круглой кнопке крупнее надписей
+        lock.setFont(bigger)
+        row.addSpacing(2)
+        row.addWidget(lock)
         return row
 
     def _toolbar(self):
         row = QHBoxLayout()
-        self.search = QLineEdit()
+        self.search = theme.role(QLineEdit(), "search")  # поиск — стеклянной капсулой
         self.search.setPlaceholderText(tr("Search by name, login or note"))
         self.search.setClearButtonEnabled(True)
         self.search_action = self.search.addAction(theme.glyph_icon("search", theme.FAINT, 13), QLineEdit.LeadingPosition)
@@ -221,6 +235,7 @@ class MainWindow(QMainWindow):
         row.addWidget(self.search, 1)
         add = theme.kind(QPushButton("+ " + tr("Add")), "primary")
         add.clicked.connect(lambda: self.add())  # без lambda clicked передал бы False вместо адреса
+        add.setMinimumHeight(self.search.sizeHint().height())
         row.addWidget(add)
         return row
 

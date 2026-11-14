@@ -14,13 +14,15 @@
 import html
 import sys
 import traceback
+from collections import OrderedDict
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer
-from PySide6.QtGui import (QColor, QCursor, QFont, QFontDatabase, QFontMetricsF, QGradient, QIcon, QLinearGradient, QPainter,
+from PySide6.QtCore import QEasingCurve, QEvent, QObject, QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer, QVariantAnimation
+from PySide6.QtGui import (QBrush, QColor, QCursor, QFont, QFontDatabase, QFontMetricsF, QGradient, QIcon, QLinearGradient, QPainter,
                            QPainterPath, QPalette, QPen, QPixmap, QRadialGradient)
-from PySide6.QtWidgets import (QAbstractScrollArea, QAbstractSpinBox, QApplication, QDialog, QFileDialog, QFrame, QGraphicsDropShadowEffect, QLabel,
-                               QLineEdit, QMainWindow, QPushButton, QStyle, QToolButton, QWidget)
+from PySide6.QtWidgets import (QAbstractScrollArea, QAbstractSpinBox, QApplication, QComboBox, QDialog, QFileDialog, QFrame,
+                               QGraphicsDropShadowEffect, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QPlainTextEdit,
+                               QPushButton, QStyle, QToolButton, QWidget)
 from shiboken6 import isValid  # жив ли ещё объект Qt за питоновской обёрткой
 
 from gui import prefs, sysglass
@@ -199,6 +201,638 @@ def _derive_colors():
 _derive_colors()
 
 
+# --- жидкое стекло B (Liquid Glass, оттенок цветами WhoKey) ---
+# Каждый кусок стекла рисуется ОДИН раз в готовую картинку — «пластину»: преломлённый фон окна,
+# вуаль, оттенок, свечение и тень внутри, блик на кромке. Дальше перерисовка — одно drawPixmap.
+# Пластина зависит от места в окне (какой кусок фона под ней), размера, скругления, плотности
+# экрана (Retina), темы, вида и состояния — всё это в ключе кэша. Тему сменили — пластины забываем.
+# Преломление: у края толстое стекло «поджимает» фон внутрь. Рисуем кольцами: от края к центру
+# вложенные скруглённые кольца, в каждом фон растянут чуть сильнее. Фон под стеклом размыт
+# (уменьшенная копия), поэтому ступенек между кольцами не видно. numpy не нужен.
+# Тень снаружи стекла рисует не сам элемент (он рисует только внутри себя), а тот, на ком он
+# лежит: окно, карточка или группа кнопок (_paint_shadows).
+# Все числа вида — в одной таблице STYLE_B (её же берёт родное стекло macOS).
+LIQUID = True        # False — стекло как раньше (_draw_glass), без пластин
+_LENS_SOFT = 0.10    # фон для линзы — копия в 1/10: размытие ~6 px, кольца не видны
+_SHADOW_MARGIN = 14  # поле вокруг стекла под тень: 10 px размытия + сдвиг 3
+_PLATES = OrderedDict()           # ключ -> пластина (QPixmap)
+_PLATE_BYTES = 0
+_PLATE_BUDGET = 48 * 1024 * 1024  # памяти на пластины; карточка таблицы на Retina — около 7 МБ
+_SHADOWS = OrderedDict()          # ключ -> тень (QPixmap с полями)
+_LENS_SOURCES = {}                # (ширина, высота окна) -> размытый фон для линзы
+_STYLE_B = {}                     # светлая? -> таблица
+
+
+def _forget_plates():
+    global _PLATE_BYTES
+    _PLATES.clear()
+    _SHADOWS.clear()
+    _LENS_SOURCES.clear()
+    _STYLE_B.clear()
+    _PLATE_BYTES = 0
+
+
+# оптика: edge — ширина преломляющего края, lens — сдвиг у самого края (доля edge),
+# power — как быстро сдвиг гаснет к центру, zoom — увеличение всего, что под стеклом
+_LENS_BIG = dict(edge=14, lens=0.55, power=2.4, zoom=1.00)    # карточка и поля
+_LENS_PILL = dict(edge=16, lens=1.45, power=1.8, zoom=1.03)   # кнопки, замок, плашки
+# перелив оттенка (по 0.7·x + 0.3·y) и главная кнопка (слева направо)
+_GRAD_B = {False: ("#6c4ef0", "#a890f0", "#f048f0"), True: ("#8f74ff", "#c4b2ff", "#f39af0")}
+_ACCENT_B = {False: ("#6f50f0", "#c844d6"), True: ("#6244e6", "#b832c8")}
+
+
+def _el(light, lens, base, base_a, tint_a, rim_w=1.4, rim_base=0.10, rim_tl=0.85, rim_br=0.35, glow=0.10,
+        inner=0.10, inset=False, sheen=0.04, shadow=10, shadow_dy=3, shadow_a=0.28, hairline=0.0, accent_a=0.0, **extra):
+    look = dict(lens, base=base, base_a=base_a, tint_a=tint_a, rim_w=rim_w, rim_base=rim_base, rim_tl=rim_tl,
+                rim_br=rim_br, glow=glow, inner=inner, inset=inset, sheen=sheen, shadow=shadow, shadow_dy=shadow_dy,
+                shadow_a=shadow_a, hairline=hairline, accent_a=accent_a, **extra)
+    if light:  # светлое стекло: ярче кромка, больше свечения, мягче тень, тонкая тёмная линия снаружи
+        look.update(rim_base=max(rim_base, 0.22), rim_tl=1.0, glow=glow * 1.6, inner=inner * 0.5,
+                    shadow_a=shadow_a * 0.45, hairline=hairline or 0.10)
+    return look
+
+
+def style_b(light=None):
+    """Таблица вида стекла B (числа — из макета агента «Look», make_style)."""
+    light = LIGHT if light is None else light
+    if light in _STYLE_B:
+        return _STYLE_B[light]
+    dark = not light
+    ink = "#0b0920" if dark else "#fbfaff"  # нейтральная вуаль
+    table = {
+        "card": _el(light, _LENS_BIG, ink, 0.22 if dark else 0.30, 0.08 if dark else 0.07, rim_w=1.2, rim_tl=0.60,
+                    rim_br=0.25, glow=0.06, inner=0.06, shadow=14, shadow_dy=4, shadow_a=0.22),
+        "group": _el(light, _LENS_PILL, ink, 0.22 if dark else 0.30, 0.20 if dark else 0.14),
+        # пилюля внутри группы — только при наведении, нажатии и фокусе: «выбранной» кнопки нет
+        "group_pill": _el(light, dict(_LENS_PILL, edge=10), "#ffffff", 0.10 if dark else 0.62, 0.18 if dark else 0.12,
+                          shadow=4, shadow_dy=1, shadow_a=0.22, glow=0.12),
+        "lock": _el(light, _LENS_PILL, ink, 0.16 if dark else 0.30, 0.22 if dark else 0.14),
+        "secondary": _el(light, _LENS_PILL, ink, 0.16 if dark else 0.30, 0.20 if dark else 0.14),
+        "danger": _el(light, _LENS_PILL, ink, 0.16 if dark else 0.30, 0.0, tint=BAD, tint_solid=0.26 if dark else 0.16),
+        "primary": _el(light, _LENS_PILL, ink, 0.0, 0.0, accent_a=0.80 if dark else 0.90, rim_tl=0.80, glow=0.14),
+        "search": _el(light, _LENS_BIG, "#05040f" if dark else "#ffffff", 0.30 if dark else 0.52, 0.10 if dark else 0.08,
+                      inset=True, inner=0.18, rim_tl=0.45, rim_br=0.55, shadow=0, shadow_a=0.0),
+        "field": _el(light, dict(_LENS_BIG, lens=0.6), "#05040f" if dark else "#ffffff", 0.32 if dark else 0.58, 0.06,
+                     inset=True, inner=0.18, rim_tl=0.40, rim_br=0.50, shadow=0, shadow_a=0.0),
+        "status": _el(light, _LENS_PILL, ink, 0.20 if dark else 0.36, 0.16 if dark else 0.12),
+        "row_sel": _el(light, _LENS_BIG, ink, 0.06 if dark else 0.30, 0.30 if dark else 0.20, shadow=0, shadow_a=0.0),
+        "group_sep": dict(w=1.0, h=18, a=0.16 if dark else 0.14),
+        "hover": dict(tint_da=0.06, rim_k=1.25, glow_k=1.6, accent_da=0.08),
+        "pressed": dict(tint_da=0.10, base_da=0.08 if dark else 0.10, rim_k=1.45, glow_k=2.2, touch_a=0.16 if dark else 0.30),
+        "disabled": dict(opacity=0.45),
+        "focus": dict(ring_w=2.0, ring=("#b9a4ff", "#f070f0") if dark else ("#7a5cf0", "#d64be0"), ring_a=0.90),
+    }
+    _STYLE_B[light] = table
+    return table
+
+
+def _state_look(look, state):
+    """Вид стекла в состоянии "normal" / "hover" / "pressed" / "disabled"."""
+    table = style_b()
+    look = dict(look)
+    if state == "hover":
+        change = table["hover"]
+        look.update(tint_a=look["tint_a"] + change["tint_da"], rim_tl=look["rim_tl"] * change["rim_k"],
+                    glow=look["glow"] * change["glow_k"])
+        if look["accent_a"]:
+            look["accent_a"] = min(0.95, look["accent_a"] + change["accent_da"])
+    elif state == "pressed":
+        change = table["pressed"]
+        look.update(tint_a=look["tint_a"] + change["tint_da"], rim_tl=look["rim_tl"] * change["rim_k"],
+                    glow=look["glow"] * change["glow_k"], lift=change["base_da"],
+                    touch=change["touch_a"] * (0.5 if look["accent_a"] else 1.0))
+    elif state == "disabled":
+        look.update(lens=0.0, zoom=1.0, shadow_a=look["shadow_a"] * 0.3)
+    return look
+
+
+# --- что стекло и какой формы ---
+
+def _glass_container(widget):
+    """На ком лежит стекло (кто рисует его тень): окно, карточка или группа кнопок."""
+    parent = widget.parentWidget()
+    while parent is not None:
+        if parent.isWindow() or parent.property("role") in ("card", "group"):
+            return parent
+        parent = parent.parentWidget()
+    return None
+
+
+def _state(widget):
+    if not widget.isEnabled():
+        return "disabled"
+    if isinstance(widget, (QPushButton, QToolButton)) and widget.isDown():
+        return "pressed"
+    if widget.underMouse() and isinstance(widget, (QPushButton, QToolButton, QComboBox)):
+        return "hover"
+    return "normal"
+
+
+def _glass_shape(widget):
+    """(вид из STYLE_B, состояние, прямоугольник в координатах элемента, скругление) или None — не стекло."""
+    table = style_b()
+    rect = QRectF(widget.rect())
+    state = _state(widget)
+    name = widget.property("role")
+    if isinstance(widget, QFrame) and name == "card":
+        return table["card"], "normal", rect, CARD_RADIUS
+    if isinstance(widget, QFrame) and name == "group":
+        return table["group"], "normal", rect, rect.height() / 2
+    if isinstance(widget, QLabel) and name == "status":
+        return table["status"], "normal", rect, rect.height() / 2
+    if isinstance(widget, (QPushButton, QToolButton)) and _is_glass_button(widget):
+        look = widget.property("kind")
+        if look == "segment":  # кнопка в группе: пилюлю рисует сама кнопка, плавно (_paint_segment_pill)
+            return None
+        if look in ("primary", "danger"):
+            return table[look], state, rect, rect.height() / 2
+        round_ = isinstance(widget, QToolButton) or len(widget.text()) == 1
+        return table["lock" if round_ else "secondary"], state, rect, rect.height() / 2
+    if isinstance(widget, (QLineEdit, QPlainTextEdit, QAbstractSpinBox, QComboBox)) and _glass_field(widget):
+        if isinstance(widget, QComboBox):
+            return table["secondary"], state, rect, rect.height() / 2
+        if name == "search":
+            return table["search"], "disabled" if state == "disabled" else "normal", rect, rect.height() / 2
+        return table["field"], "disabled" if state == "disabled" else "normal", rect, 12
+    return None
+
+
+def _glass_field(widget):
+    """Поле ввода, под которым рисуем стекло (строка внутри поля-числа или списка — нет)."""
+    parent = widget.parentWidget()
+    return not isinstance(parent, (QAbstractSpinBox, QComboBox))
+
+
+# --- линза и пластина ---
+
+def _lens_source(window):
+    """Что видно сквозь стекло: (размытый фон окна, его пикселей в логическом пикселе) или None.
+    При системном стекле macOS под окном рабочий стол — его не прочитать, преломлять нечего."""
+    if _see_through():
+        return None
+    width, height = max(1, window.width()), max(1, window.height())
+    key = (width, height)
+    if key not in _LENS_SOURCES:
+        if len(_LENS_SOURCES) >= _SCENE_LIMIT:
+            _LENS_SOURCES.clear()
+        sharp = _scene(width, height)[0]
+        _LENS_SOURCES[key] = sharp.scaled(max(1, round(width * _LENS_SOFT)), max(1, round(height * _LENS_SOFT)),
+                                          Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+    source = _LENS_SOURCES[key]
+    return source, source.width() / width
+
+
+def _lens_rings(width, height, radius, look, rings=10):
+    """(отступ от края, на сколько там поджат фон) для каждого кольца — логические пиксели."""
+    edge = min(look["edge"], radius, height / 2, width / 2)
+    steps = [(edge * k / rings, look["lens"] * edge * (1 - (k + 0.5) / rings) ** look["power"]) for k in range(rings)]
+    return steps + [(edge, 0.0)]
+
+
+def _rounded(rect, radius, inset=0.0):
+    path = QPainterPath()
+    path.addRoundedRect(rect.adjusted(inset, inset, -inset, -inset), max(0.0, radius - inset), max(0.0, radius - inset))
+    return path
+
+
+def _paint_lens(painter, under, area, rect, radius, look):
+    """Преломлённый фон: area — где стекло в окне, rect — куда рисовать (логические пиксели)."""
+    source, scale = under
+    width, height = area.width() / look["zoom"], area.height() / look["zoom"]
+    base = QRectF(area.center().x() - width / 2, area.center().y() - height / 2, width, height)
+    for inset, shift in _lens_rings(rect.width(), rect.height(), radius, look):
+        grab = base.adjusted(shift, shift, -shift, -shift)  # кусок фона меньше — у края он растянут
+        if grab.width() <= 1 or grab.height() <= 1:
+            continue
+        painter.save()
+        painter.setClipPath(_rounded(rect, radius, inset), Qt.IntersectClip)
+        painter.drawPixmap(rect, source, QRectF(grab.x() * scale, grab.y() * scale, grab.width() * scale, grab.height() * scale))
+        painter.restore()
+
+
+def _bands(painter, rect, radius, depth, strength, start, end, color, bands=6):
+    """Свечение или тень у края внутри стекла: полосы вглубь на depth, сила по strength(доля глубины),
+    по направлению — линейный перелив от start (полная сила) к end (сила 0.35·…)."""
+    for k in range(bands):
+        alpha = strength((k + 0.5) / bands)
+        if alpha <= 0.002:
+            continue
+        band = _rounded(rect, radius, depth * k / bands).subtracted(_rounded(rect, radius, depth * (k + 1) / bands))
+        light = QLinearGradient(start, end)
+        light.setColorAt(0, _with_alpha(color, int(255 * min(1.0, alpha))))
+        light.setColorAt(1, _with_alpha(color, int(255 * min(1.0, alpha * 0.35))))
+        painter.fillPath(band, light)
+
+
+def _paint_b(painter, rect, radius, look):
+    """Всё, что над преломлённым фоном: вуаль, акцент, оттенок, свечение, тень внутри, блик на кромке."""
+    shape = _rounded(rect, radius)
+    painter.fillPath(shape, _with_alpha(look["base"], int(255 * look["base_a"])))
+    if look["accent_a"]:  # главная кнопка: индиго → фуксия слева направо
+        accent = QLinearGradient(rect.topLeft(), rect.topRight())
+        first, last = _ACCENT_B[LIGHT]
+        accent.setColorAt(0, _with_alpha(first, int(255 * look["accent_a"])))
+        accent.setColorAt(1, _with_alpha(last, int(255 * look["accent_a"])))
+        painter.fillPath(shape, accent)
+    if look.get("tint_solid"):
+        painter.fillPath(shape, _with_alpha(look["tint"], int(255 * look["tint_solid"])))
+    if look["tint_a"] > 0:  # оттенок B: три цвета ключа по диагонали 0.7·x + 0.3·y
+        gx, gy = 0.7 / max(rect.width(), 1), 0.3 / max(rect.height(), 1)
+        norm = gx * gx + gy * gy
+        tint = QLinearGradient(rect.topLeft(), rect.topLeft() + QPointF(gx / norm, gy / norm))
+        for stop, color in zip((0, 0.5, 1), _GRAD_B[LIGHT]):
+            tint.setColorAt(stop, _with_alpha(color, int(255 * min(1.0, look["tint_a"]))))
+        painter.fillPath(shape, tint)
+    if look.get("lift"):
+        painter.fillPath(shape, _with_alpha(WHITE, int(255 * look["lift"])))
+    top_left, bottom_right = rect.topLeft(), rect.topLeft() + QPointF(min(rect.width(), rect.height() * 3), rect.height())
+    edge = min(look["edge"], radius, rect.height() / 2)
+    if look["sheen"]:
+        sheen = QLinearGradient(rect.topLeft(), QPointF(rect.x(), rect.y() + rect.height() / 2))
+        sheen.setColorAt(0, _with_alpha(WHITE, int(255 * look["sheen"])))
+        sheen.setColorAt(1, _with_alpha(WHITE, 0))
+        painter.fillPath(shape, sheen)
+    if look["glow"]:  # свет внутри у края, сильнее сверху слева
+        _bands(painter, rect, radius, edge, lambda u: look["glow"] * (1 - u) ** 3, top_left, bottom_right, WHITE)
+    if look["inner"]:  # выпуклая кнопка темнее снизу справа, поле (впадина) — сверху слева
+        depth = edge * (0.6 if look["inset"] else 1.0)
+        start, end = (top_left, bottom_right) if look["inset"] else (rect.bottomRight(), rect.topLeft())
+        _bands(painter, rect, radius, depth, lambda u: look["inner"] * (1 - u) ** 2, start, end, "#000000", bands=4)
+    if look.get("touch"):  # нажатие — пятно света под пальцем
+        touch = QRadialGradient(QPointF(rect.x() + rect.width() * 0.38, rect.center().y()), rect.height() * 0.9)
+        touch.setColorAt(0, _with_alpha(WHITE, int(255 * look["touch"])))
+        touch.setColorAt(1, _with_alpha(WHITE, 0))
+        painter.fillPath(shape, touch)
+    # блик на кромке: верх ярко, низ слабее, левый бок чуть светлее правого
+    rim = lambda value: _with_alpha(WHITE, int(255 * min(1.0, value)))  # noqa: E731
+    soft = 0.6  # блик гаснет поперёк кромки: в среднем ~60 % от яркости у самого края
+    base, top, bottom = look["rim_base"] * soft, look["rim_tl"] * 0.67 * soft, look["rim_br"] * 0.61 * soft
+    vertical = QLinearGradient(rect.topLeft(), rect.bottomLeft())
+    vertical.setColorAt(0, rim(base + top))
+    vertical.setColorAt(0.5, rim(base))
+    vertical.setColorAt(1, rim(base + bottom))
+    width = look["rim_w"]
+    painter.setBrush(Qt.NoBrush)
+    painter.setPen(QPen(vertical, width))
+    painter.drawPath(_rounded(rect, radius, width / 2))
+    side = QLinearGradient(rect.topLeft(), QPointF(rect.x() + min(rect.width() * 0.3, 60), rect.y()))
+    side.setColorAt(0, rim(look["rim_tl"] * 0.3 * soft))
+    side.setColorAt(1, rim(0))
+    painter.setPen(QPen(side, width))
+    painter.drawPath(_rounded(rect, radius, width / 2))
+
+
+def _plate(widget, rect, radius, dpr, look, state):
+    """Пластина стекла из кэша или новая (координаты rect — элемента)."""
+    global _PLATE_BYTES
+    window = widget.window()
+    corner = widget.mapTo(window, QPoint(0, 0))
+    key = (LIGHT, SYSTEM, window.width(), window.height(), corner.x(), corner.y(), rect.x(), rect.y(),
+           rect.width(), rect.height(), radius, dpr, state, tuple(sorted((k, str(v)) for k, v in look.items())))
+    plate = _PLATES.get(key)
+    if plate is not None:
+        _PLATES.move_to_end(key)
+        return plate
+    width, height = max(1, round(rect.width() * dpr)), max(1, round(rect.height() * dpr))
+    local = QRectF(0, 0, rect.width(), rect.height())
+    plate = QPixmap(width, height)
+    plate.setDevicePixelRatio(dpr)
+    plate.fill(Qt.transparent)
+    painter = QPainter(plate)
+    try:
+        painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        under = _lens_source(window)
+        if under is not None:
+            # фон рисуем в отдельный слой, а слой кладём по форме стекла: так край сглажен
+            layer = QPixmap(width, height)
+            layer.setDevicePixelRatio(dpr)
+            layer.fill(Qt.transparent)
+            lens = QPainter(layer)
+            try:
+                lens.setRenderHint(QPainter.SmoothPixmapTransform)
+                area = QRectF(corner.x() + rect.x(), corner.y() + rect.y(), rect.width(), rect.height())
+                _paint_lens(lens, under, area, local, radius, look)
+            finally:
+                lens.end()
+            painter.fillPath(_rounded(local, radius), QBrush(layer))  # слой той же плотности — пиксель в пиксель
+        _paint_b(painter, local, radius, look)
+    finally:
+        painter.end()
+    _PLATES[key] = plate
+    _PLATE_BYTES += width * height * 4
+    while _PLATE_BYTES > _PLATE_BUDGET and len(_PLATES) > 1:
+        dropped = _PLATES.popitem(last=False)[1]
+        _PLATE_BYTES -= dropped.width() * dropped.height() * 4
+    return plate
+
+
+def _shadow(width, height, radius, look, dpr):
+    """Мягкая тень под стеклом (и тонкая тёмная линия у светлого) — картинка с полями _SHADOW_MARGIN."""
+    key = (round(width, 2), round(height, 2), round(radius, 2), look["shadow"], look["shadow_dy"],
+           round(look["shadow_a"], 3), look["hairline"], dpr)
+    found = _SHADOWS.get(key)
+    if found is not None:
+        return found
+    margin = _SHADOW_MARGIN
+    full = QRectF(0, 0, width + 2 * margin, height + 2 * margin)
+    shape = QRectF(margin, margin, width, height)
+    # размытие: рисуем в мелкой картинке и растягиваем плавно
+    blur = max(1.0, look["shadow"] / 2.5)
+    small = QPixmap(max(1, round(full.width() / blur)), max(1, round(full.height() / blur)))
+    small.fill(Qt.transparent)
+    painter = QPainter(small)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.scale(1 / blur, 1 / blur)
+    painter.fillPath(_rounded(shape.translated(0, look["shadow_dy"]), radius), _with_alpha("#000000", int(255 * look["shadow_a"])))
+    painter.end()
+    shadow = QPixmap(round(full.width() * dpr), round(full.height() * dpr))
+    shadow.setDevicePixelRatio(dpr)
+    shadow.fill(Qt.transparent)
+    painter = QPainter(shadow)
+    painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+    outside = QPainterPath()
+    outside.addRect(full)
+    outside = outside.subtracted(_rounded(shape, radius))
+    painter.setClipPath(outside)  # под стеклом тени нет: при системном стекле её было бы видно сквозь него
+    painter.drawPixmap(full, small, QRectF(small.rect()))
+    if look["hairline"]:
+        painter.setPen(QPen(_with_alpha("#000000", int(255 * look["hairline"] * 0.9)), 1.0))
+        painter.setBrush(Qt.NoBrush)
+        painter.drawPath(_rounded(shape, radius, -0.75))
+    painter.end()
+    _SHADOWS[key] = shadow
+    if len(_SHADOWS) > 96:
+        _SHADOWS.popitem(last=False)
+    return shadow
+
+
+def paint_row_glass(painter, row, clip):
+    """Выделенная строка таблицы — стеклянной плашкой (row — вся строка, clip — ячейка, которую рисуют)."""
+    device = painter.device()
+    dpr = device.devicePixelRatio() if device is not None else 1.0
+    radius = row.height() / 2
+    key = ("row", LIGHT, round(row.width(), 1), round(row.height(), 1), dpr)
+    plate = _SHADOWS.get(key)
+    if plate is None:
+        plate = QPixmap(max(1, round(row.width() * dpr)), max(1, round(row.height() * dpr)))
+        plate.setDevicePixelRatio(dpr)
+        plate.fill(Qt.transparent)
+        p = QPainter(plate)
+        p.setRenderHint(QPainter.Antialiasing)
+        _paint_b(p, QRectF(0, 0, row.width(), row.height()), radius, style_b()["row_sel"])
+        p.end()
+        _SHADOWS[key] = plate
+    painter.save()
+    painter.setClipRect(clip)
+    painter.drawPixmap(row.topLeft(), plate)
+    painter.restore()
+
+
+def _paint_shadows(painter, container):
+    """Тени стёкол, лежащих на container (окне, карточке, группе), — до самих стёкол."""
+    device = painter.device()
+    dpr = device.devicePixelRatio() if device is not None else 1.0
+    for child in container.findChildren(QWidget):
+        if not child.isVisible() or child.isWindow() or _glass_container(child) is not container:
+            continue
+        shape = _glass_shape(child)
+        if shape is None:
+            continue
+        look, state, rect, radius = shape
+        look = _state_look(look, state)
+        if look["shadow_a"] <= 0 and not look["hairline"]:
+            continue
+        corner = child.mapTo(container, QPoint(0, 0))
+        place = rect.translated(corner.x() - _SHADOW_MARGIN, corner.y() - _SHADOW_MARGIN)
+        painter.drawPixmap(place.topLeft(), _shadow(rect.width(), rect.height(), radius, look, dpr))
+
+
+def _glass_b(painter, widget, shape=None):
+    """Рисует стекло элемента пластиной (и рамку фокуса). False — элемент не стекло."""
+    shape = shape or _glass_shape(widget)
+    if shape is None:
+        return False
+    look, state, rect, radius = shape
+    device = painter.device()
+    dpr = device.devicePixelRatio() if device is not None else 1.0
+    plate = _plate(widget, rect, radius, dpr, _state_look(look, state), state)
+    painter.save()
+    if state == "disabled":
+        painter.setOpacity(style_b()["disabled"]["opacity"])
+    painter.drawPixmap(rect.topLeft(), plate)
+    painter.restore()
+    focus = widget.hasFocus() and widget.focusPolicy() != Qt.NoFocus
+    invalid = widget.property("invalid") is True
+    if focus or invalid:
+        ring = style_b()["focus"]
+        pen = QLinearGradient(rect.topLeft(), rect.topRight())
+        first, last = (BAD_INK, BAD_INK) if invalid else ring["ring"]
+        pen.setColorAt(0, _with_alpha(first, int(255 * ring["ring_a"])))
+        pen.setColorAt(1, _with_alpha(last, int(255 * ring["ring_a"])))
+        painter.setPen(QPen(pen, ring["ring_w"]))
+        painter.setBrush(Qt.NoBrush)
+        painter.drawPath(_rounded(rect, radius, ring["ring_w"] / 2))
+    return True
+
+
+PILL_MS = 220          # пилюля в группе кнопок: появляется и гаснет за столько мс
+PILL_INSET = 2         # пилюля почти во всю высоту группы: тонкий зазор до кромки капсулы
+ANIMATE = True         # False — сразу конечное состояние (снимки в тестах)
+
+
+def pill_progress(button):
+    """Насколько видна пилюля кнопки в группе: 0..1, плавно к цели (наведение, нажатие, фокус)."""
+    target = 1.0 if _segment_active(button) else 0.0
+    if not ANIMATE:
+        button._pill = target
+        return target
+    current = getattr(button, "_pill", 0.0)
+    if getattr(button, "_pill_target", None) != target:
+        button._pill_target = target
+        animation = getattr(button, "_pill_anim", None)
+        if animation is None:
+            animation = QVariantAnimation(button)
+            animation.setEasingCurve(QEasingCurve.OutCubic)
+
+            def step(value, button=button):
+                button._pill = float(value)
+                button.update()
+                if button.parentWidget() is not None:
+                    button.parentWidget().update()  # разделители гаснут вместе с ней
+            animation.valueChanged.connect(step)
+            button._pill_anim = animation
+        animation.stop()
+        animation.setStartValue(current)
+        animation.setEndValue(target)
+        animation.setDuration(max(1, int(PILL_MS * abs(target - current))))
+        animation.start()
+    return current
+
+
+def _paint_segment_pill(painter, button):
+    """Пилюля внутри группы: проступает и чуть подрастает (92 % → 100 %), гаснет так же мягко."""
+    progress = pill_progress(button)
+    if progress <= 0.001 or not button.isEnabled():
+        return
+    state = _state(button)
+    state = state if state in ("hover", "pressed") else "hover"
+    inner = QRectF(button.rect()).adjusted(PILL_INSET, PILL_INSET, -PILL_INSET, -PILL_INSET)
+    painter.save()
+    painter.setOpacity(progress)
+    center = inner.center()
+    scale = 0.92 + 0.08 * progress
+    painter.translate(center)
+    painter.scale(scale, scale)
+    painter.translate(-center)
+    _glass_b(painter, button, (style_b()["group_pill"], state, inner, inner.height() / 2))
+    painter.restore()
+
+
+def _paint_button_b(button):
+    painter = QPainter(button)
+    try:
+        painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform | QPainter.TextAntialiasing)
+        if button.property("kind") == "segment":
+            _paint_segment_pill(painter, button)
+        else:
+            _glass_b(painter, button)
+        look = button.property("kind")
+        ink = QColor(ON_ACCENT if look == "primary" else BAD_INK if look == "danger" else TEXT)
+        if not button.isEnabled():
+            ink = QColor(FAINT)
+        _button_label(painter, button, QRectF(button.rect()), ink)
+    finally:
+        painter.end()
+
+
+def _paint_card_b(card):
+    painter = QPainter(card)
+    try:
+        painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        _glass_b(painter, card)
+        _paint_shadows(painter, card)
+    finally:
+        painter.end()
+
+
+def _segment_active(button):
+    return button.isEnabled() and (button.isDown() or button.underMouse() or button.hasFocus())
+
+
+def _paint_group_b(group):
+    """Группа кнопок — одна капсула; между кнопками — разделители, рядом с пилюлей они прячутся."""
+    painter = QPainter(group)
+    try:
+        painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        _glass_b(painter, group)
+        buttons = sorted((child for child in group.findChildren(QPushButton) if child.isVisible()), key=lambda b: b.x())
+        sep = style_b()["group_sep"]
+        color = _with_alpha("#3a2f8a" if LIGHT else WHITE, int(255 * sep["a"]))
+        for left, right in zip(buttons, buttons[1:]):
+            near = max(getattr(left, "_pill", 0.0), getattr(right, "_pill", 0.0))
+            if near >= 0.999:
+                continue
+            x = (left.geometry().right() + 1 + right.x()) / 2
+            painter.save()
+            painter.setOpacity(1 - near)  # разделитель гаснет, пока рядом проступает пилюля
+            painter.fillRect(QRectF(x - sep["w"] / 2, (group.height() - sep["h"]) / 2, sep["w"], sep["h"]), color)
+            painter.restore()
+        _paint_shadows(painter, group)
+    finally:
+        painter.end()
+
+
+def _paint_window_b(window):
+    if _see_through() and window.isWindow():
+        _paint_wash(window)
+    else:
+        painter = QPainter(window)
+        try:
+            painter.setRenderHint(QPainter.SmoothPixmapTransform)
+            sharp = _scene(window.width(), window.height())[0]
+            painter.drawPixmap(window.rect(), sharp, sharp.rect())
+        finally:
+            painter.end()
+    painter = QPainter(window)
+    try:
+        painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        _paint_shadows(painter, window)
+    finally:
+        painter.end()
+
+
+def _paint_under(widget):
+    """Поле ввода, список, плашка: стекло под ними, а текст и курсор Qt рисует сам (False)."""
+    painter = QPainter(widget)
+    try:
+        painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        _glass_b(painter, widget)
+    finally:
+        painter.end()
+    return False
+
+
+def button_group(buttons):
+    """Кнопки одной капсулой (шапка окна): равной ширины, пилюля при наведении."""
+    group = role(QFrame(), "group")
+    row = QHBoxLayout(group)
+    row.setContentsMargins(0, 0, 0, 0)
+    row.setSpacing(0)
+    width = max(button.sizeHint().width() for button in buttons) + 40  # пилюле есть место по бокам
+    for button in buttons:
+        kind(button, "segment")
+        # фокус — только с клавиатуры (Tab): после щелчка пилюля не должна оставаться гореть
+        button.setFocusPolicy(Qt.TabFocus)
+        button.setMinimumWidth(width)
+        row.addWidget(button)
+    return group
+
+
+def _paint_liquid(obj):
+    """Жидкое стекло B: True — нарисовано, False — пусть рисует Qt (поверх уже лежит стекло), None — не наше."""
+    if not LIQUID:
+        return None
+    if isinstance(obj, QLabel) and obj.property("role") == "title" and not obj.textFormat() == Qt.RichText:
+        _paint_title(obj)
+        return True
+    if _is_glass_button(obj):
+        _paint_button_b(obj)
+        return True
+    if isinstance(obj, QFrame) and obj.property("role") == "card":
+        _paint_card_b(obj)
+        return True
+    if isinstance(obj, QFrame) and obj.property("role") == "group":
+        _paint_group_b(obj)
+        return True
+    if isinstance(obj, (QMainWindow, QDialog)) or (isinstance(obj, QWidget) and obj.property("role") == "backdrop"):
+        _paint_window_b(obj)
+        return True
+    if (isinstance(obj, QLabel) and obj.property("role") == "status") or (
+            isinstance(obj, (QLineEdit, QPlainTextEdit, QAbstractSpinBox, QComboBox)) and _glass_field(obj)):
+        return _paint_under(obj)
+    return None
+
+
+def _liquid_style():
+    """Правила QSS для жидкого стекла: фон и рамки рисует стекло, Qt — только текст."""
+    return f"""
+QPushButton, QToolButton, QPushButton:hover, QToolButton:hover, QPushButton:pressed, QToolButton:pressed,
+QPushButton:focus, QToolButton:focus, QPushButton:disabled, QToolButton:checked,
+QPushButton[kind="primary"], QPushButton[kind="primary"]:hover, QPushButton[kind="primary"]:pressed,
+QPushButton[kind="danger"], QPushButton[kind="danger"]:pressed {{ background: transparent; border: none; }}
+QPushButton {{ padding: 8px 18px; }}
+QPushButton:pressed {{ padding: 8px 18px; }}
+QLineEdit, QSpinBox, QPlainTextEdit, QLineEdit:focus, QSpinBox:focus, QPlainTextEdit:focus,
+QLineEdit[invalid="true"], QPlainTextEdit[invalid="true"] {{ background: transparent; border: none; }}
+QLineEdit, QSpinBox {{ padding: 8px 12px; }}
+QLineEdit[role="search"] {{ padding: 10px 16px; }}
+QAbstractSpinBox QLineEdit, QComboBox QLineEdit {{ padding: 0; }}
+QComboBox, QComboBox:hover, QComboBox:focus {{ background: transparent; border: none; padding: 6px 14px; }}
+QFrame[role="card"], QFrame[role="group"] {{ background: transparent; border: none; }}
+QLabel[role="status"] {{ color: {MUTED}; padding: 5px 14px; }}
+"""
+
+
 def _style():
     return f"""
 /* шрифт — здесь, а не только через app.setFont: на macOS Qt ставит кнопкам, подписям
@@ -332,7 +966,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none
 /* системное стекло: на светлом размытом рабочем столе бледные подписи пропадали */
 QHeaderView::section {{ color: {ACC_LIGHT}; }}
 QLabel[role="faint"] {{ color: {MUTED}; }}
-""" if SYSTEM and not LIGHT else "") + (_light_style() if LIGHT else "")
+""" if SYSTEM and not LIGHT else "") + (_light_style() if LIGHT else "") + (_liquid_style() if LIQUID else "")
 
 
 def _light_style():
@@ -449,8 +1083,9 @@ def _set_palette():
         globals().update(cat.LIGHT_COLORS if LIGHT else cat.DARK_COLORS)
     globals().update(_LIGHT_FILES if LIGHT else _DARK_FILES)
     _derive_colors()
-    STYLE = _style()
     _SCENES.clear()
+    _forget_plates()  # пластины стекла нарисованы цветами старой темы
+    STYLE = _style()
 
 
 def _refresh_app():
@@ -528,7 +1163,8 @@ def glow(widget, color=None, radius=24, alpha=170):
 
 def neon_card(card):
     """Карточка с неоновым ореолом вокруг рамки (слой Halo, см. _FocusGlow)."""
-    card.setProperty("neon", True)
+    if not LIQUID:  # жидкое стекло не светится
+        card.setProperty("neon", True)
     return card
 
 
@@ -659,6 +1295,12 @@ class _FocusGlow(QObject):
                 sysglass.attach(obj, LIGHT)
                 if isinstance(obj, QDialog):
                     QTimer.singleShot(0, lambda: sysglass.fit_height(obj) if isValid(obj) else None)
+        if LIQUID and isinstance(obj, QPushButton) and obj.property("kind") == "segment" and kind in (
+                QEvent.Enter, QEvent.Leave, QEvent.MouseButtonPress, QEvent.MouseButtonRelease, QEvent.FocusIn,
+                QEvent.FocusOut, QEvent.EnabledChange) and obj.parentWidget() is not None:
+            obj.parentWidget().update()  # разделители прячутся рядом с пилюлей, тень пилюли — на группе
+        if LIQUID:
+            return  # неоновых ореолов у жидкого стекла нет: нажатие и фокус видны на самом стекле
         if kind == QEvent.HoverMove and _is_glass_button(obj):
             obj.update()  # пятно света идёт за курсором
         if kind in (QEvent.Move, QEvent.Resize, QEvent.Show, QEvent.Hide) \
@@ -849,7 +1491,7 @@ def role(widget, name):
 def kind(button, name):
     """Вид кнопки: "primary" — лавандовая главная (светится), "danger" — красная."""
     button.setProperty("kind", name)
-    if name == "primary":
+    if name == "primary" and not LIQUID:  # у жидкого стекла неонового ореола нет
         glow(button, ACC, radius=20, alpha=140)
     return button
 
@@ -990,6 +1632,8 @@ def _scene(width, height):
                 light.setColorAt(1, QColor(0, 0, 0, 0))
             painter.setBrush(light)
             painter.drawEllipse(center, radius * reach, radius * reach)
+        if LIQUID:  # жидкое стекло: фон окна спокойнее (вуаль); преломляются пятна света под ней
+            painter.fillRect(sharp.rect(), _with_alpha("#fbfaff" if LIGHT else "#2a2444", 90 if LIGHT else 140))
         if LIGHT:  # перламутровый отлив: едва заметная белая полоса по диагонали
             band = QLinearGradient(0, 0, width, height)
             band.setColorAt(0.35, _with_alpha(WHITE, 0))
@@ -1183,27 +1827,33 @@ def _paint_button(button):
             painter.setBrush(Qt.NoBrush)
             painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), radius, radius)
         painter.setOpacity(1)  # затемнено только стекло: FAINT на нём ещё читается, а вдвойне — уже нет
-        icon = button.icon()
-        if isinstance(button, QToolButton) and not icon.isNull():
-            size = button.iconSize()
-            place = QRect(QPoint(0, 0), size)
-            place.moveCenter(button.rect().center())
-            icon.paint(painter, place, Qt.AlignCenter, QIcon.Normal if enabled else QIcon.Disabled,
-                       QIcon.On if button.isChecked() else QIcon.Off)
-        else:
-            text = button.text()
-            if len(text) == 1:
-                # один значок: по центру ставим сам рисунок, а не его ячейку в шрифте —
-                # внутри ячейки он лежит не посередине, и на Windows это заметно (замок съезжал вправо)
-                shape = QPainterPath()
-                shape.addText(0, 0, button.font(), text)
-                painter.fillPath(shape.translated(rect.center() - shape.boundingRect().center()), ink)
-            else:
-                painter.setFont(button.font())
-                painter.setPen(ink)
-                painter.drawText(rect, Qt.AlignCenter | Qt.TextHideMnemonic, text)
+        _button_label(painter, button, rect, ink)
     finally:
         painter.end()
+
+
+def _button_label(painter, button, rect, ink):
+    """Надпись или значок кнопки по центру."""
+    enabled = button.isEnabled()
+    icon = button.icon()
+    if isinstance(button, QToolButton) and not icon.isNull():
+        size = button.iconSize()
+        place = QRect(QPoint(0, 0), size)
+        place.moveCenter(button.rect().center())
+        icon.paint(painter, place, Qt.AlignCenter, QIcon.Normal if enabled else QIcon.Disabled,
+                   QIcon.On if button.isChecked() else QIcon.Off)
+    else:
+        text = button.text()
+        if len(text) == 1:
+            # один значок: по центру ставим сам рисунок, а не его ячейку в шрифте —
+            # внутри ячейки он лежит не посередине, и на Windows это заметно (замок съезжал вправо)
+            shape = QPainterPath()
+            shape.addText(0, 0, button.font(), text)
+            painter.fillPath(shape.translated(rect.center() - shape.boundingRect().center()), ink)
+        else:
+            painter.setFont(button.font())
+            painter.setPen(ink)
+            painter.drawText(rect, Qt.AlignCenter | Qt.TextHideMnemonic, text)
 
 
 def _pearl_button_look(look, rect, hover, pressed, button):
@@ -1328,6 +1978,13 @@ def _paint_title(label):
 
 def _paint_glass(obj):
     """Рисует элемент жидким стеклом. True — нарисовано, False — пусть рисует сам Qt."""
+    try:
+        liquid = _paint_liquid(obj)
+    except Exception:  # стекло B не нарисовалось — рисуем прежнее
+        traceback.print_exc()
+        liquid = None
+    if liquid is not None:
+        return liquid
     if isinstance(obj, QLabel) and obj.property("role") == "title" and not obj.textFormat() == Qt.RichText:
         _paint_title(obj)
     elif _is_glass_button(obj):

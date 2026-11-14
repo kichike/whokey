@@ -227,7 +227,15 @@ class RoundedRowDelegate(QStyledItemDelegate):
         painter.restore()
 
     def paint(self, painter, option, index):
-        if option.state & QStyle.State_Selected:
+        if option.state & QStyle.State_Selected and theme.LIQUID:
+            # жидкое стекло: выделенная строка — стеклянной плашкой с переливом цветов ключа
+            width = option.widget.viewport().width() if option.widget else option.rect.right()
+            row = QRectF(self.INSET, option.rect.top() + 1, width - 2 * self.INSET, option.rect.height() - 2)
+            theme.paint_row_glass(painter, row, option.rect)
+            option = QStyleOptionViewItem(option)
+            option.state &= ~QStyle.State_Selected
+            self._selected = not theme.LIGHT  # на светлом стекле текст остаётся тёмным
+        elif option.state & QStyle.State_Selected:
             # переливом через всю строку, как ключ на логотипе: лавандовый → фуксия
             width = option.widget.viewport().width() if option.widget else option.rect.right()
             fill = QLinearGradient(0, 0, width, 0)
@@ -245,7 +253,7 @@ class RoundedRowDelegate(QStyledItemDelegate):
         elif index.row() % 2:
             # после сортировки номер строки — её место на экране, так что полосы не скачут
             stripe = QColor(theme.SHADOW if theme.LIGHT else theme.WHITE)
-            stripe.setAlpha(10 if theme.LIGHT else self.STRIPE_ALPHA)
+            stripe.setAlpha((10 if theme.LIGHT else self.STRIPE_ALPHA) // (2 if theme.LIQUID else 1))  # на стекле — тише
             self._plate(painter, option, stripe)
         super().paint(painter, option, index)
         self._selected = False
