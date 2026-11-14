@@ -237,8 +237,31 @@ def _forget_plates():
 _LENS_BIG = dict(edge=14, lens=0.55, power=2.4, zoom=1.00)    # карточка и поля
 _LENS_PILL = dict(edge=16, lens=1.45, power=1.8, zoom=1.03)   # кнопки, замок, плашки
 # перелив оттенка (по 0.7·x + 0.3·y) и главная кнопка (слева направо)
-_GRAD_B = {False: ("#6c4ef0", "#a890f0", "#f048f0"), True: ("#8f74ff", "#c4b2ff", "#f39af0")}
-_ACCENT_B = {False: ("#6f50f0", "#c844d6"), True: ("#6244e6", "#b832c8")}
+# Все цвета стекла — из текущей палитры (ACC, MAGENTA…): котик и любая тема перекрашивают и его.
+def _mix(first, second, amount):
+    """Цвет между first и second: amount=0 — first, 1 — second."""
+    a, b = QColor(first), QColor(second)
+    return QColor(round(a.red() + (b.red() - a.red()) * amount), round(a.green() + (b.green() - a.green()) * amount),
+                  round(a.blue() + (b.blue() - a.blue()) * amount)).name()
+
+
+def _grad_b(light):
+    """Перелив оттенка стекла: три цвета ключа (в светлой теме — пастельнее)."""
+    if light:
+        return _mix(ACC, WHITE, 0.25), _mix(ACC, WHITE, 0.5), _mix(MAGENTA, WHITE, 0.4)
+    return _mix(ACC_DEEP, ACC, 0.2), ACC, MAGENTA
+
+
+def _accent_b(light):
+    """Главная кнопка («+ Добавить», «Сохранить»): слева направо."""
+    if light:
+        return ACC_DEEP, MAGENTA
+    return _mix(ACC_DEEP, ACC, 0.1), _mix(MAGENTA, ACC_DEEP, 0.2)
+
+
+def _veil_ink(light):
+    """Нейтральная вуаль под стеклом: почти фон окна (тёмный) или почти белый (светлый)."""
+    return _mix(BG, WHITE, 0.6) if light else _mix(BG, "#000000", 0.15)
 
 
 def _el(light, lens, base, base_a, tint_a, rim_w=1.4, rim_base=0.10, rim_tl=0.85, rim_br=0.35, glow=0.10,
@@ -258,7 +281,7 @@ def style_b(light=None):
     if light in _STYLE_B:
         return _STYLE_B[light]
     dark = not light
-    ink = "#0b0920" if dark else "#fbfaff"  # нейтральная вуаль
+    ink = _veil_ink(light)  # нейтральная вуаль
     table = {
         "card": _el(light, _LENS_BIG, ink, 0.22 if dark else 0.30, 0.08 if dark else 0.07, rim_w=1.2, rim_tl=0.60,
                     rim_br=0.25, glow=0.06, inner=0.06, shadow=14, shadow_dy=4, shadow_a=0.22),
@@ -270,9 +293,9 @@ def style_b(light=None):
         "secondary": _el(light, _LENS_PILL, ink, 0.16 if dark else 0.30, 0.20 if dark else 0.14),
         "danger": _el(light, _LENS_PILL, ink, 0.16 if dark else 0.30, 0.0, tint=BAD, tint_solid=0.26 if dark else 0.16),
         "primary": _el(light, _LENS_PILL, ink, 0.0, 0.0, accent_a=0.80 if dark else 0.90, rim_tl=0.80, glow=0.14),
-        "search": _el(light, _LENS_BIG, "#05040f" if dark else "#ffffff", 0.30 if dark else 0.52, 0.10 if dark else 0.08,
+        "search": _el(light, _LENS_BIG, _mix(BG, "#000000", 0.5) if dark else WHITE, 0.30 if dark else 0.52, 0.10 if dark else 0.08,
                       inset=True, inner=0.18, rim_tl=0.45, rim_br=0.55, shadow=0, shadow_a=0.0),
-        "field": _el(light, dict(_LENS_BIG, lens=0.6), "#05040f" if dark else "#ffffff", 0.32 if dark else 0.58, 0.06,
+        "field": _el(light, dict(_LENS_BIG, lens=0.6), _mix(BG, "#000000", 0.5) if dark else WHITE, 0.32 if dark else 0.58, 0.06,
                      inset=True, inner=0.18, rim_tl=0.40, rim_br=0.50, shadow=0, shadow_a=0.0),
         "status": _el(light, _LENS_PILL, ink, 0.20 if dark else 0.36, 0.16 if dark else 0.12),
         "row_sel": _el(light, _LENS_BIG, ink, 0.06 if dark else 0.30, 0.30 if dark else 0.20, shadow=0, shadow_a=0.0),
@@ -280,7 +303,7 @@ def style_b(light=None):
         "hover": dict(tint_da=0.06, rim_k=1.25, glow_k=1.6, accent_da=0.08),
         "pressed": dict(tint_da=0.10, base_da=0.08 if dark else 0.10, rim_k=1.45, glow_k=2.2, touch_a=0.16 if dark else 0.30),
         "disabled": dict(opacity=0.45),
-        "focus": dict(ring_w=2.0, ring=("#b9a4ff", "#f070f0") if dark else ("#7a5cf0", "#d64be0"), ring_a=0.90),
+        "focus": dict(ring_w=2.0, ring=(_mix(ACC, WHITE, 0.3), NEON) if dark else (ACC, MAGENTA), ring_a=0.90),
     }
     _STYLE_B[light] = table
     return table
@@ -430,7 +453,7 @@ def _paint_b(painter, rect, radius, look):
     painter.fillPath(shape, _with_alpha(look["base"], int(255 * look["base_a"])))
     if look["accent_a"]:  # главная кнопка: индиго → фуксия слева направо
         accent = QLinearGradient(rect.topLeft(), rect.topRight())
-        first, last = _ACCENT_B[LIGHT]
+        first, last = _accent_b(LIGHT)
         accent.setColorAt(0, _with_alpha(first, int(255 * look["accent_a"])))
         accent.setColorAt(1, _with_alpha(last, int(255 * look["accent_a"])))
         painter.fillPath(shape, accent)
@@ -440,7 +463,7 @@ def _paint_b(painter, rect, radius, look):
         gx, gy = 0.7 / max(rect.width(), 1), 0.3 / max(rect.height(), 1)
         norm = gx * gx + gy * gy
         tint = QLinearGradient(rect.topLeft(), rect.topLeft() + QPointF(gx / norm, gy / norm))
-        for stop, color in zip((0, 0.5, 1), _GRAD_B[LIGHT]):
+        for stop, color in zip((0, 0.5, 1), _grad_b(LIGHT)):
             tint.setColorAt(stop, _with_alpha(color, int(255 * min(1.0, look["tint_a"]))))
         painter.fillPath(shape, tint)
     if look.get("lift"):
@@ -727,7 +750,7 @@ def _paint_group_b(group):
         _glass_b(painter, group)
         buttons = sorted((child for child in group.findChildren(QPushButton) if child.isVisible()), key=lambda b: b.x())
         sep = style_b()["group_sep"]
-        color = _with_alpha("#3a2f8a" if LIGHT else WHITE, int(255 * sep["a"]))
+        color = _with_alpha(SHADOW if LIGHT else WHITE, int(255 * sep["a"]))
         for left, right in zip(buttons, buttons[1:]):
             near = max(getattr(left, "_pill", 0.0), getattr(right, "_pill", 0.0))
             if near >= 0.999:
@@ -820,12 +843,12 @@ def _popup_style():
     """Меню правого клика и выпадающие списки — стеклом B. На Mac под ними настоящее размытие
     (sysglass), поэтому заливка тоньше; на Windows/Linux размытия нет — заливка плотнее, чтобы читалось."""
     if LIGHT:
-        fill = rgba("#fbfaff", 150 if SYSTEM else 235)
-        rim, line = rgba(WHITE, 230), rgba("#3a2f8a", 30)
+        fill = rgba(_veil_ink(True), 150 if SYSTEM else 235)
+        rim, line = rgba(WHITE, 230), rgba(SHADOW, 30)
         pick = f"qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {rgba(ACC, 46)}, stop:1 {rgba(MAGENTA, 38)})"
         pick_rim, pick_ink = rgba(WHITE, 240), TEXT
     else:
-        fill = rgba("#0b0920", 120 if SYSTEM else 232)
+        fill = rgba(_veil_ink(False), 120 if SYSTEM else 232)
         rim, line = rgba(WHITE, 46), rgba(WHITE, 26)
         pick = f"qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {rgba(ACC, 95)}, stop:1 {rgba(MAGENTA, 80)})"
         pick_rim, pick_ink = rgba(WHITE, 60), WHITE
@@ -1665,7 +1688,7 @@ def _scene(width, height):
             painter.setBrush(light)
             painter.drawEllipse(center, radius * reach, radius * reach)
         if LIQUID:  # жидкое стекло: фон окна спокойнее (вуаль); преломляются пятна света под ней
-            painter.fillRect(sharp.rect(), _with_alpha("#fbfaff" if LIGHT else "#2a2444", 90 if LIGHT else 140))
+            painter.fillRect(sharp.rect(), _with_alpha(_veil_ink(True) if LIGHT else _mix(BG, ACC, 0.16), 90 if LIGHT else 140))
         if LIGHT:  # перламутровый отлив: едва заметная белая полоса по диагонали
             band = QLinearGradient(0, 0, width, height)
             band.setColorAt(0.35, _with_alpha(WHITE, 0))
