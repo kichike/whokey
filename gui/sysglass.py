@@ -128,6 +128,27 @@ def _trim_top(window):
 
 def fit_height(window):
     """Полоса заголовка теперь часть окна: диалог, подогнанный по содержимому, становится выше на её высоту."""
-    need = window.minimumSizeHint().height()
-    if window.height() < need:
+    from PySide6.QtCore import Qt
+    if window.testAttribute(Qt.WA_ContentsMarginsRespectsSafeArea):
+        # Qt отступает под полосой заголовка («безопасная зона»), но в нужный размер окна этот отступ
+        # не считает: окна выходили ниже, чем надо, и текст сплющивался (вопросы, генератор).
+        # Делаем отступ обычным полем окна — его Qt учитывает везде, и QMessageBox тоже.
+        safe = window.contentsMargins()
+        window.setAttribute(Qt.WA_ContentsMarginsRespectsSafeArea, False)
+        own = window.contentsMargins()
+        window.setContentsMargins(own.left(), safe.top(), own.right(), own.bottom())
+        window.updateGeometry()
+        if window.minimumHeight() == window.maximumHeight():  # QMessageBox: пусть пересчитает свой размер
+            window.adjustSize()
+    # естественная высота, а не минимальная: при минимальной строки (оценка пароля в генераторе) сжимались
+    need = max(window.minimumSizeHint().height(), window.sizeHint().height())
+    layout = window.layout()
+    if layout is not None and layout.hasHeightForWidth():  # текст с переносом строк: высота зависит от ширины
+        # поля самого окна считаем отдельно: на Mac сверху их больше (полоса заголовка), а Qt о них забывает
+        margins = window.contentsMargins()
+        inner = window.width() - margins.left() - margins.right()
+        need = max(need, margins.top() + margins.bottom() + layout.heightForWidth(inner))
+    if window.height() >= need:
+        return
+    if window.minimumHeight() != window.maximumHeight():  # у QMessageBox размер постоянный — см. выше
         window.resize(window.width(), need)
