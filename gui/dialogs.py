@@ -443,19 +443,18 @@ class AboutDialog(QDialog):
         # обновления: проверить вручную; найденная версия ставится кнопкой в главном окне
         self.update_status = theme.role(QLabel(), "muted")
         self.update_status.setWordWrap(True)
-        updates = QHBoxLayout()
-        updates.addWidget(self.update_status, 1)
+        self.update_status.hide()  # пустая строка не занимает места
         self.check_button = None
         if updater is not None:
+            # рядом с «Закрыть», а текст результата — своей строкой на всю ширину:
+            # в узкой колонке рядом с кнопкой длинный ответ обрезался
             self.check_button = QPushButton(tr("Check for updates"))
             self.check_button.clicked.connect(lambda: self._check(updater))
-            updates.addWidget(self.check_button)
+            close.addButton(self.check_button, QDialogButtonBox.ActionRole)
             updater.checked.connect(self._checked)
             self._updater = updater
-            if updater.version:
-                self._checked("found")
         else:
-            self.update_status.setText(tr("Updates by button work in the installed app."))
+            self._status(tr("Updates by button work in the installed app."))
         column = QVBoxLayout(self)
         column.setSpacing(10)
         head = QHBoxLayout()
@@ -470,14 +469,25 @@ class AboutDialog(QDialog):
         column.addLayout(head)
         for widget in (what, links, license_):
             column.addWidget(widget)
-        column.addLayout(updates)
+        column.addWidget(self.update_status)
         column.addWidget(close)
         what.setMinimumWidth(380)
         what.setMinimumHeight(what.heightForWidth(380))
+        if updater is not None and updater.version:
+            self._checked("found")
+
+    def _status(self, text):
+        """Итог проверки обновлений — строкой на всю ширину; окно подрастает под текст."""
+        label = self.update_status
+        label.setText(text)
+        label.show()
+        width = max(label.width(), self.layout().contentsRect().width(), 380)
+        label.setMinimumHeight(label.heightForWidth(width))
+        self.adjustSize()
 
     def _check(self, updater):
         self.check_button.setEnabled(False)
-        self.update_status.setText(tr("Checking…"))
+        self._status(tr("Checking…"))
         updater.check()
         if not updater.busy:  # проверка уже шла или сразу закончилась
             self.check_button.setEnabled(True)
@@ -491,7 +501,7 @@ class AboutDialog(QDialog):
             text = tr("You have the latest version.")
         else:
             text = tr("Could not check for updates. Check the internet connection.")
-        self.update_status.setText(text)
+        self._status(text)
 
     def done(self, result):
         if self.check_button is not None:  # окно закрыто — проверка ему больше не отвечает
