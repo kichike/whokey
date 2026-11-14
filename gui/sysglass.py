@@ -88,10 +88,26 @@ def attach(window, light=False):
     if fx.layer().respondsToSelector_("setCornerCurve:"):
         fx.layer().setCornerCurve_("continuous")
     frame_view.addSubview_positioned_relativeTo_(fx, AppKit.NSWindowBelow, content)
+    _clear_titlebar(ns_window)
     ns_window.invalidateShadow()
 
     if first:
         _trim_top(window)
+
+
+def _clear_titlebar(ns_window):
+    """Новые macOS кладут под полосу заголовка свою подложку и «край» с резкой границей — поверх
+    нашего фона это выглядело серой полосой. Подложку прячем, кнопки окна остаются."""
+    import AppKit
+    if ns_window.respondsToSelector_("setTitlebarSeparatorStyle:"):
+        ns_window.setTitlebarSeparatorStyle_(AppKit.NSTitlebarSeparatorStyleNone)
+    frame_view = ns_window.contentView().superview()
+    for container in frame_view.subviews():
+        if container.className() != "NSTitlebarContainerView":
+            continue
+        for view in container.subviews():
+            if view.className() in ("NSTitlebarBackgroundView", "_NSTitlebarDecorationView"):
+                view.setHidden_(True)
 
 
 def _look(fx, light):
