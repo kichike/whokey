@@ -40,6 +40,7 @@ FONT_FAMILY = "MesloLGS Nerd Font"
 CHECK_FILE = (Path(__file__).parent / "assets" / "check.svg").as_posix()
 ARROW_FILE = (Path(__file__).parent / "assets" / "arrow.svg").as_posix()
 ARROW_UP_FILE = (Path(__file__).parent / "assets" / "arrow_up.svg").as_posix()
+CHECK_ON_ACCENT = (Path(__file__).parent / "assets" / "check_light.svg").as_posix()  # белая — на капле перелива
 EYE_FILE = str(Path(__file__).parent / "assets" / "eye.svg")
 EYE_OFF_FILE = str(Path(__file__).parent / "assets" / "eye_off.svg")
 # иконка окна: на Windows — .ico без полей macOS (с полями на панели задач она мельче соседних)
@@ -300,6 +301,8 @@ def style_b(light=None):
         "field": _el(light, dict(_LENS_BIG, lens=0.6), _mix(BG, "#000000", 0.5) if dark else WHITE, 0.32 if dark else 0.58, 0.06,
                      inset=True, inner=0.18, rim_tl=0.40, rim_br=0.50, shadow=0, shadow_a=0.0),
         "status": _el(light, _LENS_PILL, ink, 0.20 if dark else 0.36, 0.16 if dark else 0.12),
+        # плашка «Подключено» и имя файла: то же стекло, что у счётчика, но заметнее подкрашено
+        "chip": _el(light, _LENS_PILL, ink, 0.18 if dark else 0.34, 0.34 if dark else 0.24),
         "row_sel": _el(light, _LENS_BIG, ink, 0.06 if dark else 0.30, 0.30 if dark else 0.20, shadow=0, shadow_a=0.0),
         "group_sep": dict(w=1.0, h=18, a=0.16 if dark else 0.14),
         "hover": dict(tint_da=0.06, rim_k=1.25, glow_k=1.6, accent_da=0.08),
@@ -363,8 +366,10 @@ def _glass_shape(widget):
         return table["card"], "normal", rect, CARD_RADIUS
     if isinstance(widget, QFrame) and name == "group":
         return table["group"], "normal", rect, rect.height() / 2
-    if isinstance(widget, QLabel) and name == "status":
+    if isinstance(widget, QLabel) and name in ("status", "chip_off"):
         return table["status"], "normal", rect, rect.height() / 2
+    if isinstance(widget, QLabel) and name == "chip":
+        return table["chip"], "normal", rect, rect.height() / 2
     if isinstance(widget, (QPushButton, QToolButton)) and _is_glass_button(widget):
         look = widget.property("kind")
         if look == "segment":  # кнопка в группе: пилюлю рисует сама кнопка, плавно (_paint_segment_pill)
@@ -843,7 +848,7 @@ def _paint_liquid(obj):
     if isinstance(obj, (QMainWindow, QDialog)) or (isinstance(obj, QWidget) and obj.property("role") == "backdrop"):
         _paint_window_b(obj)
         return True
-    if (isinstance(obj, QLabel) and obj.property("role") == "status") or (
+    if (isinstance(obj, QLabel) and obj.property("role") in ("status", "chip", "chip_off")) or (
             isinstance(obj, (QLineEdit, QPlainTextEdit, QAbstractSpinBox, QComboBox)) and _glass_field(obj)):
         return _paint_under(obj)
     return None
@@ -897,7 +902,47 @@ QAbstractSpinBox QLineEdit, QComboBox QLineEdit {{ padding: 0; }}
 QComboBox, QComboBox:hover, QComboBox:focus {{ background: transparent; border: none; padding: 6px 14px; }}
 QFrame[role="card"], QFrame[role="group"] {{ background: transparent; border: none; }}
 QLabel[role="status"] {{ color: {MUTED}; padding: 5px 14px; }}
+QLabel[role="chip"], QLabel[role="chip_off"] {{ background: transparent; border: none; padding: 4px 12px; }}
+QLabel[role="chip"] {{ color: {ACC_DEEP if LIGHT else ACC_LIGHT}; }}
+""" + _liquid_controls()
+
+
+def _liquid_controls():
+    """Галочки и полоски — стеклом B: пустая галочка — впадина, как поле ввода; отмеченная —
+    капля перелива главной кнопки с белой галочкой; полоска — стеклянный жёлоб."""
+    first, last = _accent_b(LIGHT)
+    if LIGHT:
+        hollow = f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {rgba(SHADOW, 30)}, stop:1 {rgba(WHITE, 210)})"
+        rim, rim_hover, rim_on = rgba(SHADOW, 70), rgba(ACC_DEEP, 200), rgba(WHITE, 230)
+        track = f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {rgba(SHADOW, 34)}, stop:1 {rgba(WHITE, 190)})"
+        track_rim = rgba(SHADOW, 40)
+    else:
+        hollow = f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {rgba('#000000', 120)}, stop:1 {rgba(WHITE, 22)})"
+        rim, rim_hover, rim_on = rgba(WHITE, 70), rgba(ACC_LIGHT, 220), rgba(WHITE, 120)
+        track = f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {rgba('#000000', 130)}, stop:1 {rgba(WHITE, 16)})"
+        track_rim = rgba(WHITE, 36)
+    drop = f"qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {first}, stop:1 {last})"
+    return f"""
+QCheckBox {{ spacing: 8px; }}
+QCheckBox::indicator {{ width: 18px; height: 18px; border-radius: 6px; border: 1px solid {rim}; background: {hollow}; }}
+QCheckBox::indicator:hover {{ border-color: {rim_hover}; }}
+QCheckBox::indicator:focus {{ border: 2px solid {ACC if LIGHT else NEON}; }}
+QCheckBox::indicator:checked {{ background: {drop}; border: 1px solid {rim_on}; image: url("{CHECK_ON_ACCENT}"); }}
+QCheckBox::indicator:checked:focus {{ border: 2px solid {ACC_DEEP if LIGHT else WHITE}; }}
+QCheckBox::indicator:disabled {{ background: {rgba(SHADOW if LIGHT else WHITE, 14)}; border-color: {rgba(SHADOW if LIGHT else WHITE, 40)}; image: none; }}
+QProgressBar {{ background: {track}; border: 1px solid {track_rim}; border-radius: 4px; }}
+QProgressBar::chunk {{ border-radius: 3px; }}
 """
+
+
+def meter_fill(color):
+    """Заливка полоски надёжности: цвет оценки со светлым бликом сверху — капля стекла, а не плоская краска."""
+    if not LIQUID:
+        if LIGHT:
+            return f"qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {solid(color, 170, WHITE)}, stop:1 {color})"
+        return color
+    return (f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {_mix(color, WHITE, 0.55)}, "
+            f"stop:0.45 {color}, stop:1 {_mix(color, '#000000', 0.15)})")
 
 
 def _style():
@@ -1638,13 +1683,13 @@ def monogram(text, size=24):
     font = QFont(FONT_FAMILY)
     font.setPixelSize(int(size * 0.55))
     font.setBold(True)
-    if LIGHT:  # пастельная плашка: переливчатая кромка и блик сверху, иначе сливается с белым
+    if LIGHT or LIQUID:  # стеклянная плитка: переливчатая кромка и блик сверху (на светлом — иначе сливается с белым)
         r = QRectF(0.5, 0.5, size - 1, size - 1)
         painter.setBrush(Qt.NoBrush)
-        painter.setPen(QPen(_iris(r, 230), max(0.8, size / 30)))
+        painter.setPen(QPen(_iris(r, 230) if LIGHT else _with_alpha(WHITE, 150), max(0.8, size / 30)))
         painter.drawRoundedRect(r, size * 0.29, size * 0.29)
         sheen = QLinearGradient(0, 0, 0, size * 0.5)
-        sheen.setColorAt(0, _with_alpha(WHITE, 200))
+        sheen.setColorAt(0, _with_alpha(WHITE, 200 if LIGHT else 110))
         sheen.setColorAt(1, _with_alpha(WHITE, 0))
         painter.setPen(Qt.NoPen)
         painter.setBrush(sheen)

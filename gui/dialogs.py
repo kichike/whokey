@@ -31,6 +31,19 @@ def _buttons(dialog, ok_text):
     return box
 
 
+def _card(layout, margins=(18, 16, 18, 16)):
+    """Стеклянная карточка с содержимым окна — как таблица в главном окне и блок в «О программе»."""
+    card = theme.role(QFrame(), "card")
+    layout.setContentsMargins(*margins)
+    card.setLayout(layout)
+    return card
+
+
+def _heading(glyph, text):
+    """Заголовок окна со значком: «⚙  Настройки» (так же, как у окна расширения)."""
+    return theme.role(QLabel(theme.GLYPHS[glyph] + "  " + text), "heading")
+
+
 class EntryDialog(QDialog):
     """Добавление или изменение записи. Пароль на экран сам не выводится —
     только по кнопке-«глазу»."""
@@ -93,9 +106,9 @@ class EntryDialog(QDialog):
         theme.role(self.error, "error")
         column = QVBoxLayout(self)
         column.setContentsMargins(22, 20, 22, 20)
+        column.setSpacing(12)
         column.addLayout(head)
-        column.addSpacing(6)
-        column.addLayout(form)
+        column.addWidget(_card(form))
         column.addWidget(self.error)
         column.addWidget(_buttons(self, tr("Save")))
         # чтобы при закрытии понять, было ли что-то изменено. У новой записи пароль считается
@@ -180,9 +193,15 @@ class GeneratorDialog(QDialog):
         close.clicked.connect(self.accept)
 
         column = QVBoxLayout(self)
-        column.addWidget(self.generator)
-        column.addWidget(self.result)
-        column.addWidget(self.strength)
+        column.setContentsMargins(22, 20, 22, 20)
+        column.setSpacing(12)
+        column.addWidget(_heading("magic", tr("Password generator")))
+        inside = QVBoxLayout()
+        inside.setSpacing(10)
+        inside.addWidget(self.generator)
+        inside.addWidget(self.result)
+        inside.addWidget(self.strength)
+        column.addWidget(_card(inside))
         # до копирования — подсказка, после — на её месте таймер с убывающей полоской
         self.note = theme.role(QLabel(tr("A copied password is removed from the clipboard after {sec} s.").format(sec=prefs.clear_after())), "muted")
         self.countdown = ClipboardCountdown()
@@ -234,8 +253,11 @@ class ChangeMasterDialog(QDialog):
         form.addRow("", self.strength)
         form.addRow(tr("Repeat:"), self.repeat)
         column = QVBoxLayout(self)
+        column.setContentsMargins(22, 20, 22, 20)
+        column.setSpacing(12)
+        column.addWidget(_heading("lock", tr("Change master password")))
         column.addWidget(rules)
-        column.addLayout(form)
+        column.addWidget(_card(form))
         column.addWidget(self.error)
         column.addWidget(_buttons(self, tr("Save")))
         self.current.setFocus()
@@ -289,6 +311,9 @@ class ExportDialog(QDialog):
         self.master = PasswordField(tr("Master password"), master=True)
         self.error = theme.role(QLabel(), "error")
         column = QVBoxLayout(self)
+        column.setContentsMargins(22, 20, 22, 20)
+        column.setSpacing(12)
+        column.addWidget(_heading("import", tr("Export to CSV")))
         column.addWidget(warning)
         column.addWidget(self.master)
         column.addWidget(self.error)
@@ -372,7 +397,10 @@ class SettingsDialog(QDialog):
         close.button(QDialogButtonBox.Close).setText(tr("Close"))
         close.rejected.connect(self.reject)
         column = QVBoxLayout(self)
-        column.addLayout(form)
+        column.setContentsMargins(22, 20, 22, 20)
+        column.setSpacing(12)
+        column.addWidget(_heading("cog", tr("Settings")))
+        column.addWidget(_card(form))
         column.addWidget(close)
 
     def _choice(self, name, choices, current, label):
@@ -555,7 +583,7 @@ class ExtensionDialog(QDialog):
         column = QVBoxLayout(self)
         column.setContentsMargins(22, 20, 22, 20)
         head = QHBoxLayout()
-        head.addWidget(theme.role(QLabel(theme.GLYPHS["puzzle"] + "  " + tr("Browser extension")), "heading"))
+        head.addWidget(_heading("puzzle", tr("Browser extension")))
         head.addStretch()
         self.state = QLabel()
         head.addWidget(self.state)
@@ -576,7 +604,8 @@ class ExtensionDialog(QDialog):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        column.addWidget(self.table, 1)
+        log = QVBoxLayout()
+        log.addWidget(self.table, 1)
         # пустой журнал — по центру, со значком часов, а не строчкой посреди пустоты
         self.empty = QWidget()
         empty_column = QVBoxLayout(self.empty)
@@ -586,7 +615,8 @@ class ExtensionDialog(QDialog):
         empty_column.addWidget(clock, 0, Qt.AlignHCenter)
         empty_column.addWidget(theme.role(QLabel(tr("Nothing has been sent yet.")), "muted"), 0, Qt.AlignHCenter)
         empty_column.addStretch()
-        column.addWidget(self.empty, 1)
+        log.addWidget(self.empty, 1)
+        column.addWidget(_card(log, (8, 8, 8, 8)), 1)  # как таблица главного окна
 
         row = QHBoxLayout()
         self.clear_button = QPushButton(tr("Clear log"))

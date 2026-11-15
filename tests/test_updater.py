@@ -139,6 +139,28 @@ class LinuxArchive(unittest.TestCase):
                                         ("WhoKey/_internal/lib.so", b"y"), ("WhoKey/lib.so", ("link", "_internal/lib.so"))])
         self.assertEqual(install, folder / "out" / "WhoKey" / "install.sh")
 
+    def test_archive_built_like_the_release(self):
+        """Как build_linux.py: tar.add(папка) кладёт и саму папку WhoKey отдельной записью.
+        1.11.1 считал её «вне папки» — обновление на Linux всегда было «повреждено»."""
+        folder = Path(tempfile.mkdtemp())
+        program = folder / "dist" / "WhoKey"
+        (program / "_internal").mkdir(parents=True)
+        (program / "install.sh").write_text("#!/bin/sh\n")
+        (program / "WhoKey").write_text("x")
+        (program / "_internal" / "lib.so").write_text("y")
+        os.symlink("lib.so", program / "_internal" / "lib.so.1")
+        with tarfile.open(folder / "a.tar.gz", "w:gz") as tar:
+            tar.add(program, arcname="WhoKey")
+        self.assertIn("WhoKey", [m.name for m in tarfile.open(folder / "a.tar.gz").getmembers()])
+        install = U.extract_linux(folder / "a.tar.gz", folder / "out")
+        self.assertEqual(install, folder / "out" / "WhoKey" / "install.sh")
+
+    def test_top_folder_must_be_a_folder(self):
+        for entries in ([("WhoKey", ("link", "WhoKey/x")), ("WhoKey/install.sh", b"")],
+                        [("WhoKey", b"file")]):
+            with self.assertRaises(U.UpdateError, msg=str(entries)):
+                self.extract(entries)
+
     def test_files_cannot_escape(self):
         for entries in ([("WhoKey/install.sh", b""), ("WhoKey/../../evil", b"x")],
                         [("WhoKey/install.sh", b""), ("/tmp/evil", b"x")],

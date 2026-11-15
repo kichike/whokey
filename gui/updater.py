@@ -231,6 +231,8 @@ def extract_linux(archive, dest):
                 raise UpdateError(tr("The downloaded update is damaged."))
             if not (member.isfile() or member.isdir() or member.issym()):
                 raise UpdateError(tr("The downloaded update is damaged."))
+            if len(parts) == 1 and not member.isdir():  # сама папка WhoKey — только папка, не ссылка и не файл
+                raise UpdateError(tr("The downloaded update is damaged."))
             # путь через ссылку из того же архива: файл мог бы лечь мимо dest (цепочка ссылок)
             if any(os.path.join(*parts[:i]) in links for i in range(1, len(parts))):
                 raise UpdateError(tr("The downloaded update is damaged."))
@@ -243,8 +245,15 @@ def extract_linux(archive, dest):
         except TypeError:
             tar.extractall(dest, members=members)
     root = os.path.realpath(dest / "WhoKey")
+    if root != os.path.join(os.path.realpath(dest), "WhoKey") or not os.path.isdir(root):
+        raise UpdateError(tr("The downloaded update is damaged."))
     for member in members:
-        if not os.path.realpath(dest / os.path.dirname(member.name)).startswith(root):
+        # сама папка WhoKey (в настоящем архиве она есть отдельной записью) — это и есть root;
+        # у остальных папка, где файл лежит, — root или внутри него (1.11.1 на этом спотыкался)
+        if len(Path(member.name).parts) == 1:
+            continue
+        parent = os.path.realpath(dest / os.path.dirname(member.name))
+        if parent != root and not parent.startswith(root + os.sep):
             raise UpdateError(tr("The downloaded update is damaged."))
     install = dest / "WhoKey" / "install.sh"
     if not install.is_file():

@@ -298,8 +298,14 @@ class _DrainingBar(QWidget):
         p.setRenderHint(QPainter.Antialiasing)
         p.setPen(Qt.NoPen)
         r = self.height() / 2
-        track = QColor(theme.SHADOW if theme.LIGHT else theme.WHITE)
-        track.setAlpha(26 if theme.LIGHT else 22)
+        # жёлоб — впадина в стекле: темнее сверху, светлее снизу
+        track = QLinearGradient(0, 0, 0, self.height())
+        if theme.LIGHT:
+            track.setColorAt(0, theme._with_alpha(theme.SHADOW, 40))
+            track.setColorAt(1, theme._with_alpha(theme.WHITE, 190))
+        else:
+            track.setColorAt(0, theme._with_alpha("#000000", 130))
+            track.setColorAt(1, theme._with_alpha(theme.WHITE, 22))
         p.setBrush(track)
         p.drawRoundedRect(QRectF(self.rect()), r, r)
         fill = QRectF(0, 0, self.width() * self.fraction, self.height())
@@ -309,6 +315,11 @@ class _DrainingBar(QWidget):
             gradient.setColorAt(0, QColor(theme.ACC if theme.LIGHT else theme.ACC_DEEP))
             gradient.setColorAt(1, QColor(theme.MAGENTA if theme.LIGHT else theme.NEON))
             p.setBrush(gradient)
+            p.drawRoundedRect(fill, r, r)
+            sheen = QLinearGradient(0, 0, 0, self.height())  # блик сверху — капля стекла
+            sheen.setColorAt(0, theme._with_alpha(theme.WHITE, 120))
+            sheen.setColorAt(0.5, theme._with_alpha(theme.WHITE, 0))
+            p.setBrush(sheen)
             p.drawRoundedRect(fill, r, r)
 
 
@@ -390,10 +401,8 @@ class StrengthBar(QWidget):
             bits = estimate_bits(password)
         words, color = verdict(bits)
         self.bar.setValue(min(int(bits), 128))
-        # сама полоска оформлена в theme.py, здесь только цвет заполнения
-        if theme.LIGHT:  # сплошной тёмно-зелёный на перламутре тяжеловат — мягкий перелив того же цвета
-            color = f"qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {theme.solid(color, 170, theme.WHITE)}, stop:1 {color})"
-        self.bar.setStyleSheet(f"QProgressBar::chunk {{ background: {color}; }}")
+        # сама полоска оформлена в theme.py, здесь только цвет заполнения (со стеклянным бликом)
+        self.bar.setStyleSheet(f"QProgressBar::chunk {{ background: {theme.meter_fill(color)}; }}")
         self.label.setText(tr("≈{bits:.0f} bits — {verdict}").format(bits=bits, verdict=words))
 
 
