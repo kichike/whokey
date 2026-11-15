@@ -254,6 +254,10 @@ class PeekingCat(QWidget):
     def __init__(self, window):
         super().__init__(window)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        # без своего фона: в прозрачном окне macOS (стекло) отдельно перерисованный кусок ложился
+        # поверх прежнего, и за котом светлел прямоугольник
+        self.setAttribute(Qt.WA_NoSystemBackground)
+        self.setAttribute(Qt.WA_TranslucentBackground)
         self.resize(76, 40)
 
     def place(self):
@@ -281,4 +285,4 @@ def decorate(window):
         peek.setVisible(theme.egg)
         if theme.egg:
             peek.place()
-            peek.update()
+            window.update()  # всё окно целиком, а не только кусок под котом (см. PeekingCat)
