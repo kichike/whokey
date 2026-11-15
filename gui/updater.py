@@ -241,9 +241,12 @@ def extract_linux(archive, dest):
                 if os.path.isabs(member.linkname) or not target.startswith(str(dest / "WhoKey") + os.sep):
                     raise UpdateError(tr("The downloaded update is damaged."))
         try:
-            tar.extractall(dest, members=members, filter="data")  # Python 3.9.17+: ещё одна проверка
-        except TypeError:
-            tar.extractall(dest, members=members)
+            try:
+                tar.extractall(dest, members=members, filter="data")  # Python 3.9.17+: ещё одна проверка
+            except TypeError:
+                tar.extractall(dest, members=members)
+        except tarfile.TarError as error:  # ссылка наружу и т. п. — встроенная проверка Python
+            raise UpdateError(tr("The downloaded update is damaged.")) from error
     root = os.path.realpath(dest / "WhoKey")
     if root != os.path.join(os.path.realpath(dest), "WhoKey") or not os.path.isdir(root):
         raise UpdateError(tr("The downloaded update is damaged."))
