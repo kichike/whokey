@@ -98,7 +98,7 @@ _LIGHT_COLORS = {
     "MAGENTA": "#b739c4", "NEON": "#b02ab8", "RAISED": "#ffffff", "TIP": "#fdfcff", "TIP_RIM": "#ddd7f1",
     "GLOW_1": "#e2d8ff", "GLOW_2": "#ebe6fd", "GLOW_3": "#f1effb", "TITLE_START": "#6a4bdc",
     "LETTER_TOP": "#ece6ff", "LETTER_BOTTOM": "#f7d2f3", "LETTER_INK": "#3a2696",
-    "OK": "#1e7d36", "WARN": "#b07400", "BAD": "#d0304a", "BAD_INK": "#c0263b",
+    "OK": "#1e7d36", "WARN": "#8f5c00", "BAD": "#d0304a", "BAD_INK": "#c0263b",
     "SHADOW": "#3a2f8a", "IRIS_1": "#a58cf5", "IRIS_2": "#f08bd8", "IRIS_3": "#8cc8f5",
     "LAVENDER": "#c3b0ff", "PINK": "#ffb3e6", "SKY": "#9fd2ff", "ON_ACCENT": "#ffffff",
 }
@@ -2000,7 +2000,7 @@ def _paint_wash(window):
         width, height = window.width(), window.height()
         wash = QLinearGradient(0, 0, 0, height)
         if LIGHT:  # под ней светлая изморозь macOS: дымка лишь выравнивает тон, чтобы текст читался.
-            # Вдвое тоньше прежней (1.12, выбрано вживую): сквозь окно видно очертания рабочего стола
+            # Вдвое тоньше прежней (1.11.1, выбрано вживую): сквозь окно видно очертания рабочего стола
             wash.setColorAt(0, _with_alpha(GLOW_1, 35))
             wash.setColorAt(0.5, _with_alpha(BG, 47))
             wash.setColorAt(1, _with_alpha(BG, 60))
