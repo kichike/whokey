@@ -471,3 +471,44 @@ class PopupGlass(unittest.TestCase):
                 theme._shadow(width, 40, 12, look, 1.0)
         self.assertEqual(len(theme._SHADOWS), 1)
         theme._forget_plates()
+
+
+class NativeGlass(unittest.TestCase):
+    """Родное стекло macOS 26+ (sysglass.Liquid): вид из STYLE_B. Без экрана само стекло не создаётся —
+    проверяем расчёт оттенков и что под родным стеклом пластина не рисуется."""
+
+    def tearDown(self):
+        theme.set_egg(False)
+        theme.set_theme("dark")
+
+    def test_tints_follow_palette_and_text_stays_readable(self):
+        search = theme.role(QLineEdit(), "search")
+        primary = theme.kind(QPushButton("Сохранить"), "primary")
+        dialog = make_dialog(search, primary)
+        seen = set()
+        for mode in ("dark", "light"):
+            theme.set_theme(mode)
+            for egg in (False, True):
+                theme.set_egg(egg)
+                tint, style, radius = theme.native_look(search)
+                self.assertEqual(style, 0)
+                self.assertAlmostEqual(radius, search.height() / 2)
+                self.assertTrue(0.05 < tint.alphaF() < 0.6)
+                seen.add(tint.name())
+                alpha = theme.native_look(primary)[0].alphaF()
+                self.assertGreaterEqual(theme._accent_contrast(alpha, theme.native_accent_alpha(alpha)), 4.5)
+        self.assertEqual(len(seen), 4)  # тёмная, светлая и котик в обеих — разные оттенки
+        dialog.close()
+
+    def test_no_plate_under_native_glass(self):
+        primary = theme.kind(QPushButton("Сохранить"), "primary")
+        dialog = make_dialog(primary)
+        primary.setProperty("nativeGlass", True)  # как после sysglass.Liquid.scan
+        with mock.patch.object(theme, "_plate", wraps=theme._plate) as plate:
+            primary.repaint()
+            plate.assert_not_called()
+        primary.setProperty("nativeGlass", False)
+        with mock.patch.object(theme, "_plate", wraps=theme._plate) as plate:
+            primary.repaint()
+            plate.assert_called()
+        dialog.close()
