@@ -1999,10 +1999,11 @@ def _paint_wash(window):
         painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
         width, height = window.width(), window.height()
         wash = QLinearGradient(0, 0, 0, height)
-        if LIGHT:  # под ней светлая изморозь macOS: дымка лишь выравнивает тон, чтобы текст читался
-            wash.setColorAt(0, _with_alpha(GLOW_1, 70))
-            wash.setColorAt(0.5, _with_alpha(BG, 95))
-            wash.setColorAt(1, _with_alpha(BG, 120))
+        if LIGHT:  # под ней светлая изморозь macOS: дымка лишь выравнивает тон, чтобы текст читался.
+            # Вдвое тоньше прежней (1.12, выбрано вживую): сквозь окно видно очертания рабочего стола
+            wash.setColorAt(0, _with_alpha(GLOW_1, 35))
+            wash.setColorAt(0.5, _with_alpha(BG, 47))
+            wash.setColorAt(1, _with_alpha(BG, 60))
         else:
             wash.setColorAt(0, _with_alpha(GLOW_2, 100))
             wash.setColorAt(0.5, _with_alpha(GLOW_3, 132))
@@ -2013,8 +2014,11 @@ def _paint_wash(window):
         for x, y, radius, color, alpha in _lights():
             center = QPointF(x * width, y * height)
             light = QRadialGradient(center, radius * reach)
-            light.setColorAt(0, _with_alpha(color, min(255, int(alpha * 1.15))))
-            light.setColorAt(0.55, _with_alpha(color, int(alpha * 0.4)))
+            if LIGHT:  # пастельные пятна тоже вдвое слабее — как в пробном окне
+                light.setColorAt(0, _with_alpha(color, min(255, int(alpha * 0.575))))
+            else:
+                light.setColorAt(0, _with_alpha(color, min(255, int(alpha * 1.15))))
+                light.setColorAt(0.55, _with_alpha(color, int(alpha * 0.4)))
             light.setColorAt(1, QColor(0, 0, 0, 0))
             painter.setBrush(light)
             painter.drawEllipse(center, radius * reach, radius * reach)
