@@ -53,12 +53,6 @@ def system_glass():
     return _store().value("prefs/system_glass", True) not in (False, "false")
 
 
-def native_glass():
-    """Родное жидкое стекло macOS 26+ (gui/sysglass.Liquid). По умолчанию включено; в «Настройках» пока
-    не показывается — выключить можно ключом prefs/native_glass=false (тогда стекло рисует WhoKey)."""
-    return _store().value("prefs/native_glass", True) not in (False, "false")
-
-
 def theme_mode():
     """Тема оформления: "system" (как в системе, по умолчанию), "dark" или "light"."""
     mode = _store().value("prefs/theme", "system")

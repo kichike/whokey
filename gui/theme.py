@@ -18,7 +18,7 @@ from collections import OrderedDict
 from pathlib import Path
 
 from PySide6.QtCore import QEasingCurve, QEvent, QObject, QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer, QVariantAnimation
-from PySide6.QtGui import (QBrush, QColor, QCursor, QFont, QFontDatabase, QFontMetricsF, QGradient, QIcon, QImage, QLinearGradient, QPainter,
+from PySide6.QtGui import (QBrush, QColor, QCursor, QFont, QFontDatabase, QFontMetricsF, QGradient, QIcon, QLinearGradient, QPainter,
                            QPainterPath, QPalette, QPen, QPixmap, QRadialGradient)
 from PySide6.QtWidgets import (QAbstractScrollArea, QAbstractSpinBox, QApplication, QComboBox, QDialog, QFileDialog, QFrame,
                                QGraphicsDropShadowEffect, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QPlainTextEdit,
@@ -632,7 +632,7 @@ def _paint_shadows(painter, container):
         if not child.isVisible() or child.isWindow() or _glass_container(child) is not container:
             continue
         shape = _glass_shape(child)
-        if shape is None or sysglass.has_liquid(child):  # у родного стекла тень своя, системная
+        if shape is None:
             continue
         look, state, rect, radius = shape
         look = _state_look(look, state)
@@ -645,23 +645,18 @@ def _paint_shadows(painter, container):
 
 def _glass_b(painter, widget, shape=None):
     """Рисует стекло элемента пластиной (и рамку фокуса). False — элемент не стекло."""
-    own = shape is None  # стекло самого элемента, а не пилюля внутри него
     shape = shape or _glass_shape(widget)
     if shape is None:
         return False
     look, state, rect, radius = shape
-    if own and sysglass.has_liquid(widget):  # под элементом родное стекло macOS: пластину не рисуем
-        if look["accent_a"]:
-            _paint_native_accent(painter, widget, rect, radius, state)
-    else:
-        device = painter.device()
-        dpr = device.devicePixelRatio() if device is not None else 1.0
-        plate = _plate(widget, rect, radius, dpr, _state_look(look, state), state)
-        painter.save()
-        if state == "disabled":
-            painter.setOpacity(style_b()["disabled"]["opacity"])
-        painter.drawPixmap(rect.topLeft(), plate)
-        painter.restore()
+    device = painter.device()
+    dpr = device.devicePixelRatio() if device is not None else 1.0
+    plate = _plate(widget, rect, radius, dpr, _state_look(look, state), state)
+    painter.save()
+    if state == "disabled":
+        painter.setOpacity(style_b()["disabled"]["opacity"])
+    painter.drawPixmap(rect.topLeft(), plate)
+    painter.restore()
     focus = widget.hasFocus() and widget.focusPolicy() != Qt.NoFocus
     invalid = widget.property("invalid") is True
     if focus or invalid:
@@ -784,12 +779,7 @@ def _paint_group_b(group):
 
 
 def _paint_window_b(window):
-    if getattr(window, "_liquid", None) is not None and window.isWindow():
-        painter = QPainter(window)  # вуаль — родной картинкой под стеклом (sysglass.Liquid), здесь пусто
-        painter.setCompositionMode(QPainter.CompositionMode_Source)
-        painter.fillRect(window.rect(), Qt.transparent)
-        painter.end()
-    elif _see_through() and window.isWindow():
+    if _see_through() and window.isWindow():
         _paint_wash(window)
     else:
         painter = QPainter(window)
@@ -1089,8 +1079,6 @@ def apply(app):
     """Включает оформление для всего приложения."""
     global SYSTEM, _want_light
     SYSTEM = sysglass.available() and prefs.system_glass()  # без экрана macOS настройки не читаем
-    if SYSTEM and NATIVE and prefs.native_glass():
-        sysglass.use_looks(native_look, wash_image)  # родное жидкое стекло macOS 26+ (если оно есть в системе)
     _want_light = _wants_light(app, prefs.theme_mode())
     _set_palette()
     QFontDatabase.addApplicationFont(str(FONT_BOLD_FILE))
@@ -2005,41 +1993,37 @@ def _paint_wash(window):
     лавандой и фуксией, в светлой — перламутровая дымка и пастель."""
     painter = QPainter(window)
     try:
-        _draw_wash(painter, window.width(), window.height())
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setCompositionMode(QPainter.CompositionMode_Source)
+        painter.fillRect(window.rect(), Qt.transparent)
+        painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+        width, height = window.width(), window.height()
+        wash = QLinearGradient(0, 0, 0, height)
+        if LIGHT:  # под ней светлая изморозь macOS: дымка лишь выравнивает тон, чтобы текст читался.
+            # Вдвое тоньше прежней (1.12, выбрано вживую): сквозь окно видно очертания рабочего стола
+            wash.setColorAt(0, _with_alpha(GLOW_1, 35))
+            wash.setColorAt(0.5, _with_alpha(BG, 47))
+            wash.setColorAt(1, _with_alpha(BG, 60))
+        else:
+            wash.setColorAt(0, _with_alpha(GLOW_2, 100))
+            wash.setColorAt(0.5, _with_alpha(GLOW_3, 132))
+            wash.setColorAt(1, _with_alpha(BG, 165))
+        painter.fillRect(window.rect(), wash)
+        painter.setPen(Qt.NoPen)
+        reach = max(width, height)
+        for x, y, radius, color, alpha in _lights():
+            center = QPointF(x * width, y * height)
+            light = QRadialGradient(center, radius * reach)
+            if LIGHT:  # пастельные пятна тоже вдвое слабее — как в пробном окне
+                light.setColorAt(0, _with_alpha(color, min(255, int(alpha * 0.575))))
+            else:
+                light.setColorAt(0, _with_alpha(color, min(255, int(alpha * 1.15))))
+                light.setColorAt(0.55, _with_alpha(color, int(alpha * 0.4)))
+            light.setColorAt(1, QColor(0, 0, 0, 0))
+            painter.setBrush(light)
+            painter.drawEllipse(center, radius * reach, radius * reach)
     finally:
         painter.end()
-
-
-def _draw_wash(painter, width, height):
-    """Вуаль окна (для _paint_wash и для картинки под родным стеклом, wash_image)."""
-    painter.setRenderHint(QPainter.Antialiasing)
-    painter.setCompositionMode(QPainter.CompositionMode_Source)
-    painter.fillRect(QRect(0, 0, width, height), Qt.transparent)
-    painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
-    wash = QLinearGradient(0, 0, 0, height)
-    if LIGHT:  # под ней светлая изморозь macOS: дымка лишь выравнивает тон, чтобы текст читался.
-        # Вдвое тоньше прежней (1.12, выбрано вживую): сквозь окно видно очертания рабочего стола
-        wash.setColorAt(0, _with_alpha(GLOW_1, 35))
-        wash.setColorAt(0.5, _with_alpha(BG, 47))
-        wash.setColorAt(1, _with_alpha(BG, 60))
-    else:
-        wash.setColorAt(0, _with_alpha(GLOW_2, 100))
-        wash.setColorAt(0.5, _with_alpha(GLOW_3, 132))
-        wash.setColorAt(1, _with_alpha(BG, 165))
-    painter.fillRect(QRect(0, 0, width, height), wash)
-    painter.setPen(Qt.NoPen)
-    reach = max(width, height)
-    for x, y, radius, color, alpha in _lights():
-        center = QPointF(x * width, y * height)
-        light = QRadialGradient(center, radius * reach)
-        if LIGHT:  # пастельные пятна тоже вдвое слабее — как в пробном окне
-            light.setColorAt(0, _with_alpha(color, min(255, int(alpha * 0.575))))
-        else:
-            light.setColorAt(0, _with_alpha(color, min(255, int(alpha * 1.15))))
-            light.setColorAt(0.55, _with_alpha(color, int(alpha * 0.4)))
-        light.setColorAt(1, QColor(0, 0, 0, 0))
-        painter.setBrush(light)
-        painter.drawEllipse(center, radius * reach, radius * reach)
 
 
 def _paint_title(label):
@@ -2090,160 +2074,3 @@ def _paint_glass(obj):
     else:
         return False
     return True
-
-
-# --- родное жидкое стекло macOS 26+ (sysglass.Liquid): какое стекло и каким оттенком ---
-# Числа вида — те же, что у пластин (STYLE_B). Вуаль base (base_a) и оттенок B (tint_a) пластины
-# сводятся в ОДИН сплошной оттенок NSGlassEffectView наложением: A = b + t − b·t,
-# цвет = (вуаль·b·(1−t) + оттенок·t) / A. У системного стекла своя изморозь, поэтому альфа ещё
-# умножается на NATIVE_K. Всё, что подбирается вживую, — здесь, в одном месте.
-NATIVE = True          # False — родного стекла нет нигде (только пластины)
-NATIVE_K = 0.70        # общий множитель альфы родного оттенка
-NATIVE_TINT_MIX = 1.0  # сплошной оттенок: 1 — ACC (#a890f0), 0.5 — ближе к #8a6ff0, 0 — ACC_DEEP
-NATIVE_ALPHA = {       # альфа вместо расчёта: вид -> (тёмная, светлая); None — по формуле × NATIVE_K
-    "card": (0.30, 0.30),
-}
-NATIVE_CLEAR = {"lock"}  # прозрачное стекло (Clear, сильнее линза); остальное — обычное (Regular)
-NATIVE_KINDS = ("card", "group", "lock", "secondary", "primary", "danger", "search", "field", "status")
-NATIVE_PRESS = {"hover": 0.06, "pressed": 0.12}  # стекло под Qt мыши не видит — оттенок чуть плотнее
-NATIVE_DISABLED = 0.45   # выключенная кнопка: альфа оттенка × столько
-NATIVE_CONTRAST = 4.5    # перелив главной кнопки (рисует Qt) не прозрачнее, чем нужно для белого текста
-NATIVE_ACCENT_MIN = 0.30  # и не меньше этой альфы — иначе перелива не видно
-NATIVE_ACCENT_MAX = 0.85  # и не больше: плотнее — уже не стекло, а краска (у пластины 0.80/0.90)
-NATIVE_DESK_DARK = 0.5    # худший рабочий стол под тёмным материалом HUD (серый) — для расчёта контраста
-
-
-def _native_inside(widget):
-    """Внутри карточки, группы или прокручиваемой области родного стекла нет: стекло не преломляет
-    стекло (контейнер слил бы их в одну каплю), а в прокрутке Qt не обрезал бы его по краю."""
-    parent = widget.parentWidget()
-    while parent is not None and not parent.isWindow():
-        if parent.property("role") in ("card", "group") or isinstance(parent, QAbstractScrollArea):
-            return True
-        parent = parent.parentWidget()
-    return False
-
-
-def native_name(widget):
-    """Вид родного стекла элемента (ключ STYLE_B из NATIVE_KINDS) или None — стекло рисует WhoKey."""
-    if isinstance(widget, QToolButton) or _native_inside(widget):  # «глаз», кубик — значки поля, без своего стекла
-        return None
-    window = widget.window()
-    if window is widget or window.property("glassPopup") is True:
-        return None
-    shape = _glass_shape(widget)
-    if shape is None:
-        return None
-    table = style_b()
-    for name in NATIVE_KINDS:
-        if table[name] is shape[0]:
-            return name
-    return None
-
-
-def _native_color(name, look):
-    """(QColor сплошного оттенка, альфа до NATIVE_K) для вида стекла."""
-    if look["accent_a"]:  # главная кнопка: середина перелива ключа
-        first, last = _accent_b(LIGHT)
-        return QColor(_mix(first, last, 0.5)), look["accent_a"]
-    tint_color = look.get("tint") if look.get("tint_solid") else _mix(_grad_b(LIGHT)[0], _grad_b(LIGHT)[1], NATIVE_TINT_MIX)
-    b, t = look["base_a"], (look["tint_solid"] if look.get("tint_solid") else look["tint_a"])
-    total = b + t - b * t
-    if total <= 0:
-        return QColor(tint_color), 0.0
-    ink, tint = QColor(look["base"]), QColor(tint_color)
-    mix = [(ink_c * b * (1 - t) + tint_c * t) / total for ink_c, tint_c in
-           zip((ink.redF(), ink.greenF(), ink.blueF()), (tint.redF(), tint.greenF(), tint.blueF()))]
-    return QColor.fromRgbF(*mix), total
-
-
-def native_look(widget):
-    """Для sysglass: (оттенок QColor с альфой, стиль 0/1, скругление) или None — родного стекла нет."""
-    name = native_name(widget)
-    if name is None:
-        return None
-    look, state, rect, radius = _glass_shape(widget)
-    color, alpha = _native_color(name, look)
-    fixed = NATIVE_ALPHA.get(name)
-    alpha = fixed[1 if LIGHT else 0] if fixed else alpha * NATIVE_K
-    if state == "disabled":
-        alpha *= NATIVE_DISABLED
-    else:
-        alpha += NATIVE_PRESS.get(state, 0.0)
-    color.setAlphaF(max(0.0, min(1.0, alpha)))
-    return color, 1 if name in NATIVE_CLEAR else 0, radius
-
-
-def _luminance(color):
-    def channel(c):
-        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
-    return 0.2126 * channel(color[0]) + 0.7152 * channel(color[1]) + 0.0722 * channel(color[2])
-
-
-def _over(top, alpha, under):
-    return tuple(t * alpha + u * (1 - alpha) for t, u in zip(top, under))
-
-
-def _rgb(color):
-    color = QColor(color)
-    return color.redF(), color.greenF(), color.blueF()
-
-
-def _accent_contrast(native_alpha, alpha):
-    """Худший контраст текста главной кнопки (ON_ACCENT) там, где стоит текст (25–75 % ширины).
-    Худший фон: рабочий стол цвета, противоположного тексту, под системным материалом и самой тонкой
-    вуалью окна (верх _draw_wash). В тёмной теме материал HUD сам притемняет стол — берём серый
-    NATIVE_DESK_DARK (допущение, проверить вживую); в светлой — белый."""
-    ink = _rgb(ON_ACCENT)
-    ink_l = _luminance(ink)
-    if ink_l > 0.4:
-        desk = (1.0, 1.0, 1.0) if LIGHT else (NATIVE_DESK_DARK,) * 3
-    else:
-        desk = (0.0, 0.0, 0.0)
-    veil, veil_a = (GLOW_1, 35 / 255) if LIGHT else (GLOW_2, 100 / 255)
-    first, last = _accent_b(LIGHT)
-    under = _over(_rgb(_mix(first, last, 0.5)), native_alpha, _over(_rgb(veil), veil_a, desk))
-    worst = None
-    for end in (_mix(first, last, 0.25), _mix(first, last, 0.75)):
-        back_l = _luminance(_over(_rgb(end), alpha, under))
-        ratio = (max(ink_l, back_l) + 0.05) / (min(ink_l, back_l) + 0.05)
-        worst = ratio if worst is None else min(worst, ratio)
-    return worst
-
-
-def native_accent_alpha(native_alpha):
-    """Альфа перелива главной кнопки поверх родного оттенка: наименьшая от NATIVE_ACCENT_MIN, при которой
-    текст читается (≥ NATIVE_CONTRAST), но не больше NATIVE_ACCENT_MAX — иначе стекла не видно."""
-    alpha = NATIVE_ACCENT_MIN
-    while alpha < NATIVE_ACCENT_MAX and _accent_contrast(native_alpha, alpha) < NATIVE_CONTRAST:
-        alpha = round(alpha + 0.02, 2)
-    return min(alpha, NATIVE_ACCENT_MAX)
-
-
-def _paint_native_accent(painter, widget, rect, radius, state):
-    """Главная кнопка на родном стекле: перелив ключа слева направо — Qt поверх сплошного оттенка."""
-    found = native_look(widget)
-    if found is None:
-        return
-    alpha = native_accent_alpha(found[0].alphaF())
-    if state == "disabled":
-        alpha *= NATIVE_DISABLED
-    accent = QLinearGradient(rect.topLeft(), rect.topRight())
-    first, last = _accent_b(LIGHT)
-    accent.setColorAt(0, _with_alpha(first, int(255 * alpha)))
-    accent.setColorAt(1, _with_alpha(last, int(255 * alpha)))
-    painter.fillPath(_rounded(rect, radius), accent)
-
-
-def wash_image(width, height, scale=0.5):
-    """Вуаль окна картинкой — слой под родным стеклом (sysglass.Liquid). Вдвое меньше окна:
-    в ней только плавные переливы, растяжение незаметно."""
-    image = QImage(max(1, int(width * scale)), max(1, int(height * scale)), QImage.Format_ARGB32_Premultiplied)
-    image.fill(Qt.transparent)
-    painter = QPainter(image)
-    try:
-        painter.scale(scale, scale)
-        _draw_wash(painter, width, height)
-    finally:
-        painter.end()
-    return image
