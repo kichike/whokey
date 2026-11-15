@@ -127,6 +127,7 @@ def make_tar(entries):
     return data.getvalue()
 
 
+@unittest.skipIf(sys.platform == "win32", "архив Linux распаковывает только WhoKey на Linux; пути со ссылками на Windows устроены иначе")
 class LinuxArchive(unittest.TestCase):
     def extract(self, entries):
         folder = Path(tempfile.mkdtemp())
