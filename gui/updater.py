@@ -255,8 +255,15 @@ def extract_linux(archive, dest):
         parent = os.path.realpath(dest / os.path.dirname(member.name))
         if parent != root and not parent.startswith(root + os.sep):
             raise UpdateError(tr("The downloaded update is damaged."))
+    # куда на самом деле ведёт каждая распакованная ссылка: проверка имён выше — по тексту,
+    # а цепочка ссылок (a/../.. через другую ссылку) могла бы указывать наружу (ревью 1.11.2)
+    for member in members:
+        if member.issym():
+            real = os.path.realpath(dest / member.name)
+            if real != root and not real.startswith(root + os.sep):
+                raise UpdateError(tr("The downloaded update is damaged."))
     install = dest / "WhoKey" / "install.sh"
-    if not install.is_file():
+    if install.is_symlink() or not install.is_file():
         raise UpdateError(tr("The downloaded update is damaged."))
     return install
 

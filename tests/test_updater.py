@@ -155,6 +155,27 @@ class LinuxArchive(unittest.TestCase):
         install = U.extract_linux(folder / "a.tar.gz", folder / "out")
         self.assertEqual(install, folder / "out" / "WhoKey" / "install.sh")
 
+    def test_links_must_really_stay_inside(self):
+        """Ссылка выглядит как «внутри WhoKey/d1», а через другую ссылку ведёт за папку (ревью 1.11.2)."""
+        folder = Path(tempfile.mkdtemp())
+        archive = folder / "a.tar.gz"
+        with tarfile.open(archive, "w:gz") as tar:
+            for name in ("WhoKey", "WhoKey/d1", "WhoKey/d1/d2", "WhoKey/d1/d2/d3", "WhoKey/e"):
+                info = tarfile.TarInfo(name)
+                info.type, info.mode = tarfile.DIRTYPE, 0o755
+                tar.addfile(info)
+            for name, target in (("WhoKey/d1/d2/d3/a", "../../../e"), ("WhoKey/d1/d2/d3/b", "a/../../.."),
+                                 ("WhoKey/install.sh", "d1/d2/d3/b/outside.sh")):
+                info = tarfile.TarInfo(name)
+                info.type, info.linkname = tarfile.SYMTYPE, target
+                tar.addfile(info)
+        with self.assertRaises(U.UpdateError):
+            U.extract_linux(archive, folder / "out")
+
+    def test_install_script_is_not_a_link(self):
+        with self.assertRaises(U.UpdateError):
+            self.extract([("WhoKey/real.sh", b"#!/bin/sh\n"), ("WhoKey/install.sh", ("link", "real.sh"))])
+
     def test_top_folder_must_be_a_folder(self):
         for entries in ([("WhoKey", ("link", "WhoKey/x")), ("WhoKey/install.sh", b"")],
                         [("WhoKey", b"file")]):
